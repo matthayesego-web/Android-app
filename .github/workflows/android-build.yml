@@ -27,16 +27,20 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Build installable debug APK
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Build debug and unsigned release APKs
+        run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
 
-      - name: Name APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Torn-Toolkit-v0.3.0.apk
+      - name: Name APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.4.0-debug.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.4.0-unsigned-release.apk
 
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Torn-Toolkit-v0.3.0
-          path: DuckForce-Torn-Toolkit-v0.3.0.apk
+          name: DuckForce-Companion-v0.4.0-builds
+          path: |
+            DuckForce-Companion-v0.4.0-debug.apk
+            DuckForce-Companion-v0.4.0-unsigned-release.apk
           if-no-files-found: error
           retention-days: 30
