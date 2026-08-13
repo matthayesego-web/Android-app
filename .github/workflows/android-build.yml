@@ -27,10 +27,6 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Install Android SDK components
-        run: |
-          sdkmanager "platforms;android-36" "build-tools;35.0.0"
-
       - name: Build installable debug APK
         run: gradle --no-daemon :app:assembleDebug
 
