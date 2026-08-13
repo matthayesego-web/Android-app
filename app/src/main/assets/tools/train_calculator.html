@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Torn Train Payment Calculator</title>
+<style>
+:root{--bg:#0f1114;--card:#1a1e23;--card2:#242a31;--text:#f4f6f8;--muted:#aab2bd;--accent:#f2b441;--border:#38404a}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(#0b0d10,#171b20);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;min-height:100vh;padding:16px}
+main{max-width:760px;margin:auto}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 12px 34px #0008}
+h1{margin:0 0 6px;font-size:clamp(1.55rem,5vw,2.3rem)}h2{margin-top:0}.muted,label{color:var(--muted)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-weight:700;font-size:.9rem;margin-bottom:6px}input{width:100%;padding:12px 13px;border-radius:11px;border:1px solid #4b5560;background:var(--card2);color:var(--text);font-size:1rem}
+input:focus{outline:none;border-color:var(--accent)}.amount{font-size:clamp(2rem,8vw,3rem);font-weight:900;color:#ffd278;margin-top:4px}
+input[type=range]{padding:0;border:0;margin-top:12px;accent-color:var(--accent)}.rangeLabels{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted)}
+.buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}button{border:0;border-radius:10px;padding:11px 13px;background:#343b44;color:white;font-weight:800;cursor:pointer}
+button.primary{background:var(--accent);color:#19130a}.results{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{background:var(--card2);border:1px solid var(--border);border-radius:13px;padding:14px}
+.box small{color:var(--muted)}.box strong{display:block;font-size:1.35rem;margin-top:4px}.summary{white-space:pre-wrap;background:#111418;border:1px dashed #515b66;border-radius:13px;padding:14px;margin-top:14px;line-height:1.5}
+.status{color:#76df98;min-height:1.2em;margin-top:8px}.footer{text-align:center;color:var(--muted);font-size:.8rem}
+@media(max-width:600px){.grid,.results{grid-template-columns:1fr}.card{padding:15px;border-radius:14px}}
+</style>
+</head>
+<body>
+<main>
+<section class="card">
+<h1>🚂 Torn Train Payment Calculator</h1>
+<div class="muted">Mix cash and Xanax payments for company trains.</div>
+</section>
+
+<section class="card">
+<div class="grid">
+<div><label>Number of trains</label><input id="trains" type="number" min="0" step="1" value="10"></div>
+<div><label>Price per train</label><input id="trainPrice" type="number" min="0" step="1000" value="250000"></div>
+<div><label>Accepted value per Xanax</label><input id="xanaxPrice" type="number" min="1" step="1000" value="800000"></div>
+<div><label>Buyer name (optional)</label><input id="buyer" placeholder="Player name"></div>
+</div>
+</section>
+
+<section class="card">
+<div class="muted">Total amount owed</div>
+<div class="amount" id="total">$0</div>
+<div class="muted" id="formula"></div>
+
+<div style="margin-top:18px"><b>Xanax used: <span id="xCount">0</span></b></div>
+<input id="slider" type="range" min="0" max="0" value="0">
+<div class="rangeLabels"><span>All cash</span><span>Maximum Xanax</span></div>
+
+<div class="buttons">
+<button id="cashBtn">All cash</button>
+<button id="halfBtn">Closest 50/50</button>
+<button id="maxBtn">Maximum Xanax</button>
+</div>
+</section>
+
+<section class="card">
+<h2>Payment breakdown</h2>
+<div class="results">
+<div class="box"><small>Xanax payment</small><strong id="xResult">0 Xanax</strong></div>
+<div class="box"><small>Cash payment</small><strong id="cashResult">$0</strong></div>
+<div class="box"><small>Value in Xanax</small><strong id="xValue">$0</strong></div>
+<div class="box"><small>Xanax share</small><strong id="percent">0%</strong></div>
+</div>
+<div class="summary" id="summary"></div>
+<div class="buttons">
+<button class="primary" id="copyBtn">Copy payment message</button>
+<button id="resetBtn">Reset settings</button>
+</div>
+<div class="status" id="status"></div>
+</section>
+
+<div class="footer">Train Calculator v1.0 · Settings save on this device</div>
+</main>
+
+<script>
+const q=id=>document.getElementById(id);
+const fields=["trains","trainPrice","xanaxPrice","buyer"];
+const money=n=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(Math.max(0,Number(n)||0));
+
+function load(){fields.forEach(id=>{const v=localStorage.getItem("tc_"+id);if(v!==null)q(id).value=v})}
+function save(){fields.forEach(id=>localStorage.setItem("tc_"+id,q(id).value))}
+function update(){
+ const trains=Math.max(0,Math.floor(+q("trains").value||0));
+ const tp=Math.max(0,+q("trainPrice").value||0);
+ const xp=Math.max(1,+q("xanaxPrice").value||1);
+ const total=trains*tp,max=Math.floor(total/xp);
+ q("slider").max=max;
+ if(+q("slider").value>max)q("slider").value=max;
+ const x=Math.max(0,Math.min(max,Math.floor(+q("slider").value||0)));
+ const xv=x*xp,cash=total-xv,pct=total?Math.round(xv/total*100):0;
+ const buyer=q("buyer").value.trim();
+ q("total").textContent=money(total);
+ q("formula").textContent=`${trains} × ${money(tp)}`;
+ q("xCount").textContent=x;
+ q("xResult").textContent=`${x} Xanax`;
+ q("cashResult").textContent=money(cash);
+ q("xValue").textContent=money(xv);
+ q("percent").textContent=pct+"%";
+ q("summary").textContent=`${buyer?buyer+", your":"Your"} ${trains} train${trains===1?"":"s"} will cost ${money(total)}.
+
+Payment:
+• ${x} Xanax at ${money(xp)} each
+• ${money(cash)} cash
+
+Total payment value: ${money(total)}`;
+ save();
+}
+fields.forEach(id=>q(id).addEventListener("input",update));
+q("slider").addEventListener("input",update);
+q("cashBtn").onclick=()=>{q("slider").value=0;update()};
+q("maxBtn").onclick=()=>{q("slider").value=q("slider").max;update()};
+q("halfBtn").onclick=()=>{const total=(+q("trains").value||0)*(+q("trainPrice").value||0),xp=Math.max(1,+q("xanaxPrice").value||1);q("slider").value=Math.min(Math.round((total/2)/xp),+q("slider").max);update()};
+q("copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText(q("summary").textContent);q("status").textContent="Payment message copied."}catch{q("status").textContent="Copy failed. Press and hold the message to copy manually."}setTimeout(()=>q("status").textContent="",2500)};
+q("resetBtn").onclick=()=>{localStorage.clear();q("trains").value=10;q("trainPrice").value=250000;q("xanaxPrice").value=800000;q("buyer").value="";q("slider").value=0;update()};
+load();update();
+</script>
+</body>
+</html>
