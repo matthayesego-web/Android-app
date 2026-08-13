@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.1 — 2026-08-13
+
+- Replaced the launcher presentation with a professional noir Duck Force adaptive icon designed to fill Android circle/squircle masks cleanly.
+- Added a dedicated v0.4.1 presentation layer while preserving the working v0.4.0 companion behaviour.
+- Replaced the toy-like duck emoji splash mark with the Duck Force noir badge artwork.
+- Tightened typography, menu labels, elevation and spacing for a cleaner professional companion look.
+- Reduced emoji-heavy tool naming in the faction-facing menu and strengthened visual separation of companion, leadership and private tools.
+- Refined the dark charcoal / muted-gold color system used by Android resources.
+- Bumped Android versionCode to 6 and versionName to 0.4.1.
+- Continued using the permanent Duck Force release certificate established in v0.4.0 so v0.4.1 installs as a normal update.
+
 ## v0.4.0 — 2026-08-13
 
 - Reframed the app as the Duck Force Faction Companion rather than a generic utility launcher.
