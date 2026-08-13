@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Torn Xanax Armory Log v1.2</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1117;--panel:#161b22;--line:#30363d;--muted:#8b949e;--text:#f0f6fc;--accent:#f0b429;--good:#3fb950;--bad:#f85149}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}.wrap{max-width:1000px;margin:auto;padding:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 14px}h1{font-size:1.55rem;margin:0 0 5px}h2{font-size:1.05rem;margin:0 0 10px}.muted{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}label{display:block;color:var(--muted);font-size:.84rem;margin-bottom:5px}
+input,button{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;background:#0d1117;color:var(--text);font:inherit}button{background:var(--accent);color:#111;border:0;font-weight:800;cursor:pointer}
+button:disabled{opacity:.5}.status{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:9px;background:#0d1117}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:#0d1117;border:1px solid var(--line);border-radius:9px;padding:10px}.stat b{display:block;font-size:1.35rem}
+table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted)}
+.raw{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.78rem;word-break:break-word}.good{color:var(--good)}.bad{color:var(--bad)}.hide{display:none}
+details{margin-top:10px}pre{white-space:pre-wrap;word-break:break-word;background:#0d1117;padding:10px;border:1px solid var(--line);border-radius:9px;max-height:350px;overflow:auto}
+@media(max-width:650px){.stats{grid-template-columns:1fr 1fr}.wrap{padding:10px}}
+</style>
+</head><body><div class="wrap">
+<div class="card"><h1>💊 Torn Xanax Armory Log v1.2</h1><div class="muted">Pulls deposits and armory actions separately, then finds the latest Xanax restock and usage after it.</div></div>
+
+<div class="card">
+<div class="grid">
+<div><label>Limited / Minimal Torn API key</label><input id="key" type="password" autocomplete="off" placeholder="API key"></div>
+<div><label>Large Xanax deposit threshold</label><input id="threshold" type="number" min="1" value="80"></div>
+<div><label>Pages per category</label><input id="maxPages" type="number" min="1" max="50" value="20"></div>
+<div><label>Rows per page</label><input id="limit" type="number" min="1" max="100" value="100"></div>
+</div>
+<div style="margin-top:10px"><button id="run">Pull Xanax Log</button></div>
+<div id="status" class="status">Ready.</div>
+<div class="muted" style="margin-top:8px;font-size:.83rem">Key is not saved. The page sends requests only to api.torn.com.</div>
+</div>
+
+<div id="results" class="hide">
+<div class="card"><h2>Summary</h2><div class="stats">
+<div class="stat"><span class="muted">Deposit</span><b id="cutoffQty">—</b><span id="cutoffDate" class="muted"></span></div>
+<div class="stat"><span class="muted">Xanax used</span><b id="total">0</b></div>
+<div class="stat"><span class="muted">Members</span><b id="members">0</b></div>
+<div class="stat"><span class="muted">Action rows</span><b id="actions">0</b></div>
+</div></div>
+
+<div class="card"><h2>Totals by member</h2><table><thead><tr><th>Member</th><th>Xanax</th><th>Entries</th></tr></thead><tbody id="summaryRows"></tbody></table></div>
+<div class="card"><h2>Xanax usage after deposit</h2><table><thead><tr><th>Date</th><th>Member</th><th>Qty</th><th>Log</th></tr></thead><tbody id="detailRows"></tbody></table></div>
+<div class="card"><h2>Detected cutoff deposit</h2><div id="cutoffRaw" class="raw"></div>
+<details><summary>Debug: Xanax-related deposit rows found</summary><pre id="debugDeposits"></pre></details>
+<details><summary>Debug: Xanax-related action rows found</summary><pre id="debugActions"></pre></details>
+</div>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const BASE='https://api.torn.com/v2/faction/news';
+
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function tsOf(r){
+ const v=r?.timestamp ?? r?.created_at ?? r?.time ?? r?.date ?? 0;
+ const n=Number(v); if(Number.isFinite(n)&&n>0) return n>1e12?Math.floor(n/1000):Math.floor(n);
+ const d=Date.parse(v); return Number.isFinite(d)?Math.floor(d/1000):0;
+}
+function fmt(ts){return ts?new Date(ts*1000).toLocaleString():'Unknown';}
+function textOf(r){
+ let t=r?.text ?? r?.news ?? r?.message ?? r?.description ?? '';
+ return String(t).replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/&times;/gi,'x').replace(/&#215;/gi,'x').replace(/\s+/g,' ').trim();
+}
+function rowsOf(data){
+ if(Array.isArray(data?.news)) return data.news;
+ if(Array.isArray(data?.faction?.news)) return data.faction.news;
+ if(Array.isArray(data?.data)) return data.data;
+ if(data?.news && typeof data.news==='object') return Object.values(data.news);
+ return [];
+}
+function nextOf(data){return data?._metadata?.links?.next ?? data?.metadata?.links?.next ?? data?.pagination?.next ?? null;}
+
+function withKey(url,key){
+ const u=new URL(url,BASE);
+ u.searchParams.set('key',key);
+ return u.toString();
+}
+function firstUrl(cat,key,limit){
+ const u=new URL(BASE);
+ u.searchParams.set('cat',cat);
+ u.searchParams.set('sort','DESC');
+ u.searchParams.set('limit',String(limit));
+ u.searchParams.set('striptags','true');
+ u.searchParams.set('key',key);
+ return u.toString();
+}
+async function fetchCategory(cat,key,limit,maxPages){
+ let url=firstUrl(cat,key,limit), out=[], pages=0;
+ while(url && pages<maxPages){
+   pages++;
+   $('status').textContent=`Pulling ${cat} — page ${pages}…`;
+   const res=await fetch(url,{cache:'no-store'});
+   if(!res.ok) throw new Error(`${cat}: HTTP ${res.status}`);
+   const data=await res.json();
+   if(data?.error) throw new Error(`${cat}: ${data.error.error || data.error.code || 'Torn API error'}`);
+   const rows=rowsOf(data); out.push(...rows);
+   const next=nextOf(data);
+   url=next ? withKey(next,key) : null;
+ }
+ return {rows:out,pages};
+}
+function qtyNearXanax(t){
+ const s=String(t).replace(/\s+/g,' ').trim();
+ const pats=[
+   /\b(\d[\d,]*)\s*(?:x|×)?\s*xanax\b/i,
+   /\bxanax\b\s*(?:x|×|:|-)?\s*(\d[\d,]*)\b/i,
+   /\b(?:quantity|qty|amount)\s*[:=]?\s*(\d[\d,]*)\b.*?\bxanax\b/i,
+   /\bxanax\b.*?\b(?:quantity|qty|amount)\s*[:=]?\s*(\d[\d,]*)\b/i
+ ];
+ for(const p of pats){const m=s.match(p);if(m)return Number(m[1].replace(/,/g,''));}
+ if(/\bxanax\b/i.test(s)){
+   const xi=s.toLowerCase().indexOf('xanax');
+   const nums=[...s.matchAll(/\b(\d[\d,]*)\b/g)].map(m=>({n:Number(m[1].replace(/,/g,'')),i:m.index}));
+   const plausible=nums.filter(x=>x.n>0 && x.n<=10000).sort((a,b)=>Math.abs(a.i-xi)-Math.abs(b.i-xi));
+   if(plausible.length)return plausible[0].n;
+ }
+ return /\bused\b/i.test(s)&&/\bxanax\b/i.test(s)?1:0;
+}
+function actorOf(r,t){
+ const direct=r?.user?.name ?? r?.member?.name ?? r?.user_name ?? r?.username ?? r?.player?.name;
+ if(direct)return String(direct);
+ const m=t.match(/^(.+?)\s+(?:used|retrieved|withdrew|took|gave|loaned|filled|deposited|donated|added)\b/i);
+ return m?m[1].replace(/\[[^\]]*\]/g,'').trim():'Unknown';
+}
+function looksLikeUse(t){return /\bxanax\b/i.test(t) && /\b(?:used|use)\b/i.test(t);}
+function looksLikeDeposit(t){return /\bxanax\b/i.test(t) && /\b(?:deposited|donated|added|filled|put)\b/i.test(t);}
+
+$('run').addEventListener('click',async()=>{
+ const key=$('key').value.trim(), threshold=Number($('threshold').value||80),
+       maxPages=Number($('maxPages').value||20), limit=Number($('limit').value||100);
+ if(!key){$('status').innerHTML='<span class="bad">Enter your API key.</span>';return;}
+ $('run').disabled=true;$('results').classList.add('hide');
+ try{
+   const dep=await fetchCategory('armoryDeposit',key,limit,maxPages);
+   const act=await fetchCategory('armoryAction',key,limit,maxPages);
+
+   const xanDeps=dep.rows.map(r=>({r,t:textOf(r),ts:tsOf(r)})).filter(x=>/\bxanax\b/i.test(x.t));
+   const candidates=xanDeps.map(x=>({...x,qty:qtyNearXanax(x.t)})).filter(x=>x.qty>=threshold).sort((a,b)=>b.ts-a.ts);
+
+   $('debugDeposits').textContent=xanDeps.length?xanDeps.map(x=>`${fmt(x.ts)} | qty=${qtyNearXanax(x.t)} | ${x.t}`).join('\n'):'No Xanax deposit text returned by API.';
+   const xanActs=act.rows.map(r=>({r,t:textOf(r),ts:tsOf(r)})).filter(x=>/\bxanax\b/i.test(x.t));
+   $('debugActions').textContent=xanActs.length?xanActs.slice(0,300).map(x=>`${fmt(x.ts)} | qty=${qtyNearXanax(x.t)} | ${x.t}`).join('\n'):'No Xanax action text returned by API.';
+
+   if(!candidates.length){
+     throw new Error(`No Xanax deposit of ${threshold}+ detected. I did pull ${dep.rows.length} deposit rows (${xanDeps.length} mention Xanax). Open the Debug section below after lowering the threshold, or send me a screenshot of the exact faction log wording.`);
+   }
+   const cutoff=candidates[0];
+
+   const matched=xanActs
+     .filter(x=>x.ts>cutoff.ts && looksLikeUse(x.t))
+     .map(x=>({ts:x.ts,actor:actorOf(x.r,x.t),qty:qtyNearXanax(x.t)||1,text:x.t}))
+     .sort((a,b)=>b.ts-a.ts);
+
+   const agg=new Map();
+   for(const m of matched){const v=agg.get(m.actor)||{qty:0,n:0};v.qty+=m.qty;v.n++;agg.set(m.actor,v);}
+   const sum=[...agg.entries()].sort((a,b)=>b[1].qty-a[1].qty);
+
+   $('cutoffQty').textContent=cutoff.qty;
+   $('cutoffDate').textContent=fmt(cutoff.ts);
+   $('total').textContent=matched.reduce((s,x)=>s+x.qty,0);
+   $('members').textContent=sum.length;
+   $('actions').textContent=matched.length;
+   $('cutoffRaw').textContent=cutoff.t;
+   $('summaryRows').innerHTML=sum.length?sum.map(([n,v])=>`<tr><td>${esc(n)}</td><td><b>${v.qty}</b></td><td>${v.n}</td></tr>`).join(''):'<tr><td colspan="3">No used-Xanax entries after cutoff.</td></tr>';
+   $('detailRows').innerHTML=matched.length?matched.map(x=>`<tr><td>${esc(fmt(x.ts))}</td><td>${esc(x.actor)}</td><td><b>${x.qty}</b></td><td class="raw">${esc(x.text)}</td></tr>`).join(''):'<tr><td colspan="4">No used-Xanax entries after cutoff.</td></tr>';
+
+   $('results').classList.remove('hide');
+   $('status').innerHTML=`<span class="good">Done.</span> Deposits: ${dep.rows.length} rows / ${dep.pages} page(s). Actions: ${act.rows.length} rows / ${act.pages} page(s).`;
+ }catch(e){
+   $('results').classList.remove('hide');
+   $('status').innerHTML=`<span class="bad">Error:</span> ${esc(e.message)}`;
+ }finally{$('run').disabled=false;}
+});
+</script></body></html>
