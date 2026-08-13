@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="app_bg">#0D1117</color>
-    <color name="app_panel">#161B22</color>
-    <color name="app_border">#30363D</color>
-    <color name="app_accent">#F0B429</color>
-    <color name="app_text">#F0F6FC</color>
-    <color name="app_muted">#8B949E</color>
+    <color name="app_bg">#070A0F</color>
+    <color name="app_panel">#121821</color>
+    <color name="app_panel_alt">#19212C</color>
+    <color name="app_border">#2B3646</color>
+    <color name="app_accent">#D7A044</color>
+    <color name="app_accent_light">#F2C56B</color>
+    <color name="app_text">#F2F4F7</color>
+    <color name="app_muted">#98A2B3</color>
+    <color name="icon_background">#070A0F</color>
 </resources>
