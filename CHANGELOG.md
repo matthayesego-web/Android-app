@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.1 — 2026-08-12
+
+- Fixed Android status-bar and active-call overlay collisions on modern edge-to-edge devices.
+- Added dynamic top, bottom, left, and right system-bar/cutout insets to the home screen and tool screens.
+- Updated the Android app version to 0.1.1.
+
 ## v0.1.0 — 2026-08-12
 
 - Created the first combined Android prototype.

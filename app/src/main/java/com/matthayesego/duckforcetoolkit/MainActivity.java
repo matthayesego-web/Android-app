@@ -9,7 +9,9 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -106,6 +108,41 @@ public class MainActivity extends Activity {
         return view;
     }
 
+    /**
+     * Android 15+ enforces edge-to-edge for modern target SDKs. Keep our actual
+     * content below the status bar/cutout and above the navigation bar while
+     * still allowing the window background itself to extend edge-to-edge.
+     */
+    @SuppressWarnings("deprecation")
+    private void applySystemBarInsets(View view) {
+        final int baseLeft = view.getPaddingLeft();
+        final int baseTop = view.getPaddingTop();
+        final int baseRight = view.getPaddingRight();
+        final int baseBottom = view.getPaddingBottom();
+
+        view.setOnApplyWindowInsetsListener((v, insets) -> {
+            int insetLeft = insets.getSystemWindowInsetLeft();
+            int insetTop = insets.getSystemWindowInsetTop();
+            int insetRight = insets.getSystemWindowInsetRight();
+            int insetBottom = insets.getSystemWindowInsetBottom();
+
+            if (android.os.Build.VERSION.SDK_INT >= 28 && insets.getDisplayCutout() != null) {
+                insetLeft = Math.max(insetLeft, insets.getDisplayCutout().getSafeInsetLeft());
+                insetTop = Math.max(insetTop, insets.getDisplayCutout().getSafeInsetTop());
+                insetRight = Math.max(insetRight, insets.getDisplayCutout().getSafeInsetRight());
+                insetBottom = Math.max(insetBottom, insets.getDisplayCutout().getSafeInsetBottom());
+            }
+
+            v.setPadding(
+                    baseLeft + insetLeft,
+                    baseTop + insetTop,
+                    baseRight + insetRight,
+                    baseBottom + insetBottom
+            );
+            return insets;
+        });
+    }
+
     private void showHome() {
         currentTool = null;
         destroyWebView();
@@ -113,6 +150,7 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
+        applySystemBarInsets(scroll);
 
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -139,7 +177,7 @@ public class MainActivity extends Activity {
         addToolCard(Tool.ARMORY);
         addToolCard(Tool.TRAIN);
 
-        TextView footer = text("Prototype v0.1.0 • Original tools bundled locally", 12, MUTED, false);
+        TextView footer = text("Prototype v0.1.1 • Original tools bundled locally", 12, MUTED, false);
         footer.setGravity(Gravity.CENTER_HORIZONTAL);
         LinearLayout.LayoutParams footerParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -149,6 +187,7 @@ public class MainActivity extends Activity {
         root.addView(footer, footerParams);
 
         setContentView(scroll);
+        scroll.requestApplyInsets();
     }
 
     private void addToolCard(Tool tool) {
@@ -201,6 +240,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(BG);
+        applySystemBarInsets(page);
 
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setOrientation(LinearLayout.HORIZONTAL);
@@ -243,7 +283,7 @@ public class MainActivity extends Activity {
         settings.setDisplayZoomControls(false);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " DuckForceToolkit/0.1.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " DuckForceToolkit/0.1.1");
 
         WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .setDomain(tool.domain)
@@ -260,6 +300,7 @@ public class MainActivity extends Activity {
         ));
 
         setContentView(page);
+        page.requestApplyInsets();
         webView.loadUrl("https://" + tool.domain + "/assets/tools/" + tool.asset);
     }
 
@@ -340,7 +381,7 @@ public class MainActivity extends Activity {
             connection.setReadTimeout(30000);
             connection.setUseCaches(false);
             connection.setRequestProperty("Accept", "application/json, text/plain, */*");
-            connection.setRequestProperty("User-Agent", "DuckForceToolkit/0.1.0 Android");
+            connection.setRequestProperty("User-Agent", "DuckForceToolkit/0.1.1 Android");
 
             int status = connection.getResponseCode();
             InputStream raw = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
