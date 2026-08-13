@@ -23,15 +23,21 @@ jobs:
           gradle-version: '8.13'
       - name: Build debug and unsigned release APKs
         run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
-      - name: Name artifacts
+      - name: Name artifacts and collect Android signing tools
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.4.0-debug.apk
           cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.4.0-unsigned-release.apk
+          TOOLS_DIR=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          mkdir -p signing-tools/lib
+          cp "$TOOLS_DIR/zipalign" signing-tools/zipalign
+          cp "$TOOLS_DIR/apksigner" signing-tools/apksigner
+          cp "$TOOLS_DIR/lib/apksigner.jar" signing-tools/lib/apksigner.jar
       - uses: actions/upload-artifact@v7
         with:
           name: DuckForce-Companion-v0.4.0
           path: |
             DuckForce-Companion-v0.4.0-debug.apk
             DuckForce-Companion-v0.4.0-unsigned-release.apk
+            signing-tools
           if-no-files-found: error
           retention-days: 30
