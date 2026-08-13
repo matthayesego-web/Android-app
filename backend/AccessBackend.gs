@@ -5,6 +5,7 @@
  * - Keep app-by-rank access rules shared across every phone.
  * - Let only Torn Leader / Co-leader accounts change those rules.
  * - Never store a Torn API key in the sheet; keys are used only to verify requests.
+ * - Keep API keys out of backend URLs by accepting authenticated actions by POST only.
  *
  * SETUP
  * 1. Create a NEW Google Sheet specifically for Duck Force Toolkit access.
@@ -51,12 +52,20 @@ function setupDuckForceBackend() {
   };
 }
 
-function doGet(e) {
-  try {
-    const action = String((e && e.parameter && e.parameter.action) || 'health');
-    if (action === 'health') return json_({ok: true, app: 'Duck Force Toolkit Access', version: DF_TOOLKIT_VERSION});
+function doGet() {
+  return json_({
+    ok: true,
+    app: 'Duck Force Toolkit Access',
+    version: DF_TOOLKIT_VERSION,
+    authenticated_actions: 'POST only'
+  });
+}
 
-    const apiKey = String((e.parameter && e.parameter.apiKey) || '').trim();
+function doPost(e) {
+  try {
+    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const action = String(body.action || '');
+    const apiKey = String(body.apiKey || '').trim();
     if (!apiKey) throw new Error('API key required.');
 
     const user = verifyDuckForceUser_(apiKey);
@@ -80,20 +89,6 @@ function doGet(e) {
       });
     }
 
-    throw new Error('Unknown action.');
-  } catch (err) {
-    return json_({ok: false, error: String(err && err.message || err)});
-  }
-}
-
-function doPost(e) {
-  try {
-    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const action = String(body.action || '');
-    const apiKey = String(body.apiKey || '').trim();
-    if (!apiKey) throw new Error('API key required.');
-
-    const user = verifyDuckForceUser_(apiKey);
     if (!isLeaderOrCoLeader_(user.position)) throw new Error('Leader or Co-leader required.');
 
     if (action === 'save_rank_rules') {
