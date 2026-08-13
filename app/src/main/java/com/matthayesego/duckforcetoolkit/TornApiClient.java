@@ -1,0 +1,122 @@
+package com.matthayesego.duckforcetoolkit;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
+public final class TornApiClient {
+    private static final String BASE = "https://api.torn.com/v2";
+    private static final String USER_AGENT = "DuckForceToolkit/0.2.0 Android";
+
+    private TornApiClient() {}
+
+    public static AuthSession authenticate(String key) throws IOException {
+        JSONObject keyInfoRoot = getJson("/key/info", key);
+        JSONObject keyInfo = keyInfoRoot.optJSONObject("info");
+        if (keyInfo == null) throw new IOException("Torn key information was unavailable.");
+
+        JSONObject keyUser = keyInfo.optJSONObject("user");
+        if (keyUser == null) throw new IOException("Torn key owner information was unavailable.");
+        int playerId = keyUser.optInt("id", 0);
+        if (playerId <= 0) throw new IOException("Unable to determine the Torn player ID.");
+
+        JSONObject access = keyInfo.optJSONObject("access");
+        boolean factionApiAccess = access != null && access.optBoolean("faction", false);
+
+        JSONObject basicRoot = getJson("/user/basic", key);
+        JSONObject basic = basicRoot.optJSONObject("profile");
+        String playerName = basic == null ? "Unknown" : basic.optString("name", "Unknown");
+
+        JSONObject factionResponse = getJson("/user/faction", key);
+        JSONObject faction = factionResponse.optJSONObject("faction");
+        if (faction == null) throw new IOException("This Torn account is not currently in a faction.");
+
+        int factionId = faction.optInt("id", 0);
+        String factionName = faction.optString("name", "");
+        String position = faction.optString("position", "");
+        if (factionId <= 0 || factionName.isEmpty()) {
+            throw new IOException("Unable to verify the Torn faction.");
+        }
+
+        JSONArray positions = new JSONArray();
+        AccessTier tier = AccessPolicy.isLeaderPosition(position) ? AccessTier.GLOBAL : AccessTier.GREEN;
+
+        if (factionApiAccess) {
+            try {
+                JSONObject positionsResponse = getJson("/faction/positions", key);
+                JSONArray fetched = positionsResponse.optJSONArray("positions");
+                if (fetched != null) {
+                    positions = fetched;
+                    if (!AccessPolicy.isLeaderPosition(position)) {
+                        for (int i = 0; i < fetched.length(); i++) {
+                            JSONObject pos = fetched.optJSONObject(i);
+                            if (pos != null && position.equalsIgnoreCase(pos.optString("name", ""))) {
+                                tier = AccessPolicy.tierForAbilities(pos.optJSONArray("abilities"));
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (IOException ignored) {
+                // Identity remains valid. If this selection is unavailable, use the
+                // safest member fallback unless the user is Leader/Co-leader.
+            }
+        }
+
+        return new AuthSession(playerId, playerName, factionId, factionName, position,
+                factionApiAccess, tier, positions);
+    }
+
+    public static JSONObject getJson(String path, String key) throws IOException {
+        String joiner = path.contains("?") ? "&" : "?";
+        URL url = new URL(BASE + path + joiner + "key="
+                + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name()));
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        try {
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(30000);
+            connection.setUseCaches(false);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", USER_AGENT);
+
+            int code = connection.getResponseCode();
+            InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            String body = stream == null ? "" : readAll(stream);
+
+            JSONObject json;
+            try {
+                json = new JSONObject(body);
+            } catch (Exception e) {
+                throw new IOException("Torn returned an unreadable response.");
+            }
+
+            JSONObject error = json.optJSONObject("error");
+            if (error != null) {
+                String msg = error.optString("error", "Torn API error " + error.optInt("code"));
+                throw new IOException(msg);
+            }
+            if (code < 200 || code >= 300) {
+                throw new IOException("Torn API request failed (HTTP " + code + ").");
+            }
+            return json;
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static String readAll(InputStream input) throws IOException {
+        try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int n;
+            while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);
+            return out.toString(StandardCharsets.UTF_8.name());
+        }
+    }
+}
