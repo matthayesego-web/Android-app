@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.4.0 — 2026-08-13
+
+- Reframed the app as the Duck Force Faction Companion rather than a generic utility launcher.
+- Added a new companion-first launcher/home screen with faction-facing and private sections.
+- Added a Banking Companion prototype with local payout requests, full-balance requests, notes, request history, Red/Black/global queue-visibility messaging, and the $1,000,000 retroactive low-balance rule.
+- Added an Owner / Developer role tied to Torn player ID 3987363 rather than to an API-key value.
+- Moved Company Train Calculator into the Owner-only My Tools area.
+- Added a Developer Console foundation for private tools, future individual grants, delegated developers and beta features.
+- Kept Leader/Co-leader leadership controls and faction-chat listener guidance separate from ordinary member features.
+- Added a dedicated native tool host for the existing Armory Log, Faction Xanax Auditor and Company Train Calculator.
+- Redesigned the launcher artwork as a full noir detective-duck badge and added Android adaptive-icon resources.
+- Bumped Android versionCode to 5 and versionName to 0.4.0.
+- Added CI generation of both debug and unsigned release APKs so release artifacts can be signed with the permanent Duck Force release certificate.
+- Began the release-signing foundation intended for all direct-distribution builds from v0.4.0 onward.
+- Play Store readiness remains targeted for v0.7.0.
+
 ## v0.3.0 — 2026-08-13
 
 - Added a new polished native ToolkitActivity and made it the Android launcher.
