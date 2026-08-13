@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Torn Train Payment Calculator</title>
+<title>Torn Company Training Payment Calculator</title>
 <style>
 :root{--bg:#0f1114;--card:#1a1e23;--card2:#242a31;--text:#f4f6f8;--muted:#aab2bd;--accent:#f2b441;--border:#38404a}
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(#0b0d10,#171b20);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;min-height:100vh;padding:16px}
@@ -22,14 +22,14 @@ button.primary{background:var(--accent);color:#19130a}.results{display:grid;grid
 <body>
 <main>
 <section class="card">
-<h1>🚂 Torn Train Payment Calculator</h1>
-<div class="muted">Mix cash and Xanax payments for company trains.</div>
+<h1>🏋️ Torn Company Training Payment Calculator</h1>
+<div class="muted">Calculate cash and Xanax payments for employee training sessions.</div>
 </section>
 
 <section class="card">
 <div class="grid">
-<div><label>Number of trains</label><input id="trains" type="number" min="0" step="1" value="10"></div>
-<div><label>Price per train</label><input id="trainPrice" type="number" min="0" step="1000" value="250000"></div>
+<div><label>Number of training sessions</label><input id="trains" type="number" min="0" step="1" value="10"></div>
+<div><label>Price per training session</label><input id="trainPrice" type="number" min="0" step="1000" value="250000"></div>
 <div><label>Accepted value per Xanax</label><input id="xanaxPrice" type="number" min="1" step="1000" value="800000"></div>
 <div><label>Buyer name (optional)</label><input id="buyer" placeholder="Player name"></div>
 </div>
@@ -67,7 +67,7 @@ button.primary{background:var(--accent);color:#19130a}.results{display:grid;grid
 <div class="status" id="status"></div>
 </section>
 
-<div class="footer">Train Calculator v1.0 · Settings save on this device</div>
+<div class="footer">Company Training Calculator v1.0 · Settings save on this device</div>
 </main>
 
 <script>
@@ -94,13 +94,7 @@ function update(){
  q("cashResult").textContent=money(cash);
  q("xValue").textContent=money(xv);
  q("percent").textContent=pct+"%";
- q("summary").textContent=`${buyer?buyer+", your":"Your"} ${trains} train${trains===1?"":"s"} will cost ${money(total)}.
-
-Payment:
-• ${x} Xanax at ${money(xp)} each
-• ${money(cash)} cash
-
-Total payment value: ${money(total)}`;
+ q("summary").textContent=`${buyer?buyer+", your":"Your"} ${trains} training session${trains===1?"":"s"} will cost ${money(total)}.\n\nPayment:\n• ${x} Xanax at ${money(xp)} each\n• ${money(cash)} cash\n\nTotal payment value: ${money(total)}`;
  save();
 }
 fields.forEach(id=>q(id).addEventListener("input",update));
