@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 — 2026-08-13
+
+- Added a new polished native ToolkitActivity and made it the Android launcher.
+- Rebuilt the API-key entry screen as a Duck Force branded login/splash experience.
+- Reworked the main menu into clean role-aware cards with a compact account/access header.
+- Added a Leader/Co-leader Leadership Control Center.
+- Added an in-app Chat Listener details/install guide.
+- Bundled Duck Force Banking Chat Listener v0.3.0 as an Android asset.
+- Chat listener recognizes banker, balance-check, withdrawal/cash-out, and amount-specific requests such as “bank 25m”.
+- Chat listener is designed to scan both currently loaded faction-chat history and newly loaded messages, with local deduplication.
+- Documented the $1,000,000 default low-balance / likely-already-paid reconciliation rule.
+- Corrected the Train Payment Calculator branding: “train” now clearly means company employee training, with a 🏋️ icon instead of a railway train.
+- Shared banking queue deployment/export remains the next integration step; listener source is already bundled in the project.
+
 ## v0.2.0 — 2026-08-12
 
 - Added API-key-first Torn authentication and automatic saved-session verification.
