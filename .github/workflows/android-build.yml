@@ -31,12 +31,12 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Name APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Torn-Toolkit-v0.2.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Torn-Toolkit-v0.3.0.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Torn-Toolkit-v0.2.0
-          path: DuckForce-Torn-Toolkit-v0.2.0.apk
+          name: DuckForce-Torn-Toolkit-v0.3.0
+          path: DuckForce-Torn-Toolkit-v0.3.0.apk
           if-no-files-found: error
           retention-days: 30
