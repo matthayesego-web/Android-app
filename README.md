@@ -8,11 +8,15 @@ A single Android application containing three previously built Torn tools:
 
 ## Android app version
 
-**v0.1.0 prototype**
+**v0.2.0 prototype**
 
-The original HTML tools are bundled inside the APK as local assets. Each tool gets its own internal WebView origin so its saved browser data is isolated from the other tools.
+v0.2.0 adds Torn API-key authentication, Duck Force membership verification, encrypted local API-key storage, and Torn-position-based access tiers. Leader and Co-leader positions receive global access plus the Rank Access Control screen. Red/Black positions receive global tool access, Orange receives elevated access, and Green receives member access.
 
-The Torn API tools still send their requests only to `api.torn.com`. The Android shell proxies those requests locally through the app's WebView client to make the existing browser-based API logic reliable inside Android without exposing an additional server.
+The original HTML tools remain bundled inside the APK as local assets. Each tool gets its own internal WebView origin so its saved browser data is isolated from the other tools. Torn tools automatically receive the API key already connected to the Android app.
+
+The Torn API tools send their requests only to `api.torn.com`. The Android shell proxies those requests locally through the app's WebView client to make the existing browser-based API logic reliable inside Android without exposing an additional server.
+
+See `ACCESS_CONTROL.md` for the permission architecture. A shared Google Apps Script / Google Sheets backend scaffold is included in `backend/AccessBackend.gs` for the upcoming globally editable rank/module access matrix.
 
 ## Automatic APK builds
 
@@ -22,9 +26,9 @@ The workflow:
 
 - uses Java 17
 - uses Gradle 8.13
-- installs Android API 36 / Build Tools 35.0.0
+- uses the Android SDK provided by GitHub's Ubuntu runner
 - builds `:app:assembleDebug`
-- uploads `DuckForce-Torn-Toolkit-v0.1.0.apk` as a GitHub Actions artifact
+- uploads `DuckForce-Torn-Toolkit-v0.2.0.apk` as a GitHub Actions artifact
 
 You can also run it manually from **Actions → Build Android APK → Run workflow**.
 
