@@ -1,9 +1,9 @@
-name: Build v0.4.1 Polish
+name: Build v0.4.2 Visual Polish
 
 on:
   push:
     branches:
-      - agent/v041-professional-polish
+      - agent/v042-visual-polish
   workflow_dispatch:
 
 permissions:
@@ -21,21 +21,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.13'
-      - name: Stamp v0.4.1 release version
-        run: |
-          sed -i 's/versionCode = 5/versionCode = 6/' app/build.gradle.kts
-          sed -i 's/versionName = "0.4.0"/versionName = "0.4.1"/' app/build.gradle.kts
       - name: Build debug and unsigned release APKs
         run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
       - name: Name APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.4.1-debug.apk
-          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.4.1-unsigned-release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.4.2-debug.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.4.2-unsigned-release.apk
       - uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Companion-v0.4.1
+          name: DuckForce-Companion-v0.4.2
           path: |
-            DuckForce-Companion-v0.4.1-debug.apk
-            DuckForce-Companion-v0.4.1-unsigned-release.apk
+            DuckForce-Companion-v0.4.2-debug.apk
+            DuckForce-Companion-v0.4.2-unsigned-release.apk
           if-no-files-found: error
           retention-days: 30
