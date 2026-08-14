@@ -45,9 +45,9 @@ jobs:
             adb exec-out screencap -p > visual-login.png
             adb shell uiautomator dump /sdcard/window.xml
             adb pull /sdcard/window.xml visual-window.xml
-            adb shell input keyevent KEYCODE_HOME
-            sleep 2
-            adb exec-out screencap -p > visual-launcher.png
+            adb shell am start -W -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.matthayesego.duckforcetoolkit
+            sleep 3
+            adb exec-out screencap -p > visual-icon.png
 
       - name: Upload visual proof
         uses: actions/upload-artifact@v7
@@ -55,6 +55,6 @@ jobs:
           name: DuckForce-visual-smoke
           path: |
             visual-login.png
-            visual-launcher.png
+            visual-icon.png
             visual-window.xml
           if-no-files-found: error
