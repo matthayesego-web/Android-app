@@ -1,15 +1,22 @@
 # Changelog
 
+## v0.4.3 — 2026-08-14
+
+- Restored the Duck Force noir artwork after the v0.4.2 image-rendering regression.
+- Replaced the login emoji/compound-drawable substitution with a real native ImageView.
+- Rewired the launcher icon to the packaged noir duck artwork directly, with a simple adaptive inset for modern Android launchers.
+- Removed the fragile icon resource chain that could fall back to Android's generic robot placeholder.
+- Kept the compact professional v0.4.2 login layout and dark/gold companion styling.
+- Bumped Android versionCode to 8 and versionName to 0.4.3.
+- Continues using the permanent Duck Force release certificate established in v0.4.0.
+
 ## v0.4.2 — 2026-08-14
 
-- Replaced the launcher icon artwork with the user-supplied noir Duck Force detective image.
-- Updated legacy and adaptive Android launcher icon resources so the same artwork is used consistently across launchers and APK previews.
-- Redesigned the login screen into a cleaner native welcome layout with the oversized bordered hero panel removed.
-- Enlarged and standardized the Duck Force badge presentation on the login screen.
-- Tightened login spacing, typography, API-key field styling, button treatment and supporting copy.
-- Corrected visible version text to v0.4.2.
+- Switched the visual direction to the user-provided detailed noir Duck Force artwork.
+- Redesigned the login screen into a more compact professional welcome/sign-in layout.
+- Reduced oversized borders and dead space on the login screen.
+- Refined the API-key field, typography, spacing and gold primary action.
 - Bumped Android versionCode to 7 and versionName to 0.4.2.
-- Continued using the permanent Duck Force release certificate established in v0.4.0 for direct-update continuity.
 
 ## v0.4.1 — 2026-08-13
 
