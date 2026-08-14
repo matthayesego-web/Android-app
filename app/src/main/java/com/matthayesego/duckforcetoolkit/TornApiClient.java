@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class TornApiClient {
     private static final String BASE = "https://api.torn.com/v2";
-    private static final String USER_AGENT = "DuckForceToolkit/0.3.0 Android";
+    private static final String USER_AGENT = "DuckForceCompanion/0.4.5 Android";
 
     private TornApiClient() {}
 
@@ -20,14 +20,10 @@ public final class TornApiClient {
         JSONObject keyInfoRoot = getJson("/key/info", key);
         JSONObject keyInfo = keyInfoRoot.optJSONObject("info");
         if (keyInfo == null) throw new IOException("Torn key information was unavailable.");
-
         JSONObject keyUser = keyInfo.optJSONObject("user");
         if (keyUser == null) throw new IOException("Torn key owner information was unavailable.");
         int playerId = keyUser.optInt("id", 0);
         if (playerId <= 0) throw new IOException("Unable to determine the Torn player ID.");
-
-        JSONObject access = keyInfo.optJSONObject("access");
-        boolean factionApiAccess = access != null && access.optBoolean("faction", false);
 
         JSONObject basicRoot = getJson("/user/basic", key);
         JSONObject basic = basicRoot.optJSONObject("profile");
@@ -36,41 +32,43 @@ public final class TornApiClient {
         JSONObject factionResponse = getJson("/user/faction", key);
         JSONObject faction = factionResponse.optJSONObject("faction");
         if (faction == null) throw new IOException("This Torn account is not currently in a faction.");
-
         int factionId = faction.optInt("id", 0);
         String factionName = faction.optString("name", "");
         String position = faction.optString("position", "");
-        if (factionId <= 0 || factionName.isEmpty()) {
-            throw new IOException("Unable to verify the Torn faction.");
-        }
+        if (factionId <= 0 || factionName.isEmpty()) throw new IOException("Unable to verify the Torn faction.");
 
         JSONArray positions = new JSONArray();
-        AccessTier tier = AccessPolicy.isLeaderPosition(position) ? AccessTier.GLOBAL : AccessTier.GREEN;
+        JSONArray abilities = new JSONArray();
+        boolean permissionsResolved = false;
+        boolean factionApiAccess = false;
+        AccessTier tier = AccessTier.GREEN;
 
-        if (factionApiAccess) {
-            try {
-                JSONObject positionsResponse = getJson("/faction/positions", key);
-                JSONArray fetched = positionsResponse.optJSONArray("positions");
-                if (fetched != null) {
-                    positions = fetched;
-                    if (!AccessPolicy.isLeaderPosition(position)) {
-                        for (int i = 0; i < fetched.length(); i++) {
-                            JSONObject pos = fetched.optJSONObject(i);
-                            if (pos != null && position.equalsIgnoreCase(pos.optString("name", ""))) {
-                                tier = AccessPolicy.tierForAbilities(pos.optJSONArray("abilities"));
-                                break;
-                            }
-                        }
+        try {
+            JSONObject positionsResponse = getJson("/faction/positions", key);
+            JSONArray fetched = positionsResponse.optJSONArray("positions");
+            if (fetched != null) {
+                positions = fetched;
+                factionApiAccess = true;
+                for (int i = 0; i < fetched.length(); i++) {
+                    JSONObject pos = fetched.optJSONObject(i);
+                    if (pos != null && position.equalsIgnoreCase(pos.optString("name", ""))) {
+                        JSONArray found = pos.optJSONArray("abilities");
+                        abilities = found == null ? new JSONArray() : found;
+                        permissionsResolved = true;
+                        tier = AccessPolicy.tierForAbilities(abilities);
+                        break;
                     }
                 }
-            } catch (IOException ignored) {
-                // Identity remains valid. If this selection is unavailable, use the
-                // safest member fallback unless the user is Leader/Co-leader.
             }
+        } catch (IOException ignored) {
+            // Members without Faction API Access cannot read /faction/positions.
+            // The shared backend can resolve their position against a leader-synced cache.
         }
 
+        if (AccessPolicy.isLeaderPosition(position) && !permissionsResolved) permissionsResolved = true;
+
         return new AuthSession(playerId, playerName, factionId, factionName, position,
-                factionApiAccess, tier, positions);
+                factionApiAccess, tier, positions, abilities, permissionsResolved);
     }
 
     public static JSONObject getJson(String path, String key) throws IOException {
@@ -85,30 +83,17 @@ public final class TornApiClient {
             connection.setUseCaches(false);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", USER_AGENT);
-
             int code = connection.getResponseCode();
             InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
             String body = stream == null ? "" : readAll(stream);
-
             JSONObject json;
-            try {
-                json = new JSONObject(body);
-            } catch (Exception e) {
-                throw new IOException("Torn returned an unreadable response.");
-            }
-
+            try { json = new JSONObject(body); }
+            catch (Exception e) { throw new IOException("Torn returned an unreadable response."); }
             JSONObject error = json.optJSONObject("error");
-            if (error != null) {
-                String msg = error.optString("error", "Torn API error " + error.optInt("code"));
-                throw new IOException(msg);
-            }
-            if (code < 200 || code >= 300) {
-                throw new IOException("Torn API request failed (HTTP " + code + ").");
-            }
+            if (error != null) throw new IOException(error.optString("error", "Torn API error " + error.optInt("code")));
+            if (code < 200 || code >= 300) throw new IOException("Torn API request failed (HTTP " + code + ").");
             return json;
-        } finally {
-            connection.disconnect();
-        }
+        } finally { connection.disconnect(); }
     }
 
     private static String readAll(InputStream input) throws IOException {

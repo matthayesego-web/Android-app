@@ -10,8 +10,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.4.4"
+        versionCode = 10
+        versionName = "0.4.5"
     }
 
     buildTypes {
