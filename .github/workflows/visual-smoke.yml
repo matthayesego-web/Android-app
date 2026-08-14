@@ -40,13 +40,11 @@ jobs:
           script: |
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell pm clear com.matthayesego.duckforcetoolkit
-            adb shell am start -W -n com.matthayesego.duckforcetoolkit/.PolishedCompanionActivity
-            sleep 3
+            adb shell am start -n com.matthayesego.duckforcetoolkit/.PolishedCompanionActivity
+            sleep 12
             adb exec-out screencap -p > visual-login.png
-            adb shell uiautomator dump /sdcard/window.xml
-            adb pull /sdcard/window.xml visual-window.xml
-            adb shell am start -W -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.matthayesego.duckforcetoolkit
-            sleep 3
+            adb shell am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.matthayesego.duckforcetoolkit
+            sleep 12
             adb exec-out screencap -p > visual-icon.png
 
       - name: Upload visual proof
@@ -56,5 +54,4 @@ jobs:
           path: |
             visual-login.png
             visual-icon.png
-            visual-window.xml
           if-no-files-found: error
