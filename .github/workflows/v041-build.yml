@@ -1,9 +1,9 @@
-name: Build v0.4.2 Visual Polish
+name: Build v0.4.3 Image Fix
 
 on:
   push:
     branches:
-      - agent/v042-visual-polish
+      - agent/v043-image-fix
   workflow_dispatch:
 
 permissions:
@@ -25,13 +25,13 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
       - name: Name APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.4.2-debug.apk
-          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.4.2-unsigned-release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.4.3-debug.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.4.3-unsigned-release.apk
       - uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Companion-v0.4.2
+          name: DuckForce-Companion-v0.4.3
           path: |
-            DuckForce-Companion-v0.4.2-debug.apk
-            DuckForce-Companion-v0.4.2-unsigned-release.apk
+            DuckForce-Companion-v0.4.3-debug.apk
+            DuckForce-Companion-v0.4.3-unsigned-release.apk
           if-no-files-found: error
           retention-days: 30
