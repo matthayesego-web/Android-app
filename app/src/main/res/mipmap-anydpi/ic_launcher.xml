@@ -1,3 +1,3 @@
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/duckforce_noir" />
-</layer-list>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/duckforce_noir_legacy"
+    android:gravity="fill" />
