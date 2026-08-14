@@ -3,6 +3,9 @@ name: Android Visual Smoke Test
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'dist/**'
+      - '**/*.md'
   workflow_dispatch:
 
 jobs:
@@ -43,8 +46,6 @@ jobs:
             adb shell uiautomator dump /sdcard/window.xml
             adb pull /sdcard/window.xml visual-window.xml
             adb shell input keyevent KEYCODE_HOME
-            sleep 2
-            adb shell input swipe 540 1800 540 300 500
             sleep 2
             adb exec-out screencap -p > visual-launcher.png
 

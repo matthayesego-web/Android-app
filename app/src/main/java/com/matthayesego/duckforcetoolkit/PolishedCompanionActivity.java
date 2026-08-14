@@ -14,7 +14,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-/** v0.4.3 reliable image and professional presentation layer. */
+/** v0.4.4 verified image and professional presentation layer. */
 public class PolishedCompanionActivity extends CompanionActivity {
     private static final int BG = Color.rgb(6, 9, 13);
     private static final int SURFACE = Color.rgb(15, 20, 28);
@@ -130,7 +130,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
         if (view instanceof TextView) {
             TextView t = (TextView) view; CharSequence raw = t.getText();
             if (raw != null) {
-                String v = raw.toString().replace("v0.4.0","v0.4.3").replace("v0.4.1","v0.4.3").replace("v0.4.2","v0.4.3")
+                String v = raw.toString().replace("v0.4.0","v0.4.4").replace("v0.4.1","v0.4.4").replace("v0.4.2","v0.4.4").replace("v0.4.3","v0.4.4")
                         .replace("Connect your Torn account","Sign in to Duck Force")
                         .replace("Your key verifies your identity and Duck Force membership, then stays encrypted on this device.","Use your Torn API key to verify your membership. Your key is encrypted and stored only on this device.")
                         .replace("Your Duck Force tools, requests and leadership access in one place.","Faction tools, requests and leadership access — wherever you play.")

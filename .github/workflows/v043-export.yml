@@ -1,8 +1,6 @@
-name: Export v0.4.3 Release Build
+name: Export v0.4.4 Release Build
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -32,9 +30,9 @@ jobs:
       - name: Publish build output to repository
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release-unsigned.apk dist/DuckForce-Companion-v0.4.3-unsigned-release.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk dist/DuckForce-Companion-v0.4.4-unsigned-release.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/DuckForce-Companion-v0.4.3-unsigned-release.apk
-          git commit -m "Export v0.4.3 unsigned release APK" || exit 0
+          git add dist/DuckForce-Companion-v0.4.4-unsigned-release.apk
+          git commit -m "Export v0.4.4 unsigned release APK" || exit 0
           git push
