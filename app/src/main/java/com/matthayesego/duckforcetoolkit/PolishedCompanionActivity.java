@@ -95,7 +95,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
             CharSequence raw = ((TextView) child).getText();
             if (raw == null || !"🦆".contentEquals(raw)) continue;
             ImageView badge = new ImageView(this);
-            badge.setImageResource(R.drawable.duckforce_noir);
+            badge.setImageResource(R.drawable.duckforce_noir_art);
             badge.setScaleType(ImageView.ScaleType.CENTER_INSIDE); badge.setAdjustViewBounds(true);
             badge.setContentDescription("Duck Force");
             int size = dp(148);
