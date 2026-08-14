@@ -1,5 +1,5 @@
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/duckforce_noir"
+    android:drawable="@drawable/duckforce_noir_art"
     android:insetLeft="10dp"
     android:insetTop="10dp"
     android:insetRight="10dp"
