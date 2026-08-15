@@ -38,24 +38,22 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            APP_ID="com.matthayesego.duckforcetoolkit.internal"
-            ACTIVITY="com.matthayesego.duckforcetoolkit.PolishedCompanionActivity"
             adb wait-for-device
             adb shell cmd package list packages >/dev/null
             adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb shell pm clear "$APP_ID"
+            adb shell pm clear com.matthayesego.duckforcetoolkit.internal
             adb logcat -c
             sleep 10
-            adb shell am start -W -n "$APP_ID/$ACTIVITY"
+            adb shell am start -W -n com.matthayesego.duckforcetoolkit.internal/com.matthayesego.duckforcetoolkit.PolishedCompanionActivity
             sleep 20
             adb shell dumpsys activity activities > activity-login.txt
             adb shell dumpsys window windows > window-login.txt
-            adb shell pidof "$APP_ID" > pid-login.txt
+            adb shell pidof com.matthayesego.duckforcetoolkit.internal > pid-login.txt
             test -s pid-login.txt
-            grep -q "$APP_ID" activity-login.txt
+            grep -q "com.matthayesego.duckforcetoolkit.internal" activity-login.txt
             adb logcat -d -v time > logcat-login.txt
             adb exec-out screencap -p > visual-login.png
-            adb shell am start -W -a android.settings.APPLICATION_DETAILS_SETTINGS -d "package:$APP_ID"
+            adb shell am start -W -a android.settings.APPLICATION_DETAILS_SETTINGS -d "package:com.matthayesego.duckforcetoolkit.internal"
             sleep 20
             adb shell dumpsys window windows > window-icon.txt
             adb exec-out screencap -p > visual-icon.png
