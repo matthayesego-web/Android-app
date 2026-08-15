@@ -32,15 +32,15 @@ jobs:
 
       - name: Name APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.4.5-debug.apk
-          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.4.5-unsigned-release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.5.0-TEST.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.5.0-unsigned-release.apk
 
       - name: Upload APKs
         uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Companion-v0.4.5-builds
+          name: DuckForce-Companion-v0.5.0-builds
           path: |
-            DuckForce-Companion-v0.4.5-debug.apk
-            DuckForce-Companion-v0.4.5-unsigned-release.apk
+            DuckForce-Companion-v0.5.0-TEST.apk
+            DuckForce-Companion-v0.5.0-unsigned-release.apk
           if-no-files-found: error
           retention-days: 30
