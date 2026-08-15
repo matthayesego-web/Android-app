@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class TornApiClient {
     private static final String BASE = "https://api.torn.com/v2";
-    private static final String USER_AGENT = "DuckForceCompanion/0.4.5 Android";
+    private static final String USER_AGENT = "DuckForceCompanion/0.5.0 Android";
 
     private TornApiClient() {}
 
