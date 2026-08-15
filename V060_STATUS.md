@@ -78,6 +78,7 @@
 - Artifact `DuckForce-Companion-v0.6.0-internal-builds` was produced with digest `sha256:403178ee8cc5d1b47dfb4d7a868d613a18383d8b4748912faf9deec4e38931b3`.
 - A fresh branch diff confirms no banking source files are modified.
 - Temporary feature-branch CI triggering has been removed; normal Android builds return to `main` only.
+- v0.6 is validated for promotion to `main`; production distribution still requires the permanent signing workflow to succeed.
 
 ## Release/update requirement
 - User-facing v0.6 must update the existing production application ID `com.matthayesego.duckforcetoolkit`.
