@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class CompanionBackendClient {
     private static final String BACKEND_URL = "###DUCKFORCE-BACKEND-URL###";
-    private static final String USER_AGENT = "DuckForceCompanion/0.4.5 Android";
+    private static final String USER_AGENT = "DuckForceCompanion/0.5.0 Android";
 
     private CompanionBackendClient() {}
 
@@ -24,9 +24,7 @@ public final class CompanionBackendClient {
     public static AuthSession resolvePermissions(AuthSession session, String apiKey) {
         if (session == null || !isConfigured()) return session;
         try {
-            JSONObject body = new JSONObject();
-            body.put("action", "config");
-            body.put("apiKey", apiKey);
+            JSONObject body = request("config", apiKey);
             JSONObject response = post(body);
             JSONArray permissions = response.optJSONArray("permissions");
             if (permissions != null) return session.withPermissions(permissions);
@@ -36,29 +34,76 @@ public final class CompanionBackendClient {
 
     public static JSONArray getNotices(String apiKey) throws IOException {
         if (!isConfigured()) return new JSONArray();
-        try {
-            JSONObject body = new JSONObject();
-            body.put("action", "notices");
-            body.put("apiKey", apiKey);
-            JSONObject response = post(body);
-            JSONArray notices = response.optJSONArray("notices");
-            return notices == null ? new JSONArray() : notices;
-        } catch (IOException e) { throw e; }
-        catch (Exception e) { throw new IOException(e.getMessage() == null ? "Unable to read faction notices." : e.getMessage()); }
+        JSONObject response = postChecked(request("notices", apiKey), "Unable to read faction notices.");
+        JSONArray notices = response.optJSONArray("notices");
+        return notices == null ? new JSONArray() : notices;
     }
 
     public static void publishNotice(String apiKey, String title, String message, long expiresAt) throws IOException {
         if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
+        JSONObject body = request("post_notice", apiKey);
         try {
-            JSONObject body = new JSONObject();
-            body.put("action", "post_notice");
-            body.put("apiKey", apiKey);
             body.put("title", title == null ? "" : title.trim());
             body.put("message", message == null ? "" : message.trim());
             body.put("expires_at", expiresAt);
-            post(body);
-        } catch (IOException e) { throw e; }
-        catch (Exception e) { throw new IOException(e.getMessage() == null ? "Unable to publish faction notice." : e.getMessage()); }
+        } catch (Exception e) {
+            throw new IOException("Unable to prepare faction notice.");
+        }
+        postChecked(body, "Unable to publish faction notice.");
+    }
+
+    public static JSONObject getBankingRequests(String apiKey, boolean reconcile) throws IOException {
+        if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
+        JSONObject body = request("banking_list", apiKey);
+        try { body.put("reconcile", reconcile); }
+        catch (Exception ignored) {}
+        return postChecked(body, "Unable to load banking requests.");
+    }
+
+    public static JSONObject submitBankingRequest(String apiKey, String amount, String note) throws IOException {
+        if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
+        JSONObject body = request("banking_submit", apiKey);
+        try {
+            body.put("requested_amount", amount == null ? "" : amount.trim());
+            body.put("note", note == null ? "" : note.trim());
+        } catch (Exception e) {
+            throw new IOException("Unable to prepare banking request.");
+        }
+        return postChecked(body, "Unable to submit banking request.");
+    }
+
+    public static JSONObject updateBankingRequest(String apiKey, String requestId, String status) throws IOException {
+        if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
+        JSONObject body = request("banking_update", apiKey);
+        try {
+            body.put("request_id", requestId == null ? "" : requestId.trim());
+            body.put("status", status == null ? "" : status.trim());
+        } catch (Exception e) {
+            throw new IOException("Unable to prepare banking update.");
+        }
+        return postChecked(body, "Unable to update banking request.");
+    }
+
+    public static JSONObject reconcileBanking(String apiKey) throws IOException {
+        if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
+        return postChecked(request("banking_reconcile", apiKey), "Unable to reconcile banking requests.");
+    }
+
+    private static JSONObject request(String action, String apiKey) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("action", action);
+            body.put("apiKey", apiKey == null ? "" : apiKey);
+        } catch (Exception ignored) {}
+        return body;
+    }
+
+    private static JSONObject postChecked(JSONObject body, String fallback) throws IOException {
+        try { return post(body); }
+        catch (IOException e) { throw e; }
+        catch (Exception e) {
+            throw new IOException(e.getMessage() == null ? fallback : e.getMessage());
+        }
     }
 
     private static JSONObject post(JSONObject body) throws IOException {
@@ -72,18 +117,25 @@ public final class CompanionBackendClient {
             connection.setRequestProperty("Content-Type", "text/plain;charset=UTF-8");
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", USER_AGENT);
+
             byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
             try (OutputStream out = connection.getOutputStream()) { out.write(payload); }
+
             int code = connection.getResponseCode();
             InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
             String raw = stream == null ? "" : readAll(stream);
             JSONObject response;
             try { response = new JSONObject(raw); }
             catch (Exception e) { throw new IOException("Faction backend returned an unreadable response."); }
-            if (!response.optBoolean("ok", false)) throw new IOException(response.optString("error", "Faction backend request failed."));
+
+            if (!response.optBoolean("ok", false)) {
+                throw new IOException(response.optString("error", "Faction backend request failed."));
+            }
             if (code < 200 || code >= 300) throw new IOException("Faction backend HTTP " + code + ".");
             return response;
-        } finally { connection.disconnect(); }
+        } finally {
+            connection.disconnect();
+        }
     }
 
     private static String readAll(InputStream input) throws IOException {
