@@ -131,7 +131,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
         boolean chain = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_CHAIN);
         boolean oc = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_OC);
 
-        if (activity) column.addView(featureCard("📊 30-Day Faction Activity", "Count faction-log participation by member across the configured activity window.", FeatureRouterActivity.TARGET_ACTIVITY, BLUE), insertAt++, cardParams());
+        if (activity) column.addView(featureCard("📊 Faction Activity Tracker", "Count faction-log participation by member across the configured activity window.", FeatureRouterActivity.TARGET_ACTIVITY, BLUE), insertAt++, cardParams());
         if (war) column.addView(featureCard("⚔️ War Participation", "Live ranked-war hit participation when permitted, plus the latest completed war report.", FeatureRouterActivity.TARGET_WAR, GOLD_LIGHT), insertAt++, cardParams());
         if (chain) column.addView(featureCard("⛓ Chain Command Center", "Live chain status, online readiness and members currently available to help.", FeatureRouterActivity.TARGET_CHAIN, GREEN), insertAt++, cardParams());
         if (oc) column.addView(featureCard("🧩 OC Readiness", "Open organized-crime slots, item warnings and members who are not currently assigned.", FeatureRouterActivity.TARGET_OC, BLUE), insertAt++, cardParams());
