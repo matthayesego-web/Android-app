@@ -25,9 +25,9 @@ android {
 
     buildTypes {
         getByName("debug") {
-            applicationIdSuffix = ".test"
+            applicationIdSuffix = ".testv050"
             versionNameSuffix = "-test"
-            manifestPlaceholders["appLabel"] = "Duck Force Companion TEST"
+            manifestPlaceholders["appLabel"] = "Duck Force Companion TEST 0.5"
         }
         release {
             isMinifyEnabled = false
