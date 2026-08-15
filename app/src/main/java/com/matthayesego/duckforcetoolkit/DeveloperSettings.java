@@ -4,11 +4,18 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 public final class DeveloperSettings {
+    public static final String FEATURE_ACTIVITY = "activity";
+    public static final String FEATURE_WAR = "war";
+    public static final String FEATURE_CHAIN = "chain";
+    public static final String FEATURE_OC = "oc";
+
     private static final String PREFS = "duckforce_developer_v060";
     private static final String KEY_MULTI_FACTION_PREVIEW = "multi_faction_preview";
     private static final String KEY_VERBOSE = "verbose_diagnostics";
     private static final String KEY_PUBLIC_ONLY = "simulate_public_only";
     private static final String KEY_ACTIVITY_DAYS = "activity_days";
+    private static final String KEY_ACTIVITY_PAGES = "activity_pages";
+    private static final String KEY_FEATURE_PREFIX = "feature_";
 
     private DeveloperSettings() {}
 
@@ -48,6 +55,24 @@ public final class DeveloperSettings {
     public static void setActivityDays(Context context, int days) {
         if (days != 7 && days != 14 && days != 30) days = 30;
         prefs(context).edit().putInt(KEY_ACTIVITY_DAYS, days).apply();
+    }
+
+    public static int activityMaxPages(Context context) {
+        int pages = prefs(context).getInt(KEY_ACTIVITY_PAGES, 20);
+        return pages == 5 || pages == 10 || pages == 20 ? pages : 20;
+    }
+
+    public static void setActivityMaxPages(Context context, int pages) {
+        if (pages != 5 && pages != 10 && pages != 20) pages = 20;
+        prefs(context).edit().putInt(KEY_ACTIVITY_PAGES, pages).apply();
+    }
+
+    public static boolean featureEnabled(Context context, String feature) {
+        return prefs(context).getBoolean(KEY_FEATURE_PREFIX + feature, true);
+    }
+
+    public static void setFeatureEnabled(Context context, String feature, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_FEATURE_PREFIX + feature, enabled).apply();
     }
 
     public static void reset(Context context) {
