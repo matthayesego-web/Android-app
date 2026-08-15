@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main, v0.6-activity-war-platform ]
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
