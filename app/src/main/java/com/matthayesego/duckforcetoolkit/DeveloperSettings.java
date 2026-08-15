@@ -7,6 +7,7 @@ public final class DeveloperSettings {
     private static final String PREFS = "duckforce_developer_v060";
     private static final String KEY_MULTI_FACTION_PREVIEW = "multi_faction_preview";
     private static final String KEY_VERBOSE = "verbose_diagnostics";
+    private static final String KEY_PUBLIC_ONLY = "simulate_public_only";
     private static final String KEY_ACTIVITY_DAYS = "activity_days";
 
     private DeveloperSettings() {}
@@ -29,6 +30,14 @@ public final class DeveloperSettings {
 
     public static void setVerboseDiagnostics(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(KEY_VERBOSE, enabled).apply();
+    }
+
+    public static boolean simulatePublicOnly(Context context) {
+        return prefs(context).getBoolean(KEY_PUBLIC_ONLY, false);
+    }
+
+    public static void setSimulatePublicOnly(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_PUBLIC_ONLY, enabled).apply();
     }
 
     public static int activityDays(Context context) {
