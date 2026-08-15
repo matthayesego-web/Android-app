@@ -1,0 +1,44 @@
+name: v0.8 Faction Companion Build
+
+on:
+  push:
+    branches: [ v0.8-faction-companion ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v080-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Build debug and unsigned release
+        run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
+
+      - name: Upload v0.8 APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: DuckForce-Companion-v0.8.0-branch-builds
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 14
