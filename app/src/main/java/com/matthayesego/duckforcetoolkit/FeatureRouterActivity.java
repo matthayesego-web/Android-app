@@ -43,32 +43,40 @@ public class FeatureRouterActivity extends Activity {
     private void route(){
         final String target=getIntent().getStringExtra(EXTRA_TARGET);final String key=keyStore.load();
         if(key==null||key.trim().isEmpty()){showStatus("No saved Torn API key is available. Return to the Companion and sign in again.",BAD);return;}
+        if(!TARGET_DEVELOPER.equals(target)){
+            FactionScopeCache.Scope cached=FactionScopeCache.load(this,key);
+            if(cached!=null){launchFeature(target,cached.factionId,cached.factionName,cached.position,cached.factionApiAccess);return;}
+        }
         new Thread(()->{try{
-            AuthSession session=TornApiClient.authenticate(key);
-            runOnUiThread(()->launch(target,session));
+            AuthSession session=TornApiClient.authenticate(key);FactionScopeCache.save(this,key,session);
+            runOnUiThread(()->launchVerified(target,session));
         }catch(Exception e){String message=e.getMessage()==null?"Unable to verify faction scope.":e.getMessage();runOnUiThread(()->showStatus(message,BAD));}}).start();
     }
 
-    private void launch(String target,AuthSession session){
+    private void launchVerified(String target,AuthSession session){
         if(TARGET_DEVELOPER.equals(target)){
             if(!AppRoles.isOwner(session)){showStatus("Developer Console is restricted to the app owner.",BAD);return;}
-            Intent i=new Intent(this,DeveloperConsoleActivity.class);putScope(i,session);startActivity(i);finish();return;
+            Intent i=new Intent(this,DeveloperConsoleActivity.class);putScope(i,session.factionId,session.factionName,session.position,session.factionApiAccess);startActivity(i);finish();return;
         }
+        launchFeature(target,session.factionId,session.factionName,session.position,session.factionApiAccess);
+    }
+
+    private void launchFeature(String target,int factionId,String factionName,String position,boolean factionApiAccess){
         String mode;
         if(TARGET_WAR.equals(target))mode=FactionOpsActivity.MODE_WAR;
         else if(TARGET_CHAIN.equals(target))mode=FactionOpsActivity.MODE_CHAIN;
         else if(TARGET_OC.equals(target))mode=FactionOpsActivity.MODE_OC;
         else mode=FactionOpsActivity.MODE_ACTIVITY;
-        Intent i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);putScope(i,session);startActivity(i);finish();
+        Intent i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);putScope(i,factionId,factionName,position,factionApiAccess);startActivity(i);finish();
     }
 
-    private void putScope(Intent i,AuthSession session){
-        i.putExtra(FactionOpsActivity.EXTRA_FACTION_ID,session.factionId);
-        i.putExtra(FactionOpsActivity.EXTRA_FACTION_NAME,session.factionName);
-        i.putExtra(FactionOpsActivity.EXTRA_FACTION_API,session.factionApiAccess);
-        i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,session.factionId);
-        i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,session.factionName);
-        i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,session.factionApiAccess);
-        i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,session.position);
+    private void putScope(Intent i,int factionId,String factionName,String position,boolean factionApiAccess){
+        i.putExtra(FactionOpsActivity.EXTRA_FACTION_ID,factionId);
+        i.putExtra(FactionOpsActivity.EXTRA_FACTION_NAME,factionName);
+        i.putExtra(FactionOpsActivity.EXTRA_FACTION_API,factionApiAccess);
+        i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,factionId);
+        i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,factionName);
+        i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,factionApiAccess);
+        i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,position);
     }
 }
