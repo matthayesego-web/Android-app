@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
         <activity android:name=".PolishedCompanionActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+        <activity android:name=".MemberFactionActivity" android:exported="false"/>
         <activity android:name=".FeatureRouterActivity" android:exported="false"/>
         <activity android:name=".WarNoticeActivity" android:exported="false"/>
         <activity android:name=".FactionOpsActivity" android:exported="false"/>
