@@ -8,11 +8,15 @@ public final class DeveloperSettings {
     public static final String FEATURE_WAR = "war";
     public static final String FEATURE_CHAIN = "chain";
     public static final String FEATURE_OC = "oc";
+    public static final String FEATURE_PULSE = "pulse";
+    public static final String FEATURE_LOOKUP = "lookup";
+    public static final String FEATURE_PREMIUM_PREVIEW = "premium_preview";
 
     private static final String PREFS = "duckforce_developer_v060";
     private static final String KEY_MULTI_FACTION_PREVIEW = "multi_faction_preview";
     private static final String KEY_VERBOSE = "verbose_diagnostics";
     private static final String KEY_PUBLIC_ONLY = "simulate_public_only";
+    private static final String KEY_PREMIUM_SIM = "simulate_premium";
     private static final String KEY_ACTIVITY_DAYS = "activity_days";
     private static final String KEY_ACTIVITY_PAGES = "activity_pages";
     private static final String KEY_FEATURE_PREFIX = "feature_";
@@ -46,6 +50,14 @@ public final class DeveloperSettings {
 
     public static void setSimulatePublicOnly(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(KEY_PUBLIC_ONLY, enabled).apply();
+    }
+
+    public static boolean simulatePremium(Context context) {
+        return prefs(context).getBoolean(KEY_PREMIUM_SIM, false);
+    }
+
+    public static void setSimulatePremium(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_PREMIUM_SIM, enabled).apply();
     }
 
     public static int activityDays(Context context) {
