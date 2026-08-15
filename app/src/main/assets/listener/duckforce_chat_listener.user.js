@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Duck Force Banking Chat Listener
-// @namespace    duckforce.toolkit
-// @version      0.3.0
-// @description  Detect loaded Duck Force faction-chat banking requests and queue only matched requests for Duck Force Toolkit.
+// @namespace    duckforce.companion
+// @version      0.5.0
+// @description  Detect loaded Duck Force faction-chat banking requests and queue matched requests for Duck Force Companion.
 // @author       Duck Force
 // @match        https://www.torn.com/*
 // @run-at       document-end
@@ -11,16 +11,19 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.5.0';
   const BACKEND_URL = '###DUCKFORCE-BACKEND-URL###';
   const LISTENER_TOKEN = '###DUCKFORCE-LISTENER-TOKEN###';
-  const SEEN_KEY = 'duckforce_listener_seen_v1';
-  const MAX_SEEN = 600;
+  const SEEN_KEY = 'duckforce_listener_seen_v2';
+  const MAX_SEEN = 1000;
   const DEBUG = false;
+  const inflight = new Set();
 
   const REQUEST_PATTERNS = [
     /\bbanker\b/i,
     /\bbank\s+(?:me|please|pls|plz)\b/i,
+    /\b(?:bank|withdraw|send|get)\s+(?:me\s+)?(?:\$\s*)?\d+(?:\.\d+)?\s*(?:k|m|b|bn|thousand|million|billion)?\b/i,
+    /\b(?:\$\s*)?\d+(?:\.\d+)?\s*(?:k|m|b|bn|thousand|million|billion)\s+(?:bank|withdrawal|withdraw)\b/i,
     /\b(?:can|could|may|would)\s+i\s+(?:please\s+)?(?:get|have|see|check)\s+(?:my\s+)?(?:faction\s+)?balance\b/i,
     /\b(?:can|could|would)\s+(?:someone|somebody|a\s+banker)\s+(?:please\s+)?(?:get|check|send)\s+(?:me\s+)?(?:my\s+)?(?:faction\s+)?balance\b/i,
     /\b(?:balance\s+check|check\s+(?:my\s+)?balance|what(?:'s|\s+is)\s+my\s+(?:faction\s+)?balance|my\s+(?:faction\s+)?balance\s+(?:please|pls|plz)|balance\s+(?:please|pls|plz))\b/i,
@@ -58,7 +61,7 @@
       /(?:\$\s*)?(\d+(?:\.\d+)?)\s*(m|mil|million)\b/i,
       /(?:\$\s*)?(\d+(?:\.\d+)?)\s*(k|thousand)\b/i,
       /\$\s*(\d{4,})\b/i,
-      /\b(?:bank|withdraw|cash\s*out)\s+(?:me\s+)?(\d{4,})\b/i
+      /\b(?:bank|withdraw|send|get)\s+(?:me\s+)?(\d{4,})\b/i
     ];
 
     for (const pattern of patterns) {
@@ -178,9 +181,8 @@
     ];
 
     selectors.forEach(selector => {
-      try {
-        document.querySelectorAll(selector).forEach(node => nodes.add(node));
-      } catch (_) {}
+      try { document.querySelectorAll(selector).forEach(node => nodes.add(node)); }
+      catch (_) {}
     });
 
     document.querySelectorAll('a[href*="XID="]').forEach(anchor => {
@@ -196,7 +198,7 @@
   }
 
   async function submitRequest(payload) {
-    if (!configured()) return;
+    if (!configured()) return false;
     try {
       await fetch(BACKEND_URL, {
         method: 'POST',
@@ -211,12 +213,14 @@
         })
       });
       log('Queued request', payload);
+      return true;
     } catch (error) {
       console.warn('[DuckForce Listener] Could not queue banking request:', error);
+      return false;
     }
   }
 
-  function scan() {
+  async function scan() {
     if (!configured() || !document.hasFocus() || !factionChatIsOpen()) return;
 
     for (const node of candidateMessages()) {
@@ -232,29 +236,34 @@
         ? `msg:${messageId}`
         : `fp:${hash(`${profile.id}|${timestamp}|${text.toLowerCase()}`)}`;
 
-      if (wasSeen(fingerprint)) continue;
-      remember(fingerprint);
+      if (wasSeen(fingerprint) || inflight.has(fingerprint)) continue;
+      inflight.add(fingerprint);
 
-      const amount = parseAmount(text);
-      submitRequest({
-        fingerprint,
-        message_id: messageId,
-        requester_id: profile.id,
-        requester_name: profile.name || `ID ${profile.id}`,
-        request_text: text,
-        requested_amount: amount,
-        request_mode: amount ? 'AMOUNT' : 'FULL_BALANCE',
-        message_timestamp: timestamp || null,
-        detected_timestamp: Math.floor(Date.now() / 1000),
-        source: 'FACTION_CHAT_RETROACTIVE'
-      });
+      try {
+        const amount = parseAmount(text);
+        const sent = await submitRequest({
+          fingerprint,
+          message_id: messageId,
+          requester_id: profile.id,
+          requester_name: profile.name || `ID ${profile.id}`,
+          request_text: text,
+          requested_amount: amount,
+          request_mode: amount ? 'AMOUNT' : 'FULL_BALANCE',
+          message_timestamp: timestamp || null,
+          detected_timestamp: Math.floor(Date.now() / 1000),
+          source: 'FACTION_CHAT_RETROACTIVE'
+        });
+        if (sent) remember(fingerprint);
+      } finally {
+        inflight.delete(fingerprint);
+      }
     }
   }
 
   let scanTimer = null;
   function scheduleScan(delay = 350) {
     clearTimeout(scanTimer);
-    scanTimer = setTimeout(scan, delay);
+    scanTimer = setTimeout(() => { scan(); }, delay);
   }
 
   const observer = new MutationObserver(() => scheduleScan());
@@ -266,14 +275,14 @@
   window.addEventListener('focus', () => scheduleScan(200));
   window.addEventListener('scroll', () => scheduleScan(450), true);
 
-  setTimeout(scan, 800);
-  setTimeout(scan, 2500);
+  setTimeout(() => scan(), 800);
+  setTimeout(() => scan(), 2500);
   setInterval(() => {
     if (document.hasFocus()) scan();
   }, 5000);
 
   if (!configured()) {
-    console.info('[DuckForce Listener] Install this script from Duck Force Toolkit after the shared backend is configured.');
+    console.info('[DuckForce Listener] Install this script from Duck Force Companion after the shared backend is configured.');
   } else {
     log('Listener ready');
   }
