@@ -16,6 +16,7 @@ public final class DeveloperSettings {
     private static final String KEY_ACTIVITY_DAYS = "activity_days";
     private static final String KEY_ACTIVITY_PAGES = "activity_pages";
     private static final String KEY_FEATURE_PREFIX = "feature_";
+    private static volatile int runtimeActivityPages = 20;
 
     private DeveloperSettings() {}
 
@@ -59,12 +60,18 @@ public final class DeveloperSettings {
 
     public static int activityMaxPages(Context context) {
         int pages = prefs(context).getInt(KEY_ACTIVITY_PAGES, 20);
-        return pages == 5 || pages == 10 || pages == 20 ? pages : 20;
+        runtimeActivityPages = pages == 5 || pages == 10 || pages == 20 ? pages : 20;
+        return runtimeActivityPages;
     }
 
     public static void setActivityMaxPages(Context context, int pages) {
         if (pages != 5 && pages != 10 && pages != 20) pages = 20;
+        runtimeActivityPages = pages;
         prefs(context).edit().putInt(KEY_ACTIVITY_PAGES, pages).apply();
+    }
+
+    public static int runtimeActivityMaxPages() {
+        return runtimeActivityPages;
     }
 
     public static boolean featureEnabled(Context context, String feature) {
@@ -76,6 +83,7 @@ public final class DeveloperSettings {
     }
 
     public static void reset(Context context) {
+        runtimeActivityPages = 20;
         prefs(context).edit().clear().apply();
     }
 }
