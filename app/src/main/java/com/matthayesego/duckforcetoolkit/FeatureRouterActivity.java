@@ -43,17 +43,21 @@ public class FeatureRouterActivity extends Activity {
         if(key==null||key.trim().isEmpty()){showStatus("No saved Torn API key is available. Return to the Companion and sign in again.",BAD);return;}
         new Thread(()->{try{
             AuthSession session=TornApiClient.authenticate(key);
-            if(TARGET_DEVELOPER.equals(target)){
-                if(!AppRoles.isOwner(session))throw new IllegalStateException("Developer Console is restricted to the app owner.");
-                Intent i=new Intent(this,DeveloperConsoleActivity.class);putScope(i,session);startActivity(i);finish();return;
-            }
-            String mode;
-            if(TARGET_WAR.equals(target))mode=FactionOpsActivity.MODE_WAR;
-            else if(TARGET_CHAIN.equals(target))mode=FactionOpsActivity.MODE_CHAIN;
-            else if(TARGET_OC.equals(target))mode=FactionOpsActivity.MODE_OC;
-            else mode=FactionOpsActivity.MODE_ACTIVITY;
-            Intent i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);putScope(i,session);startActivity(i);finish();
+            runOnUiThread(()->launch(target,session));
         }catch(Exception e){String message=e.getMessage()==null?"Unable to verify faction scope.":e.getMessage();runOnUiThread(()->showStatus(message,BAD));}}).start();
+    }
+
+    private void launch(String target,AuthSession session){
+        if(TARGET_DEVELOPER.equals(target)){
+            if(!AppRoles.isOwner(session)){showStatus("Developer Console is restricted to the app owner.",BAD);return;}
+            Intent i=new Intent(this,DeveloperConsoleActivity.class);putScope(i,session);startActivity(i);finish();return;
+        }
+        String mode;
+        if(TARGET_WAR.equals(target))mode=FactionOpsActivity.MODE_WAR;
+        else if(TARGET_CHAIN.equals(target))mode=FactionOpsActivity.MODE_CHAIN;
+        else if(TARGET_OC.equals(target))mode=FactionOpsActivity.MODE_OC;
+        else mode=FactionOpsActivity.MODE_ACTIVITY;
+        Intent i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);putScope(i,session);startActivity(i);finish();
     }
 
     private void putScope(Intent i,AuthSession session){
