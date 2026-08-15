@@ -117,7 +117,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
         ScrollView scroll = (ScrollView) root;
         if (scroll.getChildCount() == 0 || !(scroll.getChildAt(0) instanceof LinearLayout)) return;
         LinearLayout column = (LinearLayout) scroll.getChildAt(0);
-        if (containsText(column, "30-Day Faction Activity")) return;
+        if (containsText(column, "FACTION INTELLIGENCE")) return;
 
         int insertAt = Math.min(4, column.getChildCount());
         TextView section = new TextView(this);
@@ -126,10 +126,16 @@ public class PolishedCompanionActivity extends CompanionActivity {
         LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         sectionParams.bottomMargin = dp(8); column.addView(section, insertAt++, sectionParams);
 
-        column.addView(featureCard("📊 30-Day Faction Activity", "Count faction-log participation by member across the configured activity window.", FeatureRouterActivity.TARGET_ACTIVITY, BLUE), insertAt++, cardParams());
-        column.addView(featureCard("⚔️ War Participation", "Live ranked-war hit participation when permitted, plus the latest completed war report.", FeatureRouterActivity.TARGET_WAR, GOLD_LIGHT), insertAt++, cardParams());
-        column.addView(featureCard("⛓ Chain Command Center", "Live chain status, online readiness and members currently available to help.", FeatureRouterActivity.TARGET_CHAIN, GREEN), insertAt++, cardParams());
-        column.addView(featureCard("🧩 OC Readiness", "Open organized-crime slots, item warnings and members who are not currently assigned.", FeatureRouterActivity.TARGET_OC, BLUE), insertAt++, cardParams());
+        boolean activity = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_ACTIVITY);
+        boolean war = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_WAR);
+        boolean chain = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_CHAIN);
+        boolean oc = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_OC);
+
+        if (activity) column.addView(featureCard("📊 30-Day Faction Activity", "Count faction-log participation by member across the configured activity window.", FeatureRouterActivity.TARGET_ACTIVITY, BLUE), insertAt++, cardParams());
+        if (war) column.addView(featureCard("⚔️ War Participation", "Live ranked-war hit participation when permitted, plus the latest completed war report.", FeatureRouterActivity.TARGET_WAR, GOLD_LIGHT), insertAt++, cardParams());
+        if (chain) column.addView(featureCard("⛓ Chain Command Center", "Live chain status, online readiness and members currently available to help.", FeatureRouterActivity.TARGET_CHAIN, GREEN), insertAt++, cardParams());
+        if (oc) column.addView(featureCard("🧩 OC Readiness", "Open organized-crime slots, item warnings and members who are not currently assigned.", FeatureRouterActivity.TARGET_OC, BLUE), insertAt++, cardParams());
+        if (!activity && !war && !chain && !oc) column.addView(featureCard("v0.6 features disabled", "All faction-intelligence modules are disabled in the owner Developer Console.", FeatureRouterActivity.TARGET_DEVELOPER, BORDER), insertAt++, cardParams());
 
         View gap = new View(this); column.addView(gap, insertAt, new LinearLayout.LayoutParams(1, dp(4)));
     }
