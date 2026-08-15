@@ -2,7 +2,7 @@ name: Android Visual Smoke Test
 
 on:
   push:
-    branches: [ main, v0.7-dashboard-premium-prep ]
+    branches: [ main ]
     paths-ignore:
       - 'dist/**'
       - '**/*.md'
