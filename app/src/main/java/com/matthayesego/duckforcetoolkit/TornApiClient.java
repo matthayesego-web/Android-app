@@ -111,7 +111,9 @@ public final class TornApiClient {
         String next = BASE + path + (path.contains("?") ? "&" : "?") + "key="
                 + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name());
         int pages = 0;
-        while (next != null && !next.isEmpty() && pages < Math.max(1, maxPages)) {
+        int pageLimit = Math.max(1, maxPages);
+        if (path.startsWith("/faction/news")) pageLimit = Math.min(pageLimit, DeveloperSettings.runtimeActivityMaxPages());
+        while (next != null && !next.isEmpty() && pages < pageLimit) {
             JSONObject root = getJsonAbsolute(next, key);
             JSONArray rows = root.optJSONArray(arrayName);
             if (rows != null) for (int i = 0; i < rows.length(); i++) out.put(rows.opt(i));
