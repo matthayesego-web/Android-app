@@ -14,7 +14,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-/** v0.4.4 verified image and professional presentation layer. */
+/** v0.5.0 verified image and professional presentation layer. */
 public class PolishedCompanionActivity extends CompanionActivity {
     private static final int BG = Color.rgb(6, 9, 13);
     private static final int SURFACE = Color.rgb(15, 20, 28);
@@ -136,7 +136,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
                         .replace("Your Duck Force tools, requests and leadership access in one place.","Faction tools, requests and leadership access — wherever you play.")
                         .replace("Banking Companion — v0.4 prototype","Banking Companion — Preview")
                         .replace("🦆 Duck Force Companion","DUCK FORCE COMPANION").replace("💰 Banking","BANKING")
-                        .replace("📦 Armory Log","ARMORY LOG").replace("💊 Faction Xanax Auditor","XANAX AUDITOR")
+                        .replace("📦 Armory Auditor","ARMORY AUDITOR").replace("📦 Armory Log","ARMORY LOG").replace("💊 Faction Xanax Auditor","XANAX AUDITOR")
                         .replace("⚙️ Leadership Controls","LEADERSHIP CONTROLS").replace("🏋️ Company Train Calculator","COMPANY TRAINING CALCULATOR")
                         .replace("🛠 Developer Console","DEVELOPER CONSOLE").replace("🔐 Encrypted locally","Encrypted on this device");
                 t.setText(v);
