@@ -27,26 +27,32 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Verify v0.9 metadata
+      - name: Read and verify beta metadata
         run: |
-          grep -q 'versionCode = 15' app/build.gradle.kts
-          grep -q 'versionName = "0.9.0"' app/build.gradle.kts
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          case "$VERSION_NAME" in 0.9.*) ;; *) echo "v0.9 branch must stay in 0.9.x"; exit 1;; esac
           grep -q 'AccessGateActivity' app/src/main/AndroidManifest.xml
+          grep -q 'DeveloperGateActivity' app/src/main/AndroidManifest.xml
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
       - name: Build debug and unsigned release
         run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
 
       - name: Name APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk DuckForce-Companion-v0.9.0-internal-debug.apk
-          cp app/build/outputs/apk/release/app-release-unsigned.apk DuckForce-Companion-v0.9.0-unsigned-release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "DuckForce-Companion-v${VERSION_NAME}-internal-debug.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-unsigned-release.apk"
 
       - name: Upload v0.9 APKs
         uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Companion-v0.9.0-branch-builds
+          name: DuckForce-Companion-v${{ env.VERSION_NAME }}-branch-builds
           path: |
-            DuckForce-Companion-v0.9.0-internal-debug.apk
-            DuckForce-Companion-v0.9.0-unsigned-release.apk
+            DuckForce-Companion-v${{ env.VERSION_NAME }}-internal-debug.apk
+            DuckForce-Companion-v${{ env.VERSION_NAME }}-unsigned-release.apk
           if-no-files-found: error
           retention-days: 14
