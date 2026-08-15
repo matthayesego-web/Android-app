@@ -25,7 +25,9 @@ public class FeatureRouterActivity extends Activity {
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
-        keyStore=new SecureApiKeyStore(this);showStatus("Verifying faction scope…",GOLD);route();
+        keyStore=new SecureApiKeyStore(this);
+        DeveloperSettings.activityMaxPages(this);
+        showStatus("Verifying faction scope…",GOLD);route();
     }
 
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
