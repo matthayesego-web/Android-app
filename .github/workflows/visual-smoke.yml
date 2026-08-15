@@ -44,17 +44,28 @@ jobs:
             adb shell pm clear com.matthayesego.duckforcetoolkit.internal
             adb logcat -c
             sleep 10
+
             adb shell am start -W -n com.matthayesego.duckforcetoolkit.internal/com.matthayesego.duckforcetoolkit.PolishedCompanionActivity
-            sleep 20
+            sleep 15
             adb shell dumpsys activity activities > activity-login.txt
-            adb shell dumpsys window windows > window-login.txt
             adb shell pidof com.matthayesego.duckforcetoolkit.internal > pid-login.txt
             test -s pid-login.txt
-            grep -q "com.matthayesego.duckforcetoolkit.internal" activity-login.txt
-            adb logcat -d -v time > logcat-login.txt
+            grep -q "PolishedCompanionActivity" activity-login.txt
             adb exec-out screencap -p > visual-login.png
+
+            adb shell am start -W -n com.matthayesego.duckforcetoolkit.internal/com.matthayesego.duckforcetoolkit.VisualPreviewActivity
+            sleep 8
+            adb shell dumpsys activity activities > activity-home.txt
+            adb shell pidof com.matthayesego.duckforcetoolkit.internal > pid-home.txt
+            test -s pid-home.txt
+            grep -q "VisualPreviewActivity" activity-home.txt
+            adb exec-out screencap -p > visual-home.png
+
+            adb logcat -d -v time > logcat-smoke.txt
+            ! grep -q "FATAL EXCEPTION" logcat-smoke.txt
+
             adb shell am start -W -a android.settings.APPLICATION_DETAILS_SETTINGS -d "package:com.matthayesego.duckforcetoolkit.internal"
-            sleep 20
+            sleep 15
             adb shell dumpsys window windows > window-icon.txt
             adb exec-out screencap -p > visual-icon.png
 
@@ -64,10 +75,12 @@ jobs:
           name: DuckForce-visual-smoke
           path: |
             visual-login.png
+            visual-home.png
             visual-icon.png
-            logcat-login.txt
+            logcat-smoke.txt
             activity-login.txt
-            window-login.txt
+            activity-home.txt
             window-icon.txt
             pid-login.txt
+            pid-home.txt
           if-no-files-found: error
