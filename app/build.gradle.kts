@@ -10,8 +10,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.5.0"
+        versionCode = 12
+        versionName = "0.6.0"
         manifestPlaceholders["appLabel"] = "Duck Force Companion"
     }
 
@@ -25,9 +25,9 @@ android {
 
     buildTypes {
         getByName("debug") {
-            applicationIdSuffix = ".testv050"
-            versionNameSuffix = "-test"
-            manifestPlaceholders["appLabel"] = "Duck Force Companion TEST 0.5"
+            applicationIdSuffix = ".internal"
+            versionNameSuffix = "-internal"
+            manifestPlaceholders["appLabel"] = "Duck Force Companion INTERNAL"
         }
         release {
             isMinifyEnabled = false
