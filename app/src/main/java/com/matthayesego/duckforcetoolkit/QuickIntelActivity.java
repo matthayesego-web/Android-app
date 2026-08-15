@@ -31,6 +31,7 @@ public class QuickIntelActivity extends Activity {
 
     private SecureApiKeyStore keyStore;
     private String mode;
+    private int factionId;
     private String factionName;
     private JSONArray members = new JSONArray();
 
@@ -39,11 +40,18 @@ public class QuickIntelActivity extends Activity {
         getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(BG);
         keyStore = new SecureApiKeyStore(this);
         mode = getIntent().getStringExtra(EXTRA_MODE);
+        factionId = getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID, 0);
         factionName = getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);
         if (mode == null) mode = MODE_PULSE;
         if (factionName == null || factionName.trim().isEmpty()) factionName = "Faction";
-        showLoading();
-        load();
+        JSONArray cached = FactionMemberCache.load(factionId);
+        if (cached != null) {
+            members = cached;
+            if (MODE_LOOKUP.equals(mode)) renderLookup(null); else renderPulse();
+        } else {
+            showLoading();
+            load();
+        }
     }
 
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
@@ -57,9 +65,9 @@ public class QuickIntelActivity extends Activity {
 
     private String title(){return MODE_LOOKUP.equals(mode)?"Member Quick Lookup":"Faction Pulse";}
     private void addHeader(LinearLayout r,String subtitle){Button back=button("← Companion");back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(124),dp(44)));TextView t=text(title(),27,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);r.addView(t,tp);TextView s=text(factionName+" • "+subtitle,13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(4);sp.bottomMargin=dp(14);r.addView(s,sp);}
-    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading member snapshot…");addCard(r,card("Quick intel","Reading the current faction member list once, then presenting it locally for fast access.",BLUE));setContentView(s);}
+    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading member snapshot…");addCard(r,card("Quick intel","Reading the current faction member list once, then sharing it briefly between quick-access tools.",BLUE));setContentView(s);}
 
-    private void load(){String key=keyStore.load();if(key==null||key.trim().isEmpty()){renderError("Reconnect your Torn API key to use quick intel.");return;}new Thread(()->{try{JSONArray data=TornApiClient.getJson("/faction/members",key).optJSONArray("members");members=data==null?new JSONArray():data;runOnUiThread(()->{if(MODE_LOOKUP.equals(mode))renderLookup(null);else renderPulse();});}catch(Exception e){renderError(e.getMessage()==null?"Unable to load faction members.":e.getMessage());}}).start();}
+    private void load(){String key=keyStore.load();if(key==null||key.trim().isEmpty()){renderError("Reconnect your Torn API key to use quick intel.");return;}new Thread(()->{try{JSONArray data=TornApiClient.getJson("/faction/members",key).optJSONArray("members");members=data==null?new JSONArray():data;FactionMemberCache.save(factionId,members);runOnUiThread(()->{if(MODE_LOOKUP.equals(mode))renderLookup(null);else renderPulse();});}catch(Exception e){renderError(e.getMessage()==null?"Unable to load faction members.":e.getMessage());}}).start();}
     private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");addCard(r,card("Unable to load",message,BAD));setContentView(s);});}
 
     private void renderPulse(){
