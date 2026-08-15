@@ -6,7 +6,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Html;
-import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -19,7 +18,6 @@ import org.json.JSONObject;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +59,7 @@ public class FactionOpsActivity extends Activity {
         load();
     }
 
+    private boolean hasFactionApi(){return factionApi && !DeveloperSettings.simulatePublicOnly(this);}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setLineSpacing(0f,1.08f);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
@@ -83,7 +82,7 @@ public class FactionOpsActivity extends Activity {
         TextView title=text(titleForMode(),27,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);root.addView(title,tp);
         TextView sub=text(factionName+" • "+subtitle,13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(4);sp.bottomMargin=dp(14);root.addView(sub,sp);
         Button refresh=button("↻ Refresh");refresh.setOnClickListener(v->{showLoading();load();});root.addView(refresh,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));
-        TextView gap=text("",6,MUTED,false);root.addView(gap);
+        root.addView(text("",6,MUTED,false));
     }
 
     private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading live Torn data…");addCard(r,card("Loading", "This screen reads only the authenticated faction scope for faction ID "+factionId+".", GOLD));setContentView(s);s.requestApplyInsets();}
@@ -102,7 +101,7 @@ public class FactionOpsActivity extends Activity {
     private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");addCard(r,card("Unable to load",message,BAD));setContentView(s);s.requestApplyInsets();});}
 
     private void loadActivity(String key) throws Exception {
-        if(!factionApi){renderAccessRequired("Faction API Access is required for the faction-news activity scan. War history and chain data remain available without it.");return;}
+        if(!hasFactionApi()){renderAccessRequired("Faction API Access is required for the faction-news activity scan. War history and chain data remain available without it.");return;}
         int days=DeveloperSettings.activityDays(this);
         long now=System.currentTimeMillis()/1000L, from=now-(days*86400L);
         JSONArray members=TornApiClient.getJson("/faction/members",key).optJSONArray("members");
@@ -123,8 +122,7 @@ public class FactionOpsActivity extends Activity {
         }
         for(int i=0;i<news.length();i++){
             JSONObject row=news.optJSONObject(i);if(row==null)continue;
-            String raw=row.optString("text","");
-            String clean=Html.fromHtml(raw,Html.FROM_HTML_MODE_LEGACY).toString();
+            String clean=Html.fromHtml(row.optString("text",""),Html.FROM_HTML_MODE_LEGACY).toString();
             for(MemberCount mc:counts)if(mc.pattern.matcher(clean).find())mc.count++;
         }
         Collections.sort(counts,(a,b)->{int c=Integer.compare(b.count,a.count);return c!=0?c:a.name.compareToIgnoreCase(b.name);});
@@ -150,7 +148,7 @@ public class FactionOpsActivity extends Activity {
             String scoreText=warScoreText(factions);
             List<MemberCount> participation=new ArrayList<>();
             String detail="Live member participation needs a Limited/Custom/Full key plus Faction API Access.";
-            if(factionApi){
+            if(hasFactionApi()){
                 try{
                     JSONArray attacks=TornApiClient.getPagedArray("/faction/attacks?filters=outgoing&from="+start+"&to="+now+"&sort=DESC&limit=100",key,"attacks",20);
                     Map<Integer,Integer> hitCounts=new HashMap<>();
@@ -166,7 +164,7 @@ public class FactionOpsActivity extends Activity {
             runOnUiThread(()->{
                 ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Live ranked war #"+finalWarId);addCard(r,card("LIVE WAR",finalScore+"\n"+finalDetail,GOLD));
                 if(finalParticipation.isEmpty())addCard(r,card("Participation","Member hit counts will appear here when the authenticated key can read faction attacks.",BORDER));
-                else{for(MemberCount mc:finalParticipation)addCard(r,card(mc.name,mc.count+" ranked-war attacks",mc.count==0?BAD:BORDER));}
+                else for(MemberCount mc:finalParticipation)addCard(r,card(mc.name,mc.count+" ranked-war attacks",mc.count==0?BAD:BORDER));
                 setContentView(s);s.requestApplyInsets();
             });return;
         }
@@ -180,8 +178,9 @@ public class FactionOpsActivity extends Activity {
         if(ours==null){renderSimple("War report unavailable","This faction was not present in the latest ranked-war report.");return;}
         JSONArray warMembers=ours.optJSONArray("members");List<WarMember> rows=new ArrayList<>();if(warMembers!=null)for(int i=0;i<warMembers.length();i++){JSONObject m=warMembers.optJSONObject(i);if(m!=null)rows.add(new WarMember(m.optString("name","Unknown"),m.optInt("attacks",0),m.optDouble("score",0)));}
         Collections.sort(rows,(a,b)->{int c=Integer.compare(b.attacks,a.attacks);return c!=0?c:Double.compare(b.score,a.score);});
-        String summary=ours.optString("name",factionName)+" "+ours.optInt("score",0)+" — "+(other==null?"Opponent":other.optString("name","Opponent"))+" "+(other==null?0:other.optInt("score",0));boolean won=report.optInt("winner",0)==factionId;
-        runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Latest completed ranked war #"+warId);addCard(r,card(won?"WIN":"WAR COMPLETE",summary+"\nFaction attacks: "+ours.optInt("attacks",0),won?GOOD:GOLD));int rankNo=1;for(WarMember m:rows){addCard(r,card(rankNo+". "+m.name,m.attacks+" attacks • "+String.format(Locale.US,"%.2f",m.score)+" score",m.attacks==0?BAD:BORDER));rankNo++;}setContentView(s);s.requestApplyInsets();});
+        final JSONObject finalOurs=ours;final JSONObject finalOther=other;final List<WarMember> finalRows=rows;final int finalWarId=warId;final boolean won=report.optInt("winner",0)==factionId;
+        final String summary=finalOurs.optString("name",factionName)+" "+finalOurs.optInt("score",0)+" — "+(finalOther==null?"Opponent":finalOther.optString("name","Opponent"))+" "+(finalOther==null?0:finalOther.optInt("score",0));
+        runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Latest completed ranked war #"+finalWarId);addCard(r,card(won?"WIN":"WAR COMPLETE",summary+"\nFaction attacks: "+finalOurs.optInt("attacks",0),won?GOOD:GOLD));int rankNo=1;for(WarMember m:finalRows){addCard(r,card(rankNo+". "+m.name,m.attacks+" attacks • "+String.format(Locale.US,"%.2f",m.score)+" score",m.attacks==0?BAD:BORDER));rankNo++;}setContentView(s);s.requestApplyInsets();});
     }
 
     private void loadChain(String key) throws Exception {
@@ -190,7 +189,7 @@ public class FactionOpsActivity extends Activity {
         int online=0,available=0,onWall=0;List<String> ready=new ArrayList<>();
         for(int i=0;i<members.length();i++){
             JSONObject m=members.optJSONObject(i);if(m==null)continue;JSONObject last=m.optJSONObject("last_action"),status=m.optJSONObject("status");String lastState=last==null?"":last.optString("status","");String state=status==null?"":status.optString("state","");if("Online".equalsIgnoreCase(lastState))online++;if(m.optBoolean("is_on_wall",false))onWall++;
-            boolean blocked="Hospital".equalsIgnoreCase(state)||"Jail".equalsIgnoreCase(state)||"Traveling".equalsIgnoreCase(state)||"Federal".equalsIgnoreCase(state);if(!blocked){available++;if("Online".equalsIgnoreCase(lastState))ready.add(m.optString("name","Unknown")+" • "+state);}
+            String lower=state.toLowerCase(Locale.US);boolean blocked=lower.contains("hospital")||lower.contains("jail")||lower.contains("travel");if(!blocked){available++;if("Online".equalsIgnoreCase(lastState))ready.add(m.optString("name","Unknown")+" • "+state);}
         }
         final JSONObject c=chain;final int fOnline=online,fAvailable=available,fOnWall=onWall;final List<String> fReady=ready;
         runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Live chain readiness");if(c==null)addCard(r,card("No active chain","Torn did not return an active chain object.",BORDER));else{String body="Current: "+c.optInt("current",0)+" / "+c.optInt("max",0)+"\nTimeout: "+c.optInt("timeout",0)+" sec\nModifier: "+String.format(Locale.US,"%.2f",c.optDouble("modifier",1.0));long cooldown=c.optLong("cooldown",0);if(cooldown>0)body+="\nCooldown until: "+DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(new Date(cooldown*1000L));addCard(r,card("Current chain",body,c.optInt("current",0)>0?GOOD:GOLD));}
@@ -198,7 +197,7 @@ public class FactionOpsActivity extends Activity {
     }
 
     private void loadOc(String key) throws Exception {
-        if(!factionApi){renderAccessRequired("OC Readiness requires Faction API Access because Torn restricts faction organized-crime details.");return;}
+        if(!hasFactionApi()){renderAccessRequired("OC Readiness requires Faction API Access because Torn restricts faction organized-crime details.");return;}
         JSONArray crimes=TornApiClient.getPagedArray("/faction/crimes?cat=available&limit=100",key,"crimes",5);
         JSONArray members=TornApiClient.getJson("/faction/members",key).optJSONArray("members");if(members==null)members=new JSONArray();
         List<String> unassigned=new ArrayList<>();for(int i=0;i<members.length();i++){JSONObject m=members.optJSONObject(i);if(m!=null&&!m.optBoolean("is_in_oc",false))unassigned.add(m.optString("name","Unknown"));}
