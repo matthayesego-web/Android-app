@@ -15,7 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-/** v0.6.0 presentation layer. Keeps the approved Companion shell while attaching faction intelligence features. */
+/** Presentation layer for the compact quick-access dashboard and companion visual polish. */
 public class PolishedCompanionActivity extends CompanionActivity {
     private static final int BG = Color.rgb(6, 9, 13);
     private static final int SURFACE = Color.rgb(15, 20, 28);
@@ -57,6 +57,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
         }
         polishTree(view);
         stampText(view);
+        if (containsText(view, "Welcome back,")) compactKnownHomeCards(view);
         super.setContentView(view);
     }
 
@@ -117,46 +118,90 @@ public class PolishedCompanionActivity extends CompanionActivity {
         ScrollView scroll = (ScrollView) root;
         if (scroll.getChildCount() == 0 || !(scroll.getChildAt(0) instanceof LinearLayout)) return;
         LinearLayout column = (LinearLayout) scroll.getChildAt(0);
-        if (containsText(column, "FACTION INTELLIGENCE")) return;
+        if (containsText(column, "QUICK ACCESS")) return;
 
         int insertAt = Math.min(4, column.getChildCount());
-        TextView section = new TextView(this);
-        section.setText("FACTION INTELLIGENCE"); section.setTextColor(MUTED); section.setTextSize(12);
-        section.setTypeface(Typeface.DEFAULT, Typeface.BOLD); section.setLetterSpacing(.08f);
+        TextView section = sectionLabel("QUICK ACCESS");
         LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         sectionParams.bottomMargin = dp(8); column.addView(section, insertAt++, sectionParams);
 
+        LinearLayout grid = new LinearLayout(this); grid.setOrientation(LinearLayout.VERTICAL);
         boolean activity = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_ACTIVITY);
         boolean war = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_WAR);
         boolean chain = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_CHAIN);
         boolean oc = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_OC);
+        boolean pulse = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_PULSE);
+        boolean lookup = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_LOOKUP);
 
-        if (activity) column.addView(featureCard("📊 Faction Activity Tracker", "Count faction-log participation by member across the configured activity window.", FeatureRouterActivity.TARGET_ACTIVITY, BLUE), insertAt++, cardParams());
-        if (war) column.addView(featureCard("⚔️ War Participation", "Live ranked-war hit participation when permitted, plus the latest completed war report.", FeatureRouterActivity.TARGET_WAR, GOLD_LIGHT), insertAt++, cardParams());
-        if (chain) column.addView(featureCard("⛓ Chain Command Center", "Live chain status, online readiness and members currently available to help.", FeatureRouterActivity.TARGET_CHAIN, GREEN), insertAt++, cardParams());
-        if (oc) column.addView(featureCard("🧩 OC Readiness", "Open organized-crime slots, item warnings and members who are not currently assigned.", FeatureRouterActivity.TARGET_OC, BLUE), insertAt++, cardParams());
-        if (!activity && !war && !chain && !oc) column.addView(featureCard("v0.6 features disabled", "All faction-intelligence modules are disabled in the owner Developer Console.", FeatureRouterActivity.TARGET_DEVELOPER, BORDER), insertAt++, cardParams());
+        addPair(grid,
+                activity ? featureTile("📊 Activity", "30-day participation", FeatureRouterActivity.TARGET_ACTIVITY, BLUE) : null,
+                war ? featureTile("⚔ War", "Live participation", FeatureRouterActivity.TARGET_WAR, GOLD_LIGHT) : null);
+        addPair(grid,
+                chain ? featureTile("⛓ Chain", "Status & readiness", FeatureRouterActivity.TARGET_CHAIN, GREEN) : null,
+                oc ? featureTile("🧩 OC Tracker", "Open • plan • complete", FeatureRouterActivity.TARGET_OC, BLUE) : null);
+        addPair(grid,
+                pulse ? featureTile("◉ Faction Pulse", "Health at a glance", FeatureRouterActivity.TARGET_PULSE, GREEN) : null,
+                lookup ? featureTile("⌕ Member Lookup", "Find anyone fast", FeatureRouterActivity.TARGET_LOOKUP, BLUE) : null);
 
-        View gap = new View(this); column.addView(gap, insertAt, new LinearLayout.LayoutParams(1, dp(4)));
+        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        gp.bottomMargin = dp(10); column.addView(grid, insertAt++, gp);
+
+        if (DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_PREMIUM_PREVIEW)) {
+            TextView premium = sectionLabel("PREMIUM PREVIEW"); premium.setTextColor(GOLD_LIGHT);
+            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            pp.topMargin = dp(2); pp.bottomMargin = dp(8); column.addView(premium, insertAt++, pp);
+            LinearLayout premiumGrid = new LinearLayout(this); premiumGrid.setOrientation(LinearLayout.VERTICAL);
+            addPair(premiumGrid, premiumTile("🔔 Smart Alerts", "Locked • planned"), premiumTile("◆ Advanced Intel", "Locked • planned"));
+            LinearLayout.LayoutParams pgp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            pgp.bottomMargin = dp(8); column.addView(premiumGrid, insertAt++, pgp);
+        }
     }
 
-    private LinearLayout.LayoutParams cardParams() {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        p.bottomMargin = dp(10); return p;
+    private TextView sectionLabel(String value) {
+        TextView section = new TextView(this);
+        section.setText(value); section.setTextColor(MUTED); section.setTextSize(12);
+        section.setTypeface(Typeface.DEFAULT, Typeface.BOLD); section.setLetterSpacing(.08f);
+        return section;
     }
 
-    private LinearLayout featureCard(String title, String body, String target, int stroke) {
-        LinearLayout card = new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(16), dp(15), dp(16), dp(15)); card.setBackground(rounded(SURFACE, stroke, 17));
-        TextView heading = new TextView(this); heading.setText(title); heading.setTextColor(TEXT); heading.setTextSize(18); heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD); card.addView(heading);
-        TextView description = new TextView(this); description.setText(body); description.setTextColor(MUTED); description.setTextSize(13); description.setLineSpacing(0f,1.08f);
-        LinearLayout.LayoutParams dpv = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); dpv.topMargin=dp(5); card.addView(description, dpv);
-        TextView tap = new TextView(this); tap.setText("Tap to open"); tap.setTextColor(stroke); tap.setTextSize(11); tap.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        LinearLayout.LayoutParams tvp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); tvp.topMargin=dp(9); card.addView(tap, tvp);
-        card.setClickable(true); card.setFocusable(true); card.setOnClickListener(v -> openV060(target)); return card;
+    private void addPair(LinearLayout grid, View left, View right) {
+        if (left == null && right == null) return;
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+        if (left != null) row.addView(left, tileParams(false));
+        if (right != null) row.addView(right, tileParams(left != null));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rp.bottomMargin = dp(8); grid.addView(row, rp);
     }
 
-    private void openV060(String target) {
+    private LinearLayout.LayoutParams tileParams(boolean withLeftMargin) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(92), 1f);
+        if (withLeftMargin) p.leftMargin = dp(8);
+        return p;
+    }
+
+    private LinearLayout featureTile(String title, String body, String target, int stroke) {
+        LinearLayout tile = tileBase(title, body, stroke);
+        tile.setOnClickListener(v -> openFeature(target));
+        return tile;
+    }
+
+    private LinearLayout premiumTile(String title, String body) {
+        LinearLayout tile = tileBase(title, body, GOLD_LIGHT);
+        tile.setOnClickListener(v -> startActivity(new Intent(this, PremiumPreviewActivity.class)));
+        return tile;
+    }
+
+    private LinearLayout tileBase(String title, String body, int stroke) {
+        LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(13), dp(10), dp(13), dp(10));
+        tile.setBackground(rounded(SURFACE, stroke, 15)); tile.setClickable(true); tile.setFocusable(true);
+        TextView heading = new TextView(this); heading.setText(title); heading.setTextColor(TEXT); heading.setTextSize(15); heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD); tile.addView(heading);
+        TextView description = new TextView(this); description.setText(body); description.setTextColor(MUTED); description.setTextSize(11.5f); description.setMaxLines(2);
+        LinearLayout.LayoutParams dpv = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); dpv.topMargin=dp(4); tile.addView(description, dpv);
+        return tile;
+    }
+
+    private void openFeature(String target) {
         Intent i = new Intent(this, FeatureRouterActivity.class); i.putExtra(FeatureRouterActivity.EXTRA_TARGET, target); startActivity(i);
     }
 
@@ -165,10 +210,27 @@ public class PolishedCompanionActivity extends CompanionActivity {
             ViewGroup g = (ViewGroup) view;
             for (int i = 0; i < g.getChildCount(); i++) if (retargetDeveloperConsole(g.getChildAt(i))) return true;
             if (view instanceof LinearLayout && containsText(view, "🛠 Developer Console")) {
-                view.setClickable(true); view.setOnClickListener(v -> openV060(FeatureRouterActivity.TARGET_DEVELOPER)); return true;
+                view.setClickable(true); view.setOnClickListener(v -> openFeature(FeatureRouterActivity.TARGET_DEVELOPER)); return true;
             }
         }
         return false;
+    }
+
+    private void compactKnownHomeCards(View view) {
+        if (view instanceof LinearLayout) {
+            LinearLayout l = (LinearLayout) view;
+            String title = directTitle(l);
+            String[] known={"BANKING","ARMORY AUDITOR","LEADERSHIP CONTROLS","COMPANY TRAINING CALCULATOR","DEVELOPER CONSOLE"};
+            for(String k:known) if(k.equals(title)){l.setPadding(dp(14),dp(11),dp(14),dp(11));break;}
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)compactKnownHomeCards(g.getChildAt(i));
+        }
+    }
+
+    private String directTitle(LinearLayout layout) {
+        for(int i=0;i<layout.getChildCount();i++){View child=layout.getChildAt(i);if(child instanceof TextView){CharSequence raw=((TextView)child).getText();if(raw!=null)return raw.toString();}}
+        return "";
     }
 
     private void polishTree(View view) {
@@ -196,7 +258,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
         if (view instanceof TextView) {
             TextView t = (TextView) view; CharSequence raw = t.getText();
             if (raw != null) {
-                String v = raw.toString().replace("v0.5.0","v0.6.0").replace("v0.4.0","v0.6.0").replace("v0.4.1","v0.6.0").replace("v0.4.2","v0.6.0").replace("v0.4.3","v0.6.0").replace("v0.4.4","v0.6.0")
+                String v = raw.toString().replace("v0.6.0","v0.7.0").replace("v0.5.0","v0.7.0").replace("v0.4.0","v0.7.0").replace("v0.4.1","v0.7.0").replace("v0.4.2","v0.7.0").replace("v0.4.3","v0.7.0").replace("v0.4.4","v0.7.0")
                         .replace("Connect your Torn account","Sign in to Duck Force")
                         .replace("Your key verifies your identity and Duck Force membership, then stays encrypted on this device.","Use your Torn API key to verify your membership. Your key is encrypted and stored only on this device.")
                         .replace("Your Duck Force tools, requests and leadership access in one place.","Faction tools, intelligence and leadership access — wherever you play.")
