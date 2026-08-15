@@ -15,6 +15,14 @@ android {
         manifestPlaceholders["appLabel"] = "Duck Force Companion"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".test"
