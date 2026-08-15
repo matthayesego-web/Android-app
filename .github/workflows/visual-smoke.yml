@@ -8,6 +8,10 @@ on:
       - '**/*.md'
   workflow_dispatch:
 
+concurrency:
+  group: visual-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   visual-smoke:
     runs-on: macos-15-intel
