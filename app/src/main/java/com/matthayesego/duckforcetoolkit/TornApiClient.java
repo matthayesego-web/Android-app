@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class TornApiClient {
     private static final String BASE = "https://api.torn.com/v2";
-    private static final String USER_AGENT = "DuckForceCompanion/0.5.0 Android";
+    private static final String USER_AGENT = "DuckForceCompanion/0.6.0 Android";
 
     private TornApiClient() {}
 
@@ -73,8 +73,18 @@ public final class TornApiClient {
 
     public static JSONObject getJson(String path, String key) throws IOException {
         String joiner = path.contains("?") ? "&" : "?";
-        URL url = new URL(BASE + path + joiner + "key="
-                + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name()));
+        return getJsonAbsolute(BASE + path + joiner + "key="
+                + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name()), key);
+    }
+
+    public static JSONObject getJsonAbsolute(String absoluteUrl, String key) throws IOException {
+        String urlValue = absoluteUrl;
+        if (!urlValue.startsWith(BASE)) throw new IOException("Refusing non-Torn pagination URL.");
+        if (!urlValue.contains("key=")) {
+            String joiner = urlValue.contains("?") ? "&" : "?";
+            urlValue += joiner + "key=" + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name());
+        }
+        URL url = new URL(urlValue);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
             connection.setRequestMethod("GET");
@@ -94,6 +104,23 @@ public final class TornApiClient {
             if (code < 200 || code >= 300) throw new IOException("Torn API request failed (HTTP " + code + ").");
             return json;
         } finally { connection.disconnect(); }
+    }
+
+    public static JSONArray getPagedArray(String path, String key, String arrayName, int maxPages) throws IOException {
+        JSONArray out = new JSONArray();
+        String next = BASE + path + (path.contains("?") ? "&" : "?") + "key="
+                + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name());
+        int pages = 0;
+        while (next != null && !next.isEmpty() && pages < Math.max(1, maxPages)) {
+            JSONObject root = getJsonAbsolute(next, key);
+            JSONArray rows = root.optJSONArray(arrayName);
+            if (rows != null) for (int i = 0; i < rows.length(); i++) out.put(rows.opt(i));
+            JSONObject metadata = root.optJSONObject("_metadata");
+            JSONObject links = metadata == null ? null : metadata.optJSONObject("links");
+            next = links == null || links.isNull("next") ? null : links.optString("next", null);
+            pages++;
+        }
+        return out;
     }
 
     private static String readAll(InputStream input) throws IOException {
