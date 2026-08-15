@@ -2,10 +2,6 @@ name: Sign Production Android Update
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - '.release/v0.6.0'
 
 permissions:
   contents: read
