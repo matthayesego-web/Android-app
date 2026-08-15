@@ -41,17 +41,17 @@ jobs:
             adb wait-for-device
             adb shell cmd package list packages >/dev/null
             adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb shell pm clear com.matthayesego.duckforcetoolkit
+            adb shell pm clear com.matthayesego.duckforcetoolkit.test
             adb logcat -c
             sleep 10
-            adb shell am start -W -n com.matthayesego.duckforcetoolkit/.PolishedCompanionActivity || true
+            adb shell am start -W -n com.matthayesego.duckforcetoolkit.test/com.matthayesego.duckforcetoolkit.PolishedCompanionActivity || true
             sleep 20
             adb shell dumpsys activity activities > activity-login.txt
             adb shell dumpsys window windows > window-login.txt
-            adb shell pidof com.matthayesego.duckforcetoolkit > pid-login.txt || true
+            adb shell pidof com.matthayesego.duckforcetoolkit.test > pid-login.txt || true
             adb logcat -d -v time > logcat-login.txt
             adb exec-out screencap -p > visual-login.png
-            adb shell am start -W -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.matthayesego.duckforcetoolkit || true
+            adb shell am start -W -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.matthayesego.duckforcetoolkit.test || true
             sleep 20
             adb shell dumpsys window windows > window-icon.txt
             adb exec-out screencap -p > visual-icon.png
