@@ -71,11 +71,13 @@
 - Existing war notice/message-board behavior.
 
 ## Validation status
-- Feature branch remains separate from `main`.
+- GitHub Actions compile validation passed successfully after the repository was temporarily made public so the standard hosted runner could start.
+- Successful workflow run: `31859105090` (rerun attempt on v0.6 head `58ae193dc65448794fc4dfbda5146d1b53b02efd`).
+- `:app:assembleDebug` and `:app:assembleRelease` both completed successfully.
+- APK naming and artifact upload steps completed successfully.
+- Artifact `DuckForce-Companion-v0.6.0-internal-builds` was produced with digest `sha256:403178ee8cc5d1b47dfb4d7a868d613a18383d8b4748912faf9deec4e38931b3`.
 - A fresh branch diff confirms no banking source files are modified.
-- GitHub Actions compile validation is currently blocked before runner startup by the repository account's Actions billing/spending-limit status.
-- The Actions failure is infrastructure-related; no v0.6 compiler result has been produced yet.
-- Do not merge v0.6 to `main` until a complete Android build passes.
+- Temporary feature-branch CI triggering has been removed; normal Android builds return to `main` only.
 
 ## Release/update requirement
 - User-facing v0.6 must update the existing production application ID `com.matthayesego.duckforcetoolkit`.
