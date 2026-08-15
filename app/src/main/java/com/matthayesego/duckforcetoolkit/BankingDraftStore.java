@@ -7,10 +7,12 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class BankingDraftStore {
     private static final String PREFS = "duckforce_banking_v040";
     private static final String KEY = "requests";
+    private static final AtomicBoolean SYNCING = new AtomicBoolean(false);
 
     private BankingDraftStore() {}
 
@@ -33,12 +35,44 @@ public final class BankingDraftStore {
     }
 
     public static JSONArray all(Context context) {
+        JSONArray rows = read(context);
+        scheduleSync(context.getApplicationContext(), rows);
+        return rows;
+    }
+
+    private static JSONArray read(Context context) {
         try {
             SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             return new JSONArray(prefs.getString(KEY, "[]"));
         } catch (Exception ignored) {
             return new JSONArray();
         }
+    }
+
+    private static void scheduleSync(Context context, JSONArray snapshot) {
+        if (!CompanionBackendClient.isConfigured() || snapshot == null || snapshot.length() == 0 || !SYNCING.compareAndSet(false, true)) return;
+        new Thread(() -> {
+            try {
+                String key = new SecureApiKeyStore(context).load();
+                if (key == null || key.trim().isEmpty()) return;
+                AuthSession current = TornApiClient.authenticate(key);
+                for (int i = 0; i < snapshot.length(); i++) {
+                    JSONObject row = snapshot.optJSONObject(i);
+                    if (row == null || row.optInt("playerId", 0) != current.playerId) continue;
+                    String amount = row.optString("amount", "FULL BALANCE");
+                    if ("FULL BALANCE".equalsIgnoreCase(amount)) amount = "";
+                    try {
+                        CompanionBackendClient.submitBankingRequest(key, amount, row.optString("note", ""));
+                        remove(context, row);
+                    } catch (Exception ignored) {
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                SYNCING.set(false);
+            }
+        }, "DuckForce-BankingFallbackSync").start();
     }
 
     public static String fingerprint(JSONObject row) {
