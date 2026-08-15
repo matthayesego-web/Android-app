@@ -11,6 +11,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONObject;
 
@@ -53,6 +54,8 @@ public class DeveloperConsoleActivity extends Activity {
         boolean multi=DeveloperSettings.multiFactionPreview(this);
         addCard(r,card("Current tenant",factionName+" ["+factionId+"] • "+position+"\nFaction API access: "+(factionApi?"YES":"NO")+"\nEffective test access: "+(effectiveFactionApi()?"FACTION API":"PUBLIC-ONLY")+"\nTenant architecture: "+(multi?"PREVIEW":"SINGLE-FACTION")+"\nBackend configured: "+(CompanionBackendClient.isConfigured()?"YES":"NO"),BLUE));
 
+        long cacheAge=FactionScopeCache.ageSeconds(this);String cacheText=FactionScopeCache.hasFreshScope(this)?"Fresh faction scope cache • age "+cacheAge+" sec • expires after 5 minutes.":"No fresh faction scope cache. The next feature launch will re-verify Torn identity and faction.";LinearLayout cache=card("Faction scope verification",cacheText,BORDER);Button fresh=button("Force Fresh Faction Verification");fresh.setOnClickListener(v->{FactionScopeCache.clear(this);Toast.makeText(this,"Faction scope cache cleared.",Toast.LENGTH_SHORT).show();render();});LinearLayout.LayoutParams freshp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));freshp.topMargin=dp(7);cache.addView(fresh,freshp);addCard(r,cache);
+
         LinearLayout quick=card("Feature test launchers","Open any v0.6 module directly using the current developer settings and authenticated faction scope.",BLUE);
         addLaunchButton(quick,"Open Activity Tracker",FeatureRouterActivity.TARGET_ACTIVITY);
         addLaunchButton(quick,"Open War Participation",FeatureRouterActivity.TARGET_WAR);
@@ -78,7 +81,7 @@ public class DeveloperConsoleActivity extends Activity {
 
         LinearLayout diag=card("API diagnostics","Run a read-only endpoint sweep using the encrypted API key currently stored on this device.",GOLD);Button run=button("Run Endpoint Diagnostics");run.setOnClickListener(v->runDiagnostics());diag.addView(run,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,diag);
 
-        LinearLayout reset=card("Reset v0.6 test controls","Restores all four feature modules, single-faction mode, real permission checks, 30-day/20-page activity scanning and concise diagnostics. Banking data is not touched.",BORDER);Button resetButton=button("Reset Developer Settings");resetButton.setOnClickListener(v->{DeveloperSettings.reset(this);render();});reset.addView(resetButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,reset);
+        LinearLayout reset=card("Reset v0.6 test controls","Restores all four feature modules, single-faction mode, real permission checks, 30-day/20-page activity scanning and concise diagnostics. Banking data is not touched.",BORDER);Button resetButton=button("Reset Developer Settings");resetButton.setOnClickListener(v->{DeveloperSettings.reset(this);FactionScopeCache.clear(this);render();});reset.addView(resetButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,reset);
 
         setContentView(s);s.requestApplyInsets();
     }
