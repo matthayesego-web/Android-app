@@ -6,6 +6,9 @@
         <activity android:name=".FeatureRouterActivity" android:exported="false"/>
         <activity android:name=".WarNoticeActivity" android:exported="false"/>
         <activity android:name=".FactionOpsActivity" android:exported="false"/>
+        <activity android:name=".OcTrackerActivity" android:exported="false"/>
+        <activity android:name=".QuickIntelActivity" android:exported="false"/>
+        <activity android:name=".PremiumPreviewActivity" android:exported="false"/>
         <activity android:name=".DeveloperConsoleActivity" android:exported="false"/>
         <activity android:name=".CompanionActivity" android:exported="false"/>
         <activity android:name=".ToolHostActivity" android:exported="false"/>
