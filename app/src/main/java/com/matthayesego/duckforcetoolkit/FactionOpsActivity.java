@@ -74,7 +74,7 @@ public class FactionOpsActivity extends Activity {
         if(MODE_WAR.equals(mode))return "War Participation";
         if(MODE_CHAIN.equals(mode))return "Chain Command Center";
         if(MODE_OC.equals(mode))return "OC Readiness";
-        return "30-Day Activity";
+        return "Faction Activity Tracker";
     }
 
     private void addHeader(LinearLayout root,String subtitle){
@@ -103,17 +103,26 @@ public class FactionOpsActivity extends Activity {
     private void loadActivity(String key) throws Exception {
         if(!hasFactionApi()){renderAccessRequired("Faction API Access is required for the faction-news activity scan. War history and chain data remain available without it.");return;}
         int days=DeveloperSettings.activityDays(this);
+        int pageCap=DeveloperSettings.activityMaxPages(this);
         long now=System.currentTimeMillis()/1000L, from=now-(days*86400L);
         JSONArray members=TornApiClient.getJson("/faction/members",key).optJSONArray("members");
         if(members==null)members=new JSONArray();
-        String cats="main,attack,armoryDeposit,armoryAction,territoryWar,rankedWar,territoryGain,chain,crime,membership";
+
+        String primaryCats="main,attack,armoryDeposit,armoryAction,territoryWar,rankedWar,territoryGain,chain,crime,membership";
         JSONArray news;
         try{
-            news=TornApiClient.getPagedArray("/faction/news?cat="+cats+"&from="+from+"&to="+now+"&sort=DESC&limit=100",key,"news",20);
+            news=TornApiClient.getPagedArray("/faction/news?cat="+primaryCats+"&from="+from+"&to="+now+"&sort=DESC&limit=100",key,"news",pageCap);
         }catch(Exception limitedKey){
             String fallback="main,armoryDeposit,armoryAction,territoryWar,rankedWar,territoryGain,chain,crime,membership";
-            news=TornApiClient.getPagedArray("/faction/news?cat="+fallback+"&from="+from+"&to="+now+"&sort=DESC&limit=100",key,"news",20);
+            news=TornApiClient.getPagedArray("/faction/news?cat="+fallback+"&from="+from+"&to="+now+"&sort=DESC&limit=100",key,"news",pageCap);
         }
+        try{
+            JSONArray funds=TornApiClient.getPagedArray("/faction/news?cat=depositFunds,giveFunds&from="+from+"&to="+now+"&sort=DESC&limit=100",key,"news",pageCap);
+            appendAll(news,funds);
+        }catch(Exception ignored){
+            // Some faction keys may not expose fund categories. Core activity remains usable.
+        }
+
         List<MemberCount> counts=new ArrayList<>();
         for(int i=0;i<members.length();i++){
             JSONObject m=members.optJSONObject(i);if(m==null)continue;
@@ -126,16 +135,25 @@ public class FactionOpsActivity extends Activity {
             for(MemberCount mc:counts)if(mc.pattern.matcher(clean).find())mc.count++;
         }
         Collections.sort(counts,(a,b)->{int c=Integer.compare(b.count,a.count);return c!=0?c:a.name.compareToIgnoreCase(b.name);});
-        final JSONArray finalNews=news;final List<MemberCount> finalCounts=counts;
+        final JSONArray finalNews=news;final List<MemberCount> finalCounts=counts;final int finalPageCap=pageCap;
         runOnUiThread(()->{
             ScrollView s=shell();LinearLayout r=root(s);addHeader(r,days+"-day faction-log scan");
-            addCard(r,card("Activity coverage",finalNews.length()+" faction-news rows scanned • up to 2,000 rows per refresh\nCounts are log entries that mention each member by name; they are a participation signal, not a Torn-issued score.",BLUE));
-            int total=0;for(MemberCount mc:finalCounts)total+=mc.count;
-            addCard(r,card("Faction activity mentions",String.format(Locale.US,"%,d member mentions across %,d scanned log rows",total,finalNews.length()),GOOD));
+            addCard(r,card("Activity coverage",finalNews.length()+" faction-news rows scanned • page cap "+finalPageCap+" per category batch\nScans the full faction-news category set when permitted. Counts are log entries mentioning each member by name; this is a participation signal, not a Torn-issued score.",BLUE));
+            int total=0,active=0,zero=0;for(MemberCount mc:finalCounts){total+=mc.count;if(mc.count>0)active++;else zero++;}
+            addCard(r,card("Faction activity mentions",String.format(Locale.US,"%,d member mentions • %d members active • %d with zero mentions",total,active,zero),GOOD));
+            if(!finalCounts.isEmpty())addCard(r,card("Bottom 5 — needs attention",bottomFive(finalCounts),GOLD));
             int rank=1;for(MemberCount mc:finalCounts){String body=String.format(Locale.US,"%,d actions / mentions",mc.count);addCard(r,card(rank+". "+mc.name,body,mc.count==0?BAD:BORDER));rank++;}
             setContentView(s);s.requestApplyInsets();
         });
     }
+
+    private String bottomFive(List<MemberCount> counts){
+        StringBuilder b=new StringBuilder();int start=Math.max(0,counts.size()-5);int n=1;
+        for(int i=start;i<counts.size();i++){MemberCount mc=counts.get(i);if(b.length()>0)b.append("\n");b.append(n++).append(". ").append(mc.name).append(" — ").append(mc.count);}
+        return b.toString();
+    }
+
+    private void appendAll(JSONArray target,JSONArray source){if(source==null)return;for(int i=0;i<source.length();i++)target.put(source.opt(i));}
 
     private void loadWar(String key) throws Exception {
         JSONObject membersRoot=TornApiClient.getJson("/faction/members",key);
