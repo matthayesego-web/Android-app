@@ -1,6 +1,9 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -11,6 +14,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -64,7 +68,7 @@ public class FactionOpsActivity extends Activity {
     private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setLineSpacing(0f,1.08f);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
     private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(TEXT);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackground(rounded(PANEL2,BORDER,11));return b;}
-    private LinearLayout card(String title,String body,int stroke){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(16),dp(15),dp(16),dp(15));c.setBackground(rounded(PANEL,stroke,17));c.addView(text(title,18,TEXT,true));if(body!=null&&!body.isEmpty()){TextView b=text(body,13,MUTED,false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(6);c.addView(b,p);}return c;}
+    private LinearLayout card(String title,String body,int stroke){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(16),dp(15),dp(16),dp(15));c.setBackground(rounded(PANEL,stroke,17));c.addView(text(title,18,TEXT,true));if(body!=null&&!body.isEmpty()){TextView b=text(body,13,MUTED,false);b.setTextIsSelectable(true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(6);c.addView(b,p);}return c;}
     private void addCard(LinearLayout root,LinearLayout card){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.bottomMargin=dp(10);root.addView(card,p);}
 
     @SuppressWarnings("deprecation") private ScrollView shell(){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.setBackgroundColor(BG);int l=dp(16),t=dp(16),r=dp(16),b=dp(28);s.setPadding(l,t,r,b);s.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(l+i.getSystemWindowInsetLeft(),t+i.getSystemWindowInsetTop(),r+i.getSystemWindowInsetRight(),b+i.getSystemWindowInsetBottom());return i;});return s;}
@@ -141,7 +145,11 @@ public class FactionOpsActivity extends Activity {
             addCard(r,card("Activity coverage",finalNews.length()+" faction-news rows scanned • page cap "+finalPageCap+" per category batch\nScans the full faction-news category set when permitted. Counts are log entries mentioning each member by name; this is a participation signal, not a Torn-issued score.",BLUE));
             int total=0,active=0,zero=0;for(MemberCount mc:finalCounts){total+=mc.count;if(mc.count>0)active++;else zero++;}
             addCard(r,card("Faction activity mentions",String.format(Locale.US,"%,d member mentions • %d members active • %d with zero mentions",total,active,zero),GOOD));
-            if(!finalCounts.isEmpty())addCard(r,card("Bottom 5 — needs attention",bottomFive(finalCounts),GOLD));
+            String bottom=bottomFive(finalCounts);
+            if(!bottom.isEmpty()){
+                LinearLayout bottomCard=card("Bottom 5 — needs attention",bottom,GOLD);Button copyBottom=button("Copy Bottom 5");copyBottom.setOnClickListener(v->copyText("Bottom 5",bottom));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));cp.topMargin=dp(9);bottomCard.addView(copyBottom,cp);addCard(r,bottomCard);
+            }
+            String fullRanking=rankingText(finalCounts);LinearLayout copyCard=card("Copy-ready report","Generate a paste-ready numbered list of every member and activity total.",BORDER);Button copyAll=button("Copy Full Ranking");copyAll.setOnClickListener(v->copyText("Faction Activity Ranking",fullRanking));LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));ap.topMargin=dp(9);copyCard.addView(copyAll,ap);addCard(r,copyCard);
             int rank=1;for(MemberCount mc:finalCounts){String body=String.format(Locale.US,"%,d actions / mentions",mc.count);addCard(r,card(rank+". "+mc.name,body,mc.count==0?BAD:BORDER));rank++;}
             setContentView(s);s.requestApplyInsets();
         });
@@ -149,10 +157,12 @@ public class FactionOpsActivity extends Activity {
 
     private String bottomFive(List<MemberCount> counts){
         StringBuilder b=new StringBuilder();int start=Math.max(0,counts.size()-5);int n=1;
-        for(int i=start;i<counts.size();i++){MemberCount mc=counts.get(i);if(b.length()>0)b.append("\n");b.append(n++).append(". ").append(mc.name).append(" — ").append(mc.count);}
+        for(int i=counts.size()-1;i>=start;i--){MemberCount mc=counts.get(i);if(b.length()>0)b.append("\n");b.append(n++).append(". ").append(mc.name).append(" — ").append(mc.count);}
         return b.toString();
     }
 
+    private String rankingText(List<MemberCount> counts){StringBuilder b=new StringBuilder();int n=1;for(MemberCount mc:counts){if(b.length()>0)b.append("\n");b.append(n++).append(". ").append(mc.name).append(" — ").append(mc.count);}return b.toString();}
+    private void copyText(String label,String value){ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);if(clipboard!=null){clipboard.setPrimaryClip(ClipData.newPlainText(label,value));Toast.makeText(this,label+" copied.",Toast.LENGTH_SHORT).show();}}
     private void appendAll(JSONArray target,JSONArray source){if(source==null)return;for(int i=0;i<source.length();i++)target.put(source.opt(i));}
 
     private void loadWar(String key) throws Exception {
