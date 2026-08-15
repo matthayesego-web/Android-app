@@ -11,7 +11,7 @@ on:
 jobs:
   visual-smoke:
     runs-on: macos-15-intel
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -33,7 +33,7 @@ jobs:
       - name: Boot emulator and capture visual proof
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 37
+          api-level: 35
           arch: x86_64
           profile: pixel_2
           disable-animations: true
