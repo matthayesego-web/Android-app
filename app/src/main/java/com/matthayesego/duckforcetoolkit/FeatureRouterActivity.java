@@ -17,6 +17,8 @@ public class FeatureRouterActivity extends Activity {
     public static final String TARGET_WAR = "WAR";
     public static final String TARGET_CHAIN = "CHAIN";
     public static final String TARGET_OC = "OC";
+    public static final String TARGET_PULSE = "PULSE";
+    public static final String TARGET_LOOKUP = "LOOKUP";
     public static final String TARGET_DEVELOPER = "DEVELOPER";
 
     private static final int BG=Color.rgb(8,12,18),PANEL=Color.rgb(20,27,38),BORDER=Color.rgb(49,63,81),TEXT=Color.rgb(245,248,252),MUTED=Color.rgb(151,163,179),GOLD=Color.rgb(243,184,52),BAD=Color.rgb(248,81,73);
@@ -62,12 +64,20 @@ public class FeatureRouterActivity extends Activity {
     }
 
     private void launchFeature(String target,int factionId,String factionName,String position,boolean factionApiAccess){
-        String mode;
-        if(TARGET_WAR.equals(target))mode=FactionOpsActivity.MODE_WAR;
-        else if(TARGET_CHAIN.equals(target))mode=FactionOpsActivity.MODE_CHAIN;
-        else if(TARGET_OC.equals(target))mode=FactionOpsActivity.MODE_OC;
-        else mode=FactionOpsActivity.MODE_ACTIVITY;
-        Intent i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);putScope(i,factionId,factionName,position,factionApiAccess);startActivity(i);finish();
+        Intent i;
+        if(TARGET_OC.equals(target)){
+            i=new Intent(this,OcTrackerActivity.class);
+        } else if(TARGET_PULSE.equals(target)||TARGET_LOOKUP.equals(target)) {
+            i=new Intent(this,QuickIntelActivity.class);
+            i.putExtra(QuickIntelActivity.EXTRA_MODE,TARGET_LOOKUP.equals(target)?QuickIntelActivity.MODE_LOOKUP:QuickIntelActivity.MODE_PULSE);
+        } else {
+            String mode;
+            if(TARGET_WAR.equals(target))mode=FactionOpsActivity.MODE_WAR;
+            else if(TARGET_CHAIN.equals(target))mode=FactionOpsActivity.MODE_CHAIN;
+            else mode=FactionOpsActivity.MODE_ACTIVITY;
+            i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);
+        }
+        putScope(i,factionId,factionName,position,factionApiAccess);startActivity(i);finish();
     }
 
     private void putScope(Intent i,int factionId,String factionName,String position,boolean factionApiAccess){
