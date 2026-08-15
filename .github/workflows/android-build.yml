@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, v0.7-dashboard-premium-prep ]
   workflow_dispatch:
 
 permissions:
