@@ -51,6 +51,13 @@ public final class FactionScopeCache {
                 .apply();
     }
 
+    public static long ageSeconds(Context context){
+        long verifiedAt=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getLong("verified_at",0L);
+        return verifiedAt<=0?-1L:Math.max(0L,(System.currentTimeMillis()-verifiedAt)/1000L);
+    }
+
+    public static boolean hasFreshScope(Context context){long age=ageSeconds(context);return age>=0&&age*1000L<TTL_MS;}
+
     public static void clear(Context context){context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().clear().apply();}
 
     private static String fingerprint(String value){
