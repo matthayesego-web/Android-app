@@ -29,7 +29,7 @@ import java.util.Map;
 
 public class ToolHostActivity extends Activity {
     public static final String EXTRA_TOOL="tool";
-    private static final String APP_VERSION="0.4.5";
+    private static final String APP_VERSION="0.5.0";
     private static final int BG=Color.rgb(8,12,18),PANEL=Color.rgb(20,27,38),TEXT=Color.rgb(245,248,252);
     private WebView webView;private SecureApiKeyStore keyStore;
     private enum Tool{ARMORY("Faction Armory Auditor","armory.duckforce.app","armory_log.html"),TRAIN("Company Train Calculator","train.duckforce.app","train_calculator.html");final String title,domain,asset;Tool(String t,String d,String a){title=t;domain=d;asset=a;}}
