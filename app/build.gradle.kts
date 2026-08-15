@@ -12,9 +12,15 @@ android {
         targetSdk = 36
         versionCode = 10
         versionName = "0.4.5"
+        manifestPlaceholders["appLabel"] = "Duck Force Companion"
     }
 
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+            manifestPlaceholders["appLabel"] = "Duck Force Companion TEST"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
