@@ -24,6 +24,12 @@ jobs:
         with:
           gradle-version: '8.13'
 
+      - name: Read app version
+        run: |
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$VERSION_NAME" || (echo "Unable to read versionName" && exit 1)
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+
       - name: Validate signing secrets
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -46,7 +52,7 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/duckforce-release.jks"
           chmod 600 "$RUNNER_TEMP/duckforce-release.jks"
 
-      - name: Sign update APK
+      - name: Sign and verify update APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -55,6 +61,7 @@ jobs:
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           APK_SIGNER="$BUILD_TOOLS/apksigner"
           test -x "$APK_SIGNER" || (echo "apksigner not found" && exit 1)
+          OUT="DuckForce-Companion-v${VERSION_NAME}.apk"
           "$APK_SIGNER" sign \
             --ks "$RUNNER_TEMP/duckforce-release.jks" \
             --ks-key-alias "$ANDROID_KEY_ALIAS" \
@@ -63,23 +70,25 @@ jobs:
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
-            --out DuckForce-Companion-v0.6.0.apk \
+            --out "$OUT" \
             app/build/outputs/apk/release/app-release-unsigned.apk
-          "$APK_SIGNER" verify --verbose --print-certs DuckForce-Companion-v0.6.0.apk
+          "$APK_SIGNER" verify --verbose --print-certs "$OUT" | tee signer-verification.txt
+          grep -qi "c3ecc35a64f8e7ecedda1ca46d5fe0841b890eed9c78ccb6716d61a9237f0322" signer-verification.txt
 
       - name: Confirm production package ID
         run: |
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/aapt" dump badging DuckForce-Companion-v0.6.0.apk | tee apk-badging.txt
+          "$BUILD_TOOLS/aapt" dump badging "DuckForce-Companion-v${VERSION_NAME}.apk" | tee apk-badging.txt
           grep -q "package: name='com.matthayesego.duckforcetoolkit'" apk-badging.txt
 
       - name: Upload signed production update
         uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Companion-v0.6.0-production-update
+          name: DuckForce-Companion-v${{ env.VERSION_NAME }}-production-update
           path: |
-            DuckForce-Companion-v0.6.0.apk
+            DuckForce-Companion-v${{ env.VERSION_NAME }}.apk
             apk-badging.txt
+            signer-verification.txt
           if-no-files-found: error
           retention-days: 30
 
