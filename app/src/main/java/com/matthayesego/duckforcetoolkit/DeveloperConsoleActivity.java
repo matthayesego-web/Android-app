@@ -1,6 +1,7 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -52,17 +53,24 @@ public class DeveloperConsoleActivity extends Activity {
         boolean multi=DeveloperSettings.multiFactionPreview(this);
         addCard(r,card("Current tenant",factionName+" ["+factionId+"] • "+position+"\nFaction API access: "+(factionApi?"YES":"NO")+"\nEffective test access: "+(effectiveFactionApi()?"FACTION API":"PUBLIC-ONLY")+"\nTenant architecture: "+(multi?"PREVIEW":"SINGLE-FACTION")+"\nBackend configured: "+(CompanionBackendClient.isConfigured()?"YES":"NO"),BLUE));
 
+        LinearLayout quick=card("Feature test launchers","Open any v0.6 module directly using the current developer settings and authenticated faction scope.",BLUE);
+        addLaunchButton(quick,"Open Activity Tracker",FeatureRouterActivity.TARGET_ACTIVITY);
+        addLaunchButton(quick,"Open War Participation",FeatureRouterActivity.TARGET_WAR);
+        addLaunchButton(quick,"Open Chain Command Center",FeatureRouterActivity.TARGET_CHAIN);
+        addLaunchButton(quick,"Open OC Readiness",FeatureRouterActivity.TARGET_OC);
+        addCard(r,quick);
+
         LinearLayout multiCard=card("Multi-faction architecture preview",multi?"ON — faction-scoped v0.6 tools are marked for tenant-preview testing. The production sign-in gate remains Duck Force-only until the multi-faction release gate is deliberately opened.":"OFF — production and developer behavior remain single-faction. The v0.6 data model still scopes every new tool by authenticated faction ID.",multi?GOOD:GOLD);Button multiButton=button(multi?"Turn Tenant Preview Off":"Turn Tenant Preview On");multiButton.setOnClickListener(v->{DeveloperSettings.setMultiFactionPreview(this,!DeveloperSettings.multiFactionPreview(this));render();});multiCard.addView(multiButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,multiCard);
 
         boolean publicOnly=DeveloperSettings.simulatePublicOnly(this);LinearLayout publicCard=card("Permission simulation",publicOnly?"PUBLIC-ONLY simulation is ON. Faction API-only v0.6 features behave as though this member lacks Faction API Access.":"Using the real authenticated Torn permission state.",publicOnly?GOLD:BORDER);Button publicButton=button(publicOnly?"Use Real Permissions":"Simulate Public-Only Member");publicButton.setOnClickListener(v->{DeveloperSettings.setSimulatePublicOnly(this,!DeveloperSettings.simulatePublicOnly(this));render();});publicCard.addView(publicButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,publicCard);
 
         TextView featureTitle=text("FEATURE SWITCHES",12,MUTED,true);featureTitle.setLetterSpacing(.08f);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fp.topMargin=dp(5);fp.bottomMargin=dp(8);r.addView(featureTitle,fp);
-        addFeatureToggle(r,"Activity Tracker",DeveloperSettings.FEATURE_ACTIVITY,"30-day faction-log participation scanner");
+        addFeatureToggle(r,"Activity Tracker",DeveloperSettings.FEATURE_ACTIVITY,"faction-log participation scanner");
         addFeatureToggle(r,"War Participation",DeveloperSettings.FEATURE_WAR,"live hit participation + completed ranked-war report");
         addFeatureToggle(r,"Chain Command Center",DeveloperSettings.FEATURE_CHAIN,"live chain and member-readiness snapshot");
         addFeatureToggle(r,"OC Readiness",DeveloperSettings.FEATURE_OC,"organized-crime slots, item warnings and unassigned members");
 
-        LinearLayout lookback=card("Activity scanner controls","Lookback: "+DeveloperSettings.activityDays(this)+" days • API page cap: "+DeveloperSettings.activityMaxPages(this)+" pages (100 rows/page).",BORDER);
+        LinearLayout lookback=card("Activity scanner controls","Lookback: "+DeveloperSettings.activityDays(this)+" days • API page cap: "+DeveloperSettings.activityMaxPages(this)+" pages per news-category batch (100 rows/page).",BORDER);
         LinearLayout daysRow=new LinearLayout(this);daysRow.setOrientation(LinearLayout.HORIZONTAL);int[] daysValues={7,14,30};for(int d:daysValues){Button b=button(d+" days");b.setOnClickListener(v->{DeveloperSettings.setActivityDays(this,d);render();});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(44),1f);if(d!=7)p.leftMargin=dp(6);daysRow.addView(b,p);}lookback.addView(daysRow);
         LinearLayout pageRow=new LinearLayout(this);pageRow.setOrientation(LinearLayout.HORIZONTAL);LinearLayout.LayoutParams prp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));prp.topMargin=dp(7);int[] pageValues={5,10,20};for(int pages:pageValues){Button b=button(pages+" pages");b.setOnClickListener(v->{DeveloperSettings.setActivityMaxPages(this,pages);render();});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(44),1f);if(pages!=5)p.leftMargin=dp(6);pageRow.addView(b,p);}lookback.addView(pageRow,prp);addCard(r,lookback);
 
@@ -74,6 +82,8 @@ public class DeveloperConsoleActivity extends Activity {
 
         setContentView(s);s.requestApplyInsets();
     }
+
+    private void addLaunchButton(LinearLayout parent,String label,String target){Button b=button(label);b.setOnClickListener(v->{Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,target);startActivity(i);});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));p.topMargin=dp(7);parent.addView(b,p);}
 
     private void addFeatureToggle(LinearLayout root,String label,String feature,String description){boolean enabled=DeveloperSettings.featureEnabled(this,feature);LinearLayout c=card(label,description+"\nStatus: "+(enabled?"ENABLED":"DISABLED"),enabled?GOOD:BORDER);Button b=button(enabled?"Disable for Testing":"Enable Feature");b.setOnClickListener(v->{DeveloperSettings.setFeatureEnabled(this,feature,!DeveloperSettings.featureEnabled(this,feature));render();});c.addView(b,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44)));addCard(root,c);}
 
