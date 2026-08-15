@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class OcTrackerActivity extends Activity {
     private static final int TAB_OPEN=0, TAB_PLANNING=1, TAB_COMPLETE=2;
@@ -26,6 +29,7 @@ public class OcTrackerActivity extends Activity {
     private static final int TEXT=Color.rgb(245,248,252), MUTED=Color.rgb(151,163,179), GOLD=Color.rgb(243,184,52), BLUE=Color.rgb(88,166,255), GOOD=Color.rgb(63,185,80), BAD=Color.rgb(248,81,73);
 
     private SecureApiKeyStore keyStore;
+    private int factionId;
     private String factionName;
     private boolean factionApi;
     private JSONArray recruiting=new JSONArray(), planning=new JSONArray(), completed=new JSONArray(), members=new JSONArray();
@@ -33,7 +37,7 @@ public class OcTrackerActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
-        keyStore=new SecureApiKeyStore(this);factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);factionApi=getIntent().getBooleanExtra(FactionOpsActivity.EXTRA_FACTION_API,false);if(factionName==null||factionName.trim().isEmpty())factionName="Faction";showLoading();load();
+        keyStore=new SecureApiKeyStore(this);factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);factionApi=getIntent().getBooleanExtra(FactionOpsActivity.EXTRA_FACTION_API,false);if(factionName==null||factionName.trim().isEmpty())factionName="Faction";showLoading();load();
     }
 
     private boolean hasFactionApi(){return factionApi&&!DeveloperSettings.simulatePublicOnly(this);}
@@ -47,18 +51,33 @@ public class OcTrackerActivity extends Activity {
     private LinearLayout root(ScrollView s){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);s.addView(r,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));return r;}
 
     private void addHeader(LinearLayout r,String subtitle){Button back=button("← Companion",BORDER);back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(124),dp(44)));TextView title=text("OC Tracker",27,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);r.addView(title,tp);TextView sub=text(factionName+" • "+subtitle,13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(4);sp.bottomMargin=dp(12);r.addView(sub,sp);}
-    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading organized crimes…");addCard(r,card("Quick OC status","Loading recruiting, planning and recent completed crimes into one fast screen.",BLUE));setContentView(s);}
+    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading organized crimes…");addCard(r,card("Quick OC status","Loading recruiting, planning and recent completed crimes together for fast access.",BLUE));setContentView(s);}
 
     private void load(){
         if(!hasFactionApi()){renderError("Faction API Access is required for organized-crime details.");return;}
         String key=keyStore.load();if(key==null||key.trim().isEmpty()){renderError("Reconnect your Torn API key to use the OC tracker.");return;}
-        new Thread(()->{try{
-            recruiting=TornApiClient.getPagedArray("/faction/crimes?cat=recruiting&sort=DESC&limit=100",key,"crimes",3);
-            planning=TornApiClient.getPagedArray("/faction/crimes?cat=planning&sort=DESC&limit=100",key,"crimes",3);
-            completed=TornApiClient.getPagedArray("/faction/crimes?cat=completed&sort=DESC&limit=20",key,"crimes",1);
-            JSONArray m=TornApiClient.getJson("/faction/members",key).optJSONArray("members");members=m==null?new JSONArray():m;
-            runOnUiThread(this::render);
-        }catch(Exception e){renderError(e.getMessage()==null?"Unable to load organized crimes.":e.getMessage());}}).start();
+        new Thread(()->{
+            ExecutorService pool=Executors.newFixedThreadPool(4);
+            try{
+                JSONArray cachedMembers=FactionMemberCache.load(factionId);
+                Future<JSONArray> recruitingFuture=pool.submit(()->TornApiClient.getPagedArray("/faction/crimes?cat=recruiting&sort=DESC&limit=100",key,"crimes",3));
+                Future<JSONArray> planningFuture=pool.submit(()->TornApiClient.getPagedArray("/faction/crimes?cat=planning&sort=DESC&limit=100",key,"crimes",3));
+                Future<JSONArray> completedFuture=pool.submit(()->TornApiClient.getPagedArray("/faction/crimes?cat=completed&sort=DESC&limit=20",key,"crimes",1));
+                Future<JSONArray> membersFuture=cachedMembers==null?pool.submit(()->{JSONArray m=TornApiClient.getJson("/faction/members",key).optJSONArray("members");return m==null?new JSONArray():m;}):null;
+
+                recruiting=recruitingFuture.get();
+                planning=planningFuture.get();
+                completed=completedFuture.get();
+                members=cachedMembers!=null?cachedMembers:membersFuture.get();
+                if(cachedMembers==null)FactionMemberCache.save(factionId,members);
+                runOnUiThread(this::render);
+            }catch(Exception e){
+                Throwable cause=e.getCause()==null?e:e.getCause();
+                renderError(cause.getMessage()==null?"Unable to load organized crimes.":cause.getMessage());
+            }finally{
+                pool.shutdownNow();
+            }
+        }).start();
     }
 
     private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");addCard(r,card("Unable to load",message,BAD));setContentView(s);});}
