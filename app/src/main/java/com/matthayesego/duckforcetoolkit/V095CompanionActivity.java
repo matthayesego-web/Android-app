@@ -1,8 +1,6 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Typeface;
@@ -11,7 +9,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -20,17 +17,13 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-
 /**
- * v0.9.7 premium faction-OS shell.
+ * Premium faction-OS shell.
  * The working legacy feature handlers remain underneath, but the visible app is rebuilt around
  * Home / Faction / War / Leadership / More with no duplicate top tabs.
  */
 public class V095CompanionActivity extends V090CompanionActivity {
-    private static final String VERSION = "0.9.7";
+    private static final String VERSION = "0.9.13";
     private static final int BG=Color.rgb(5,8,12), SURFACE=Color.rgb(12,18,26), SURFACE_2=Color.rgb(8,13,20), BORDER=Color.rgb(36,47,61);
     private static final int TEXT=Color.rgb(246,248,251), MUTED=Color.rgb(145,155,169), GOLD=Color.rgb(241,190,86), GOLD_DARK=Color.rgb(122,84,27);
     private static final int BLUE=Color.rgb(82,153,235), GREEN=Color.rgb(76,190,102), RED=Color.rgb(239,88,82);
@@ -39,7 +32,6 @@ public class V095CompanionActivity extends V090CompanionActivity {
     private LinearLayout pageHost;
     private LinearLayout bottomNav;
     private ImageView avatarView;
-    private Bitmap avatarBitmap;
     private boolean leadershipAvailable;
     private String playerName="Member", factionName="Duck Force", position="Member";
     private int factionId=0;
@@ -141,7 +133,7 @@ public class V095CompanionActivity extends V090CompanionActivity {
 
     private void addHomeHeader(LinearLayout root){
         LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(2),dp(10),dp(2),dp(12));
-        avatarView=new ImageView(this);avatarView.setScaleType(ImageView.ScaleType.CENTER_CROP);avatarView.setImageResource(R.drawable.duckforce_noir_art);avatarView.setBackground(oval(Color.rgb(17,23,31),GOLD_DARK));avatarView.setClipToOutline(true);avatarView.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}});if(avatarBitmap!=null)avatarView.setImageBitmap(avatarBitmap);
+        avatarView=new ImageView(this);avatarView.setScaleType(ImageView.ScaleType.CENTER_CROP);avatarView.setImageResource(R.drawable.duckforce_noir_art);avatarView.setBackground(oval(Color.rgb(17,23,31),GOLD_DARK));avatarView.setClipToOutline(true);avatarView.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}});
         header.addView(avatarView,new LinearLayout.LayoutParams(dp(78),dp(78)));
         LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);TextView welcome=text("Welcome back,",13,MUTED,false);copy.addView(welcome);TextView name=text(playerName,28,TEXT,true);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);np.topMargin=dp(1);copy.addView(name,np);TextView role=text(factionName+"  •  "+position,12,DeveloperPreviewStore.isMemberPreview(this)?BLUE:GOLD,false);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);rp.topMargin=dp(4);copy.addView(role,rp);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f);cp.leftMargin=dp(14);header.addView(copy,cp);root.addView(header,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
     }
@@ -161,7 +153,7 @@ public class V095CompanionActivity extends V090CompanionActivity {
 
     private void renderFaction(){
         pageHost.removeAllViews();selectNav("Faction");addPageTitle(pageHost,"FACTION","Your faction hub","Personal faction status, shared tools and strength intelligence without dashboard clutter.");
-        LinearLayout strength=premiumCard("FFSCOUTER INTEL","Faction Strength Intel","Estimated battle stats, Fair Fight, source and freshness using your own registered Torn key.",BLUE,()->openFeature(FeatureRouterActivity.TARGET_STRENGTH));addFull(pageHost,strength,128);
+        LinearLayout strength=premiumCard("FFSCOUTER INTEL","Faction Strength Intel","Estimated battle stats, Fair Fight, source and freshness using your own opted-in Torn key.",BLUE,()->openFeature(FeatureRouterActivity.TARGET_STRENGTH));addFull(pageHost,strength,128);
         addSection(pageHost,"MY FACTION STATUS");
         addFull(pageHost,premiumCard("PERSONAL","My Status","A single place for your OC, war participation, chain context and current obligations.",GOLD,()->openMember(MemberFactionActivity.MODE_OVERVIEW)),112);
         LinearLayout pair=new LinearLayout(this);pair.setOrientation(LinearLayout.HORIZONTAL);pair.addView(compactCard("MY OC","Assignment and readiness",BLUE,()->openMember(MemberFactionActivity.MODE_OC)),weighted(false));pair.addView(compactCard("PARTICIPATION","My ranked-war activity",GREEN,()->openMember(MemberFactionActivity.MODE_PARTICIPATION)),weighted(true));LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(140));pp.bottomMargin=dp(14);pageHost.addView(pair,pp);
@@ -173,7 +165,7 @@ public class V095CompanionActivity extends V090CompanionActivity {
         if(!leadershipAvailable){renderHome();return;}pageHost.removeAllViews();selectNav("Leadership");addPageTitle(pageHost,"LEADERSHIP","Command center","Exceptions first: who needs attention, why they need it, and the tools required to act.");
         addFull(pageHost,premiumCard("PRIORITY","Leadership Attention","War-hit gaps, missing OC assignments, inactivity and availability exceptions in one view.",GOLD,()->startActivity(new Intent(this,LeadershipAttentionActivity.class))),124);
         addSection(pageHost,"MEMBERS");
-        addFull(pageHost,premiumCard("MEMBER INTELLIGENCE","Member Dossier","Leadership-focused member lookup. Current status now; participation, OC and FFScouter context expand here next.",BLUE,()->openFeature(FeatureRouterActivity.TARGET_LOOKUP)),120);
+        addFull(pageHost,premiumCard("MEMBER INTELLIGENCE","Member Dossier","Leadership-focused member lookup with current Torn status and opted-in battle intelligence.",BLUE,()->openFeature(FeatureRouterActivity.TARGET_LOOKUP)),120);
         addSection(pageHost,"WAR & OC");
         LinearLayout pair=new LinearLayout(this);pair.setOrientation(LinearLayout.HORIZONTAL);pair.addView(compactCard("WAR","Participation command",RED,()->openFeature(FeatureRouterActivity.TARGET_WAR)),weighted(false));pair.addView(compactCard("OC","OC management",BLUE,()->openFeature(FeatureRouterActivity.TARGET_OC)),weighted(true));LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(140));pp.bottomMargin=dp(14);pageHost.addView(pair,pp);
         addSection(pageHost,"OPERATIONS");
@@ -192,14 +184,15 @@ public class V095CompanionActivity extends V090CompanionActivity {
     private void loadWarStatus(){String key=new SecureApiKeyStore(this).load();if(key==null)return;new Thread(()->{try{JSONObject factionRoot=TornApiClient.getJson("/user/faction",key);JSONObject faction=factionRoot.optJSONObject("faction");int id=faction==null?0:faction.optInt("id",0);if(id>0)factionId=id;WarStatus status=WarStatus.from(TornApiClient.getJson("/faction/wars",key),id);long now=System.currentTimeMillis()/1000L;runOnUiThread(()->applyWarStatus(status,now));}catch(Exception e){runOnUiThread(()->{if(warTitle!=null){warEyebrow.setText("WAR STATUS");warEyebrow.setTextColor(MUTED);warTitle.setText("War status unavailable");warMeta.setText("Open War Center to retry live Torn data.");warStatus.setText("");}});}}).start();}
     private void applyWarStatus(WarStatus status,long now){if(warTitle==null)return;if(!status.present){warEyebrow.setText("WAR STATUS");warEyebrow.setTextColor(GREEN);warTitle.setText("No Ranked War Scheduled");warMeta.setText("Duck Force has no current or upcoming ranked war.");warStatus.setText("Ready for the next operation");warStatus.setTextColor(GREEN);}else if(status.isUpcoming(now)){warEyebrow.setText("UPCOMING WAR");warEyebrow.setTextColor(GOLD);warTitle.setText("War Starts Soon");warMeta.setText("vs "+status.opponent+(status.target>0?"  •  target "+status.target:""));warStatus.setText("Starts in "+WarStatus.duration(status.start-now));warStatus.setTextColor(GOLD);}else if(status.isLive(now)){warEyebrow.setText("CURRENT WAR");warEyebrow.setTextColor(RED);warTitle.setText("War In Progress");warMeta.setText("vs "+status.opponent+"  •  "+status.ourScore+" – "+status.opponentScore);warStatus.setText(WarStatus.duration(now-status.start)+" elapsed");warStatus.setTextColor(RED);}else{warEyebrow.setText("LATEST WAR");warEyebrow.setTextColor(MUTED);warTitle.setText("Latest Ranked War Ended");warMeta.setText(status.opponent+"  •  final "+status.ourScore+" – "+status.opponentScore);warStatus.setText("Open War Center for participation details");warStatus.setTextColor(MUTED);}}
 
-    private void loadAvatar(){if(avatarBitmap!=null||avatarView==null)return;String key=new SecureApiKeyStore(this).load();if(key==null)return;new Thread(()->{HttpURLConnection connection=null;try{JSONObject root=TornApiClient.getJson("/user/profile",key);JSONObject profile=root.optJSONObject("profile");String image=profile==null?"":profile.optString("image","").trim();if(image.isEmpty())return;if(image.startsWith("//"))image="https:"+image;else if(image.startsWith("/"))image="https://www.torn.com"+image;connection=(HttpURLConnection)new URL(image).openConnection();connection.setConnectTimeout(12000);connection.setReadTimeout(18000);connection.setRequestProperty("User-Agent","DuckForceCompanion/0.9.7 Android");try(InputStream in=connection.getInputStream()){Bitmap bitmap=BitmapFactory.decodeStream(in);if(bitmap!=null){avatarBitmap=bitmap;runOnUiThread(()->{if(avatarView!=null)avatarView.setImageBitmap(bitmap);});}}}catch(Exception ignored){}finally{if(connection!=null)connection.disconnect();}}).start();}
+    /** Remote Torn profile images are intentionally not auto-fetched; the local TornFCA mark remains. */
+    private void loadAvatar(){/* Local artwork only: avoids an unnecessary non-API Torn web request on every shell build. */}
 
     private void openFeature(String target){Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,target);startActivity(i);}
     private void openMember(String mode){Intent i=new Intent(this,MemberFactionActivity.class);i.putExtra(MemberFactionActivity.EXTRA_MODE,mode);startActivity(i);}
     private void invokeLegacy(String title){if(legacyRoot==null||!performClickableAncestor(findContainingIgnoreCase(legacyRoot,title))){Toast.makeText(this,title+" is unavailable for this account.",Toast.LENGTH_SHORT).show();}}
     private boolean performClickableAncestor(View start){View v=start;while(v!=null){if(v.isClickable()&&v.performClick())return true;if(!(v.getParent() instanceof View))break;v=(View)v.getParent();}return false;}
 
-    private void stampVersion(View view){if(view instanceof TextView){TextView t=(TextView)view;CharSequence raw=t.getText();if(raw!=null){String v=raw.toString().replace("v0.8.0","v"+VERSION).replace("v0.9.0","v"+VERSION).replace("v0.9.1","v"+VERSION).replace("v0.9.2","v"+VERSION).replace("v0.9.3","v"+VERSION).replace("v0.9.4","v"+VERSION).replace("v0.9.5","v"+VERSION).replace("v0.9.6","v"+VERSION);if(!v.equals(raw.toString()))t.setText(v);}}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)stampVersion(g.getChildAt(i));}}
+    private void stampVersion(View view){if(view instanceof TextView){TextView t=(TextView)view;CharSequence raw=t.getText();if(raw!=null){String v=raw.toString().replace("v0.8.0","v"+VERSION).replace("v0.9.0","v"+VERSION).replace("v0.9.1","v"+VERSION).replace("v0.9.2","v"+VERSION).replace("v0.9.3","v"+VERSION).replace("v0.9.4","v"+VERSION).replace("v0.9.5","v"+VERSION).replace("v0.9.6","v"+VERSION).replace("v0.9.7","v"+VERSION).replace("v0.9.8","v"+VERSION).replace("v0.9.9","v"+VERSION).replace("v0.9.10","v"+VERSION).replace("v0.9.11","v"+VERSION).replace("v0.9.12","v"+VERSION);if(!v.equals(raw.toString()))t.setText(v);}}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)stampVersion(g.getChildAt(i));}}
     private TextView findExact(View view,String exact){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&exact.equals(raw.toString()))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView f=findExact(g.getChildAt(i),exact);if(f!=null)return f;}}return null;}
     private boolean containsExact(View view,String exact){return findExact(view,exact)!=null;}
     private TextView findContainingIgnoreCase(View view,String needle){if(view==null)return null;String n=needle.toLowerCase();if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().toLowerCase().contains(n))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView f=findContainingIgnoreCase(g.getChildAt(i),needle);if(f!=null)return f;}}return null;}
