@@ -66,7 +66,12 @@ public class MemberDossierActivity extends Activity {
     }
 
     private void loadTornStatsRoster(String key){
-        tsRosterById.clear();try{JSONObject root=TornStatsClient.factionRoster(key);JSONObject roster=root.optJSONObject("members");if(roster!=null){for(String id:roster.keySet()){JSONObject o=roster.optJSONObject(id);if(o!=null)try{tsRosterById.put(Integer.parseInt(id),o);}catch(Exception ignored){}}}tsStatus=tsRosterById.size()+" TornStats roster records loaded";}catch(Exception e){tsStatus=e.getMessage()==null?"TornStats unavailable":e.getMessage();}
+        tsRosterById.clear();
+        try{
+            JSONObject root=TornStatsClient.factionRoster(key);JSONObject roster=root.optJSONObject("members");JSONArray names=roster==null?null:roster.names();
+            for(int i=0;names!=null&&i<names.length();i++){String memberId=names.optString(i,"");JSONObject o=roster.optJSONObject(memberId);if(o!=null)try{tsRosterById.put(Integer.parseInt(memberId),o);}catch(Exception ignored){}}
+            tsStatus=tsRosterById.size()+" TornStats roster records loaded";
+        }catch(Exception e){tsStatus=e.getMessage()==null?"TornStats unavailable":e.getMessage();}
     }
 
     private void renderSearch(){
@@ -112,7 +117,7 @@ public class MemberDossierActivity extends Activity {
 
     private void loadDetailedTornStats(int id){String key=keyStore.load();if(key==null)return;showLoading("Loading TornStats detail for the selected member…");new Thread(()->{try{JSONObject spy=TornStatsClient.userSpy(key,id);tsSpyById.put(id,spy);runOnUiThread(this::renderDossier);}catch(Exception e){String m=e.getMessage()==null?"TornStats detail unavailable.":e.getMessage();runOnUiThread(()->{Toast.makeText(this,m,Toast.LENGTH_LONG).show();renderDossier();});}}).start();}
 
-    private JSONObject extractSpy(JSONObject root){if(root==null)return null;JSONObject compare=root.optJSONObject("compare");if(compare!=null){JSONObject spy=compare.optJSONObject("spy");if(spy!=null)return spy;}JSONObject spy=root.optJSONObject("spy");return spy;}
+    private JSONObject extractSpy(JSONObject root){if(root==null)return null;JSONObject compare=root.optJSONObject("compare");if(compare!=null){JSONObject spy=compare.optJSONObject("spy");if(spy!=null)return spy;}return root.optJSONObject("spy");}
     private static String freshness(String value){return value==null||value.isBlank()?"":" • "+value;}
     private static String ffFreshness(JSONObject ff){if(ff==null)return"";Object raw=ff.opt("last_updated");if(raw instanceof JSONObject){JSONObject o=(JSONObject)raw;String rel=o.optString("relative",o.optString("human",""));if(!rel.isBlank())return" • "+rel;}String rel=ff.optString("last_updated_human","");return rel.isBlank()?"":" • "+rel;}
     private static String format(double v){return String.format(Locale.US,"%.2f",v);}
