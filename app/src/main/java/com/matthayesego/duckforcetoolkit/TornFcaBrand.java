@@ -65,7 +65,13 @@ public final class TornFcaBrand {
 
     public static String rebrand(String value){
         if(value==null)return"";
-        return value
+        if("DUCK FORCE".equals(value))return"FACTION COMPANION";
+        if("Companion".equals(value))return"TornFCA";
+        String branded=value
+                .replace("Sign in to Duck Force","Sign in to TornFCA")
+                .replace("Connect to Duck Force","Connect to TornFCA")
+                .replace("Duck Force only  •  ","")
+                .replace("Duck Force only • ","")
                 .replace("Duck Force Companion","TornFCA")
                 .replace("DUCK FORCE COMPANION","TORNFCA")
                 .replace("Duck Force Beta","TornFCA Beta")
@@ -88,6 +94,8 @@ public final class TornFcaBrand {
                 .replace("v0.9.13","v0.9.16")
                 .replace("v0.9.14","v0.9.16")
                 .replace("v0.9.15","v0.9.16");
+        if(branded.contains("Encrypted on this device"))branded=branded.replaceAll("v0\\.9\\.\\d+","v"+VERSION);
+        return branded;
     }
 
     /** Retargets existing feature intents through thin TornFCA wrappers so every screen receives branding/theme. */
