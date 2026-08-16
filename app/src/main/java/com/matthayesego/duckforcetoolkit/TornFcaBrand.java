@@ -14,7 +14,7 @@ import android.widget.TextView;
 public final class TornFcaBrand {
     public static final String NAME="TornFCA";
     public static final String LONG_NAME="Torn Faction Companion App";
-    public static final String VERSION="0.9.16";
+    public static final String VERSION="0.9.17";
 
     private static final int[] LEGACY_BRAND_COLORS=new int[]{
             Color.rgb(241,190,86),Color.rgb(241,194,106),Color.rgb(243,184,52),Color.rgb(215,160,68),Color.rgb(242,197,107)
@@ -55,8 +55,6 @@ public final class TornFcaBrand {
     private static boolean selectedNav(ViewGroup group,int accent){for(int i=0;i<group.getChildCount();i++)if(group.getChildAt(i)instanceof TextView&&((TextView)group.getChildAt(i)).getCurrentTextColor()==accent)return true;return false;}
 
     private static void replaceLegacyArtwork(Context context,ImageView image){
-        // Never replace the dedicated profile-avatar target. Its placeholder is intentionally
-        // swapped asynchronously for the authenticated Torn profile image.
         if("tornfca-profile-avatar".equals(image.getTag()))return;
         try{Drawable current=image.getDrawable();Drawable legacy=context.getDrawable(R.drawable.duckforce_noir_art);if(current!=null&&legacy!=null&&current.getConstantState()!=null&&legacy.getConstantState()!=null&&current.getConstantState().equals(legacy.getConstantState())){image.setImageResource(R.drawable.tornfca_mark);int pad=Math.round(8*context.getResources().getDisplayMetrics().density);image.setPadding(pad,pad,pad,pad);}}catch(Exception ignored){}
     }
@@ -67,6 +65,8 @@ public final class TornFcaBrand {
         if(value==null)return"";
         if("DUCK FORCE".equals(value))return"FACTION COMPANION";
         if("Companion".equals(value))return"TornFCA";
+        if("My Obligations".equals(value))return"My Day";
+        if("What needs my action right now".equals(value))return"Bars, cooldowns, OC, chain and war readiness";
         String branded=value
                 .replace("Sign in to Duck Force","Sign in to TornFCA")
                 .replace("Connect to Duck Force","Connect to TornFCA")
@@ -84,16 +84,17 @@ public final class TornFcaBrand {
                 .replace("Duck Force payout","faction payout")
                 .replace("Duck Force can remain the first tenant","the current faction can remain the first tenant")
                 .replace("DUCK FORCE •","TORNFCA •")
-                .replace("v0.9.6","v0.9.16")
-                .replace("v0.9.7","v0.9.16")
-                .replace("v0.9.8","v0.9.16")
-                .replace("v0.9.9","v0.9.16")
-                .replace("v0.9.10","v0.9.16")
-                .replace("v0.9.11","v0.9.16")
-                .replace("v0.9.12","v0.9.16")
-                .replace("v0.9.13","v0.9.16")
-                .replace("v0.9.14","v0.9.16")
-                .replace("v0.9.15","v0.9.16");
+                .replace("v0.9.6","v0.9.17")
+                .replace("v0.9.7","v0.9.17")
+                .replace("v0.9.8","v0.9.17")
+                .replace("v0.9.9","v0.9.17")
+                .replace("v0.9.10","v0.9.17")
+                .replace("v0.9.11","v0.9.17")
+                .replace("v0.9.12","v0.9.17")
+                .replace("v0.9.13","v0.9.17")
+                .replace("v0.9.14","v0.9.17")
+                .replace("v0.9.15","v0.9.17")
+                .replace("v0.9.16","v0.9.17");
         if(branded.contains("Encrypted on this device"))branded=branded.replaceAll("v0\\.9\\.\\d+","v"+VERSION);
         return branded;
     }
@@ -114,7 +115,12 @@ public final class TornFcaBrand {
         else if(c.equals(PremiumAdminActivity.class.getName()))target=TornFcaScreens.PremiumAdmin.class;
         else if(c.equals(LeadershipAttentionActivity.class.getName()))target=TornFcaScreens.LeadershipAttention.class;
         else if(c.equals(FactionStrengthActivity.class.getName()))target=TornFcaScreens.FactionStrength.class;
-        else if(c.equals(MemberFactionActivity.class.getName()))target=TornFcaScreens.MemberFaction.class;
+        else if(c.equals(MemberFactionActivity.class.getName())){
+            String mode=source.getStringExtra(MemberFactionActivity.EXTRA_MODE);
+            if(MemberFactionActivity.MODE_OVERVIEW.equals(mode))target=MemberDailyActivity.class;
+            else if(MemberFactionActivity.MODE_PARTICIPATION.equals(mode))target=MemberWarActivity.class;
+            else target=TornFcaScreens.MemberFaction.class;
+        }
         else if(c.equals(WarNoticeActivity.class.getName()))target=TornFcaScreens.WarNotice.class;
         else if(c.equals(FactionOpsActivity.class.getName()))target=TornFcaScreens.FactionOps.class;
         else if(c.equals(OcTrackerActivity.class.getName()))target=TornFcaScreens.OcTracker.class;
