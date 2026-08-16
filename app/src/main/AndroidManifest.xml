@@ -3,6 +3,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
         <activity android:name=".AccessGateActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+        <activity android:name=".V095CompanionActivity" android:exported="false"/>
+        <activity android:name=".MoreActivity" android:exported="false"/>
+        <activity android:name=".AboutActivity" android:exported="false"/>
         <activity android:name=".V090CompanionActivity" android:exported="false"/>
         <activity android:name=".DeveloperGateActivity" android:exported="false"/>
         <activity android:name=".DeveloperPanelActivity" android:exported="false"/>
