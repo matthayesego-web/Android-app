@@ -10,9 +10,9 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 23
-        versionName = "0.9.8"
-        manifestPlaceholders["appLabel"] = "Duck Force Companion"
+        versionCode = 24
+        versionName = "0.9.9"
+        manifestPlaceholders["appLabel"] = "TornFCA"
     }
 
     signingConfigs {
@@ -27,12 +27,12 @@ android {
         getByName("debug") {
             applicationIdSuffix = ".internal"
             versionNameSuffix = "-internal"
-            manifestPlaceholders["appLabel"] = "Duck Force Companion INTERNAL"
+            manifestPlaceholders["appLabel"] = "TornFCA INTERNAL"
         }
         create("beta") {
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
-            manifestPlaceholders["appLabel"] = "Duck Force Companion BETA"
+            manifestPlaceholders["appLabel"] = "TornFCA BETA"
             isDebuggable = true
             isMinifyEnabled = false
         }
