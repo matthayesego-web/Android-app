@@ -83,7 +83,10 @@ public final class TornFcaBrand {
                 .replace("Loading Duck Force estimates","Loading faction estimates")
                 .replace("Duck Force War Center","Faction War Center")
                 .replace("Duck Force payout","faction payout")
+                .replace("Duck Force can remain the first tenant","the current faction can remain the first tenant")
                 .replace("DUCK FORCE •","TORNFCA •")
+                .replace("v0.9.6","v0.9.9")
+                .replace("v0.9.7","v0.9.9")
                 .replace("v0.9.8","v0.9.9");
     }
 
