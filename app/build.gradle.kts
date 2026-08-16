@@ -2,6 +2,11 @@ plugins {
     id("com.android.application")
 }
 
+val configuredDeveloperHash = providers.gradleProperty("TORNFCA_DEV_PASSWORD_SHA256").orNull
+    ?.trim()?.takeIf { it.isNotEmpty() }
+    ?: System.getenv("TORNFCA_DEV_PASSWORD_SHA256")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "AD039B0643FE2CD75558E56B90955252ED3F56CE6B2B7AA90CD1ED3BC22AC6AB"
+
 android {
     namespace = "com.matthayesego.duckforcetoolkit"
     compileSdk = 36
@@ -10,9 +15,14 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 24
-        versionName = "0.9.9"
+        versionCode = 25
+        versionName = "0.9.10"
         manifestPlaceholders["appLabel"] = "TornFCA"
+        buildConfigField("String", "DEVELOPER_ACCESS_SHA256", "\"$configuredDeveloperHash\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     signingConfigs {
