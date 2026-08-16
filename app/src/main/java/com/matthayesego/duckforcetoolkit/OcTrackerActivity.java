@@ -29,8 +29,8 @@ public class OcTrackerActivity extends Activity {
     private static final int TEXT=Color.rgb(245,248,252), MUTED=Color.rgb(151,163,179), GOLD=Color.rgb(243,184,52), BLUE=Color.rgb(88,166,255), GOOD=Color.rgb(63,185,80), BAD=Color.rgb(248,81,73);
     private SecureApiKeyStore keyStore;
     private int factionId;
-    private String factionName;
-    private boolean factionApi;
+    private String factionName,position;
+    private boolean factionApi,leadershipMode;
     private JSONArray recruiting=new JSONArray(), planning=new JSONArray(), completed=new JSONArray(), members=new JSONArray(), personalAvailable=new JSONArray();
     private JSONObject personalCurrent;
     private int selectedTab=TAB_OPEN;
@@ -42,7 +42,10 @@ public class OcTrackerActivity extends Activity {
         factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);
         factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);
         factionApi=getIntent().getBooleanExtra(FactionOpsActivity.EXTRA_FACTION_API,false);
+        position=getIntent().getStringExtra(DeveloperConsoleActivity.EXTRA_POSITION);
         if(factionName==null||factionName.trim().isEmpty())factionName="Faction";
+        if(position==null||position.trim().isEmpty())position="Member";
+        leadershipMode=AccessPolicy.isLeaderPosition(position)&&!DeveloperPreviewStore.isMemberPreview(this);
         showLoading();load();
     }
 
@@ -57,12 +60,14 @@ public class OcTrackerActivity extends Activity {
     private LinearLayout root(ScrollView s){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);s.addView(r,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));return r;}
     private void finishView(ScrollView s){setContentView(s);s.requestApplyInsets();}
     private void addHeader(LinearLayout r,String subtitle){Button back=button("← Companion",BORDER);back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(124),dp(44)));TextView title=text("OC Tracker",27,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);r.addView(title,tp);TextView sub=text(factionName+" • "+subtitle,13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(4);sp.bottomMargin=dp(12);r.addView(sub,sp);}
-    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading organized crimes…");addCard(r,card("Quick OC status","Loading the organized-crime information available to your Torn key.",BLUE));finishView(s);}
+    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading organized crimes…");addCard(r,card("Quick OC status",leadershipMode?"Loading the faction-wide OC command view.":"Loading your personal organized-crime information.",BLUE));finishView(s);}
 
     private void load(){
         String key=keyStore.load();
         if(key==null||key.trim().isEmpty()){renderError("Reconnect your Torn API key to use the OC tracker.");return;}
-        if(hasFactionApi())loadFaction(key);else loadPersonal(key);
+        // Leadership launches must attempt Torn's faction endpoint directly. The endpoint is the
+        // authoritative permission check; a stale cached factionApiAccess flag must never hide OC command data.
+        if(leadershipMode||hasFactionApi())loadFaction(key);else loadPersonal(key);
     }
 
     private void loadFaction(String key){
@@ -75,7 +80,11 @@ public class OcTrackerActivity extends Activity {
             recruiting=recruitingFuture.get();planning=planningFuture.get();completed=completedFuture.get();members=cachedMembers!=null?cachedMembers:membersFuture.get();
             if(cachedMembers==null)FactionMemberCache.save(factionId,members);
             runOnUiThread(this::renderFaction);
-        }catch(Exception e){Throwable cause=e.getCause()==null?e:e.getCause();renderError(cause.getMessage()==null?"Unable to load organized crimes.":cause.getMessage());}finally{pool.shutdownNow();}}).start();
+        }catch(Exception e){
+            Throwable cause=e.getCause()==null?e:e.getCause();String message=cause.getMessage()==null?"Unable to load organized crimes.":cause.getMessage();
+            if(leadershipMode)message="Leadership OC command requires Torn Faction API Access. Torn rejected the faction-wide OC request: "+message;
+            renderError(message);
+        }finally{pool.shutdownNow();}}).start();
     }
 
     private void loadPersonal(String key){
@@ -95,7 +104,7 @@ public class OcTrackerActivity extends Activity {
 
     private void renderPersonal(){
         ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Personal OC view");
-        addCard(r,card("Personal access active","Your Torn key can show your own current OC and recruiting slots. The full faction-wide OC roster still requires in-game Faction API Access.",BLUE));
+        addCard(r,card("Personal access active","Your Torn key can show your own current OC and recruiting slots. The full faction-wide OC roster remains inside Leadership for authorized users.",BLUE));
         if(personalCurrent==null){
             addCard(r,card("My current OC","You are not currently assigned to an organized crime.",GOLD));
         }else{
@@ -103,7 +112,7 @@ public class OcTrackerActivity extends Activity {
             String body="Status: "+status+" • Difficulty "+personalCurrent.optInt("difficulty",0);
             long ready=personalCurrent.optLong("ready_at",0L);if(ready>0)body+="\nReady: "+DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(new Date(ready*1000L));
             JSONObject mySlot=findMySlot(personalCurrent);
-            if(mySlot!=null){String position=mySlot.optString("position","Assigned slot");int cpr=mySlot.optInt("checkpoint_pass_rate",0);body+="\nSlot: "+position+" • CPR "+cpr+"%";JSONObject req=mySlot.optJSONObject("item_requirement");if(req!=null)body+=" • Item "+(req.optBoolean("is_available",false)?"ready":"missing");}
+            if(mySlot!=null){String slotLabel=slotLabel(mySlot);int cpr=mySlot.optInt("checkpoint_pass_rate",0);body+="\nSlot: "+slotLabel+" • CPR "+cpr+"%";JSONObject req=mySlot.optJSONObject("item_requirement");if(req!=null)body+=" • Item "+(req.optBoolean("is_available",false)?"ready":"missing");}
             addCard(r,card(personalCurrent.optString("name","My current OC"),body,status.toLowerCase(Locale.US).contains("planning")?GOOD:GOLD));
         }
 
@@ -112,10 +121,16 @@ public class OcTrackerActivity extends Activity {
         for(int i=0;i<personalAvailable.length();i++){
             JSONObject crime=personalAvailable.optJSONObject(i);if(crime==null)continue;
             JSONArray slots=crime.optJSONArray("slots");StringBuilder body=new StringBuilder("Difficulty ").append(crime.optInt("difficulty",0));
-            int shown=0;for(int j=0;slots!=null&&j<slots.length();j++){JSONObject slot=slots.optJSONObject(j);if(slot==null||slot.optJSONObject("user")!=null)continue;if(shown==0)body.append("\n");else body.append("\n");String position=slot.optString("position","Open slot");body.append(position).append(" • CPR ").append(slot.optInt("checkpoint_pass_rate",0)).append('%');JSONObject req=slot.optJSONObject("item_requirement");if(req!=null)body.append(" • item ").append(req.optBoolean("is_available",false)?"ready":"missing");shown++;}
+            int shown=0;for(int j=0;slots!=null&&j<slots.length();j++){JSONObject slot=slots.optJSONObject(j);if(slot==null||slot.optJSONObject("user")!=null)continue;body.append("\n").append(slotLabel(slot)).append(" • CPR ").append(slot.optInt("checkpoint_pass_rate",0)).append('%');JSONObject req=slot.optJSONObject("item_requirement");if(req!=null)body.append(" • item ").append(req.optBoolean("is_available",false)?"ready":"missing");shown++;}
             addCard(r,card(crime.optString("name","Recruiting OC"),body.toString(),shown>0?GOOD:BORDER));
         }
         finishView(s);
+    }
+
+    private String slotLabel(JSONObject slot){
+        JSONObject info=slot==null?null:slot.optJSONObject("position_info");
+        if(info!=null){String label=info.optString("label","");if(!label.isEmpty())return label;String name=info.optString("name","");int number=info.optInt("number",0);if(!name.isEmpty())return number>0?name+" #"+number:name;}
+        String legacy=slot==null?"":slot.optString("position","");return legacy.isEmpty()?"Open slot":legacy;
     }
 
     private JSONObject findMySlot(JSONObject crime){
@@ -126,8 +141,21 @@ public class OcTrackerActivity extends Activity {
         return fallback;
     }
 
-    private void renderFaction(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Fast recruiting, planning and completion view");addSummary(r);addTabs(r);if(selectedTab==TAB_PLANNING)renderPlanning(r);else if(selectedTab==TAB_COMPLETE)renderCompleted(r);else renderOpen(r);finishView(s);}
-    private void addSummary(LinearLayout r){int openSlots=0;for(int i=0;i<recruiting.length();i++)openSlots+=slotStats(recruiting.optJSONObject(i))[1];int successes=0;for(int i=0;i<completed.length();i++){JSONObject c=completed.optJSONObject(i);if(c!=null&&c.optString("status","").toLowerCase(Locale.US).contains("success"))successes++;}addCard(r,card("OC status",recruiting.length()+" open • "+planning.length()+" planning • "+completed.length()+" recent complete\n"+openSlots+" recruiting slots open • "+successes+" recent successes",BLUE));}
+    private void renderFaction(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,leadershipMode?"Leadership OC command view":"Faction OC view");addSummary(r);addTabs(r);if(selectedTab==TAB_PLANNING)renderPlanning(r);else if(selectedTab==TAB_COMPLETE)renderCompleted(r);else renderOpen(r);finishView(s);}
+
+    private void addSummary(LinearLayout r){
+        int openSlots=0,filledSlots=0,totalSlots=0,missingItems=0;
+        for(int i=0;i<recruiting.length();i++){int[] s=slotStats(recruiting.optJSONObject(i));filledSlots+=s[0];openSlots+=s[1];totalSlots+=s[2];missingItems+=s[3];}
+        for(int i=0;i<planning.length();i++){int[] s=slotStats(planning.optJSONObject(i));filledSlots+=s[0];openSlots+=s[1];totalSlots+=s[2];missingItems+=s[3];}
+        int successes=0;for(int i=0;i<completed.length();i++){JSONObject c=completed.optJSONObject(i);if(c!=null&&c.optString("status","").toLowerCase(Locale.US).contains("success"))successes++;}
+        int assigned=0;for(int i=0;i<members.length();i++){JSONObject m=members.optJSONObject(i);if(m!=null&&m.optBoolean("is_in_oc",false))assigned++;}int unassigned=Math.max(0,members.length()-assigned);
+        String body=(recruiting.length()+planning.length())+" active OCs • "+recruiting.length()+" recruiting • "+planning.length()+" planning\n"
+                +filledSlots+" / "+totalSlots+" active slots filled • "+openSlots+" open • "+missingItems+" missing-item warnings\n"
+                +assigned+" members assigned • "+unassigned+" not currently in an OC\n"
+                +completed.length()+" recent complete • "+successes+" recent successes";
+        addCard(r,card(leadershipMode?"OC command snapshot":"OC status",body,BLUE));
+    }
+
     private void addTabs(LinearLayout r){LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);String[] labels={"Open "+recruiting.length(),"Planning "+planning.length(),"Complete "+completed.length()};for(int i=0;i<labels.length;i++){final int tab=i;Button b=button(labels[i],selectedTab==i?GOLD:BORDER);b.setOnClickListener(v->{selectedTab=tab;renderFaction();});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(46),1f);if(i>0)p.leftMargin=dp(6);row.addView(b,p);}LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));rp.bottomMargin=dp(12);r.addView(row,rp);}
     private void renderOpen(LinearLayout r){TextView h=text("OPEN / RECRUITING",12,MUTED,true);h.setLetterSpacing(.08f);r.addView(h);if(recruiting.length()==0)addCard(r,card("No recruiting OCs","No organized crimes are currently recruiting.",GOOD));for(int i=0;i<recruiting.length();i++){JSONObject c=recruiting.optJSONObject(i);if(c==null)continue;int[] stats=slotStats(c);String body="Difficulty "+c.optInt("difficulty",0)+" • "+stats[0]+" / "+stats[2]+" filled"+(stats[1]>0?" • "+stats[1]+" open":"")+(stats[3]>0?"\nMissing item warnings: "+stats[3]:"");addCard(r,card(c.optString("name","Organized Crime"),body,stats[1]>0?GOLD:GOOD));}List<String> unassigned=new ArrayList<>();for(int i=0;i<members.length();i++){JSONObject m=members.optJSONObject(i);if(m!=null&&!m.optBoolean("is_in_oc",false))unassigned.add(m.optString("name","Unknown"));}if(!unassigned.isEmpty()){StringBuilder b=new StringBuilder();for(int i=0;i<Math.min(20,unassigned.size());i++){if(i>0)b.append(" • ");b.append(unassigned.get(i));}if(unassigned.size()>20)b.append(" • +").append(unassigned.size()-20).append(" more");addCard(r,card("Members not in an OC",unassigned.size()+" members\n"+b,BORDER));}}
     private void renderPlanning(LinearLayout r){TextView h=text("PLANNING / READY",12,MUTED,true);h.setLetterSpacing(.08f);r.addView(h);if(planning.length()==0)addCard(r,card("No planning OCs","No organized crimes are currently in planning.",BORDER));for(int i=0;i<planning.length();i++){JSONObject c=planning.optJSONObject(i);if(c==null)continue;int[] stats=slotStats(c);String body="Difficulty "+c.optInt("difficulty",0)+" • "+stats[0]+" / "+stats[2]+" filled"+(stats[3]>0?"\nMissing item warnings: "+stats[3]:"");long ready=c.optLong("ready_at",0L);if(ready>0)body+="\nReady: "+DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(new Date(ready*1000L));addCard(r,card(c.optString("name","Organized Crime"),body,stats[3]>0?GOLD:GOOD));}}
