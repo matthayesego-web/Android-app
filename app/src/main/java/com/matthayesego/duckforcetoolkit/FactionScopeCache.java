@@ -8,7 +8,9 @@ import java.security.MessageDigest;
 
 public final class FactionScopeCache {
     private static final String PREFS = "tornfca_scope_v099";
-    private static final long TTL_MS = 5L * 60L * 1000L;
+    // Faction identity/position changes far less frequently than live war data. Keeping this warm
+    // avoids forcing a full key/faction permission re-authentication every few minutes.
+    private static final long TTL_MS = 30L * 60L * 1000L;
 
     private FactionScopeCache() {}
 
