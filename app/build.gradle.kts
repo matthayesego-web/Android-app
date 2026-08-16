@@ -23,16 +23,17 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 33
+        versionCode = 34
         versionName = "0.9.17"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
-        // Closed-beta temporary developer gate. Only the one-way SHA-256 hash is shipped; the
-        // plaintext password is never embedded in source or the APK. Replace before public release.
+        // Closed-beta developer gate. The temporary PIN remains hash-only, and the console also
+        // requires the verified Torn identity of the app owner before any developer controls open.
         val devHash = "BFB3F43E00B5530E0A2E42343287C792193DB09A9D87515B19A29992E18BAF7D"
         val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL")
         val premiumBackend = localOrEnv("TORNFCA_PREMIUM_BACKEND_URL")
         buildConfigField("String", "DEVELOPER_ACCESS_SHA256", quotedBuildValue(devHash))
+        buildConfigField("int", "DEVELOPER_PLAYER_ID", "3987363")
         buildConfigField("String", "FACTION_BACKEND_URL", quotedBuildValue(factionBackend))
         buildConfigField("String", "PREMIUM_BACKEND_URL", quotedBuildValue(premiumBackend))
     }
