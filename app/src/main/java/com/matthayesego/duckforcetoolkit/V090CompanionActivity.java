@@ -8,127 +8,45 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-/** v0.9.x shell overlay: automation, hidden developer entry and safe member-preview presentation. */
+/** v0.9.x shell overlay: premium faction-OS presentation, automation and hidden developer entry. */
 public class V090CompanionActivity extends PolishedCompanionActivity {
-    private static final int PANEL=Color.rgb(15,20,28), BORDER=Color.rgb(45,55,69), TEXT=Color.rgb(244,246,249), MUTED=Color.rgb(154,164,178), GOLD=Color.rgb(241,194,106), BLUE=Color.rgb(88,166,255);
-    private int footerTapCount=0;
-    private long lastFooterTap=0L;
+    private static final int PANEL=Color.rgb(14,20,29), PANEL_2=Color.rgb(9,14,21), BORDER=Color.rgb(45,55,69), TEXT=Color.rgb(244,246,249), MUTED=Color.rgb(154,164,178), GOLD=Color.rgb(241,194,106), BLUE=Color.rgb(88,166,255), GREEN=Color.rgb(63,185,80), RED=Color.rgb(248,81,73);
+    private int footerTapCount=0;private long lastFooterTap=0L;
 
-    @Override public void setContentView(View view) {
-        super.setContentView(view);
-        stampVersion(view);
-        attachAutomationObserver(view);
-    }
-
+    @Override public void setContentView(View view){super.setContentView(view);stampVersion(view);attachAutomationObserver(view);}
     private int dp090(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded090(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp090(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp090(1),stroke);return d;}
+    private GradientDrawable gradient090(int a,int b,int stroke,int radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{a,b});d.setCornerRadius(dp090(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp090(1),stroke);return d;}
 
-    private void stampVersion(View view){
-        if(view instanceof TextView){TextView t=(TextView)view;CharSequence raw=t.getText();if(raw!=null){String v=raw.toString().replace("v0.8.0","v0.9.1").replace("v0.9.0","v0.9.1");if(!v.equals(raw.toString()))t.setText(v);}}
-        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)stampVersion(g.getChildAt(i));}
-    }
+    private void stampVersion(View view){if(view instanceof TextView){TextView t=(TextView)view;CharSequence raw=t.getText();if(raw!=null){String v=raw.toString().replace("v0.8.0","v0.9.2").replace("v0.9.0","v0.9.2").replace("v0.9.1","v0.9.2");if(!v.equals(raw.toString()))t.setText(v);}}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)stampVersion(g.getChildAt(i));}}
+    private void attachAutomationObserver(View root){if(root==null||"v092-observed".equals(root.getTag()))return;root.setTag("v092-observed");root.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener(){@Override public void onGlobalLayout(){enhance(root);}});enhance(root);}
+    private void enhance(View root){stampVersion(root);injectAttentionCard(root);injectStrengthIntel(root);polishHomeBrand(root);polishNavigation(root);polishDashboardCards(root);retargetDeveloperConsole(root);applyMemberPreview(root);attachFooterDeveloperTrigger(root);}
 
-    private void attachAutomationObserver(View root){
-        if(root==null||"v091-observed".equals(root.getTag()))return;
-        root.setTag("v091-observed");
-        root.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener(){
-            @Override public void onGlobalLayout(){enhance(root);}
-        });
-        enhance(root);
-    }
+    private void polishHomeBrand(View root){TextView welcome=findTextContaining090(root,"Welcome back,");if(welcome==null||!(welcome.getParent() instanceof LinearLayout))return;LinearLayout hero=(LinearLayout)welcome.getParent();if("v092-hero".equals(hero.getTag()))return;hero.setTag("v092-hero");hero.setPadding(dp090(18),dp090(18),dp090(18),dp090(18));hero.setBackground(gradient090(Color.rgb(24,38,55),Color.rgb(11,17,24),Color.rgb(49,70,92),24));
+        LinearLayout brandRow=new LinearLayout(this);brandRow.setOrientation(LinearLayout.HORIZONTAL);brandRow.setGravity(Gravity.CENTER_VERTICAL);ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.duckforce_noir_art);logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);logo.setContentDescription("Duck Force");brandRow.addView(logo,new LinearLayout.LayoutParams(dp090(48),dp090(48)));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);TextView brand=new TextView(this);brand.setText("DUCK FORCE");brand.setTextColor(GOLD);brand.setTextSize(11);brand.setTypeface(Typeface.DEFAULT,Typeface.BOLD);brand.setLetterSpacing(.16f);copy.addView(brand);TextView os=new TextView(this);os.setText("FACTION OPERATING SYSTEM");os.setTextColor(MUTED);os.setTextSize(9);os.setTypeface(Typeface.DEFAULT,Typeface.BOLD);os.setLetterSpacing(.08f);copy.addView(os);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);cp.leftMargin=dp090(10);brandRow.addView(copy,cp);hero.addView(brandRow,0,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,dp090(52)));}
 
-    private void enhance(View root){
-        stampVersion(root);
-        polishHomeBrand(root);
-        retargetDeveloperConsole(root);
-        applyMemberPreview(root);
-        attachFooterDeveloperTrigger(root);
-        injectAttentionCard(root);
-    }
+    private void polishNavigation(View root){String[] labels={"Home","Faction","Leadership"};for(String label:labels){TextView t=findText090(root,label);if(t==null)continue;t.setTextSize(14);t.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));t.setGravity(Gravity.CENTER);t.setMinHeight(dp090(48));}}
 
-    private void polishHomeBrand(View root){
-        TextView welcome=findTextContaining090(root,"Welcome back,");
-        if(welcome==null||!(welcome.getParent() instanceof LinearLayout))return;
-        LinearLayout hero=(LinearLayout)welcome.getParent();
-        if(containsExactText090(hero,"DUCK FORCE • FACTION OS"))return;
-        TextView brand=new TextView(this);brand.setText("DUCK FORCE • FACTION OS");brand.setTextColor(GOLD);brand.setTextSize(10);brand.setTypeface(Typeface.DEFAULT,Typeface.BOLD);brand.setLetterSpacing(.12f);
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.bottomMargin=dp090(7);hero.addView(brand,0,p);
-    }
+    private void polishDashboardCards(View root){decorateTile(root,"My OC","OC READINESS",BLUE);decorateTile(root,"My War","RANKED WAR",RED);decorateTile(root,"Chain","CHAIN STATUS",GREEN);decorateTile(root,"My Obligations","ACTION QUEUE",GOLD);decorateTile(root,"While You Were Away","SESSION DIGEST",BLUE);}
+    private void decorateTile(View root,String title,String eyebrow,int accent){TextView titleView=findText090(root,title);if(titleView==null||!(titleView.getParent() instanceof LinearLayout))return;LinearLayout card=(LinearLayout)titleView.getParent();String tag="v092-card-"+title;if(tag.equals(card.getTag()))return;card.setTag(tag);card.setPadding(dp090(15),dp090(12),dp090(15),dp090(12));card.setBackground(gradient090(PANEL,PANEL_2,accent,17));card.setElevation(dp090(1));TextView small=new TextView(this);small.setText(eyebrow);small.setTextColor(accent);small.setTextSize(9);small.setTypeface(Typeface.DEFAULT,Typeface.BOLD);small.setLetterSpacing(.10f);card.addView(small,0,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));ViewGroup.LayoutParams p=card.getLayoutParams();if(p!=null&&p.height>0)p.height=Math.max(p.height,dp090(title.equals("While You Were Away")?108:112));}
 
-    private void injectAttentionCard(View root){
-        if(DeveloperPreviewStore.isMemberPreview(this))return;
-        if(!containsExactText090(root,"Leadership"))return;
-        if(containsText090(root,"Leadership Attention"))return;
-        TextView section=findText090(root,"WHAT NEEDS MY ATTENTION?");
-        if(section==null||!(section.getParent() instanceof LinearLayout))return;
-        LinearLayout parent=(LinearLayout)section.getParent();
-        int index=parent.indexOfChild(section)+1;
+    private void injectAttentionCard(View root){if(DeveloperPreviewStore.isMemberPreview(this))return;if(!containsExactText090(root,"Leadership"))return;if(containsText090(root,"Leadership Attention"))return;TextView section=findText090(root,"WHAT NEEDS MY ATTENTION?");if(section==null||!(section.getParent() instanceof LinearLayout))return;LinearLayout parent=(LinearLayout)section.getParent();int index=parent.indexOfChild(section)+1;LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp090(17),dp090(13),dp090(17),dp090(13));card.setBackground(gradient090(Color.rgb(38,31,17),PANEL,GOLD,18));card.setClickable(true);card.setFocusable(true);TextView eyebrow=new TextView(this);eyebrow.setText("COMMAND PRIORITY");eyebrow.setTextColor(GOLD);eyebrow.setTextSize(10);eyebrow.setTypeface(Typeface.DEFAULT,Typeface.BOLD);eyebrow.setLetterSpacing(.10f);card.addView(eyebrow);TextView title=new TextView(this);title.setText("Leadership Attention  →");title.setTextColor(TEXT);title.setTextSize(18);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp090(4);card.addView(title,tp);TextView body=new TextView(this);body.setText("See exactly who needs attention and why");body.setTextColor(MUTED);body.setTextSize(12);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp090(3);card.addView(body,bp);card.setOnClickListener(v->startActivity(new Intent(this,LeadershipAttentionActivity.class)));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp090(108));p.bottomMargin=dp090(10);parent.addView(card,Math.min(index,parent.getChildCount()),p);}
 
-        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp090(16),dp090(12),dp090(16),dp090(12));card.setBackground(rounded090(PANEL,GOLD,17));card.setClickable(true);card.setFocusable(true);
-        TextView eyebrow=new TextView(this);eyebrow.setText("COMMAND PRIORITY");eyebrow.setTextColor(GOLD);eyebrow.setTextSize(10);eyebrow.setTypeface(Typeface.DEFAULT,Typeface.BOLD);eyebrow.setLetterSpacing(.10f);card.addView(eyebrow);
-        TextView title=new TextView(this);title.setText("Leadership Attention  →");title.setTextColor(TEXT);title.setTextSize(17);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp090(4);card.addView(title,tp);
-        TextView body=new TextView(this);body.setText("Who needs attention and why — live exceptions from faction data");body.setTextColor(MUTED);body.setTextSize(12);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp090(3);card.addView(body,bp);
-        card.setOnClickListener(v->startActivity(new Intent(this,LeadershipAttentionActivity.class)));
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp090(104));p.bottomMargin=dp090(10);parent.addView(card,Math.min(index,parent.getChildCount()),p);
-    }
+    private void injectStrengthIntel(View root){if(containsText090(root,"Faction Strength Intel"))return;TextView section=findText090(root,"FACTION OVERVIEW");if(section==null||!(section.getParent() instanceof LinearLayout))return;LinearLayout parent=(LinearLayout)section.getParent();int index=parent.indexOfChild(section)+1;LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp090(17),dp090(13),dp090(17),dp090(13));card.setBackground(gradient090(Color.rgb(17,30,43),PANEL_2,BLUE,18));card.setClickable(true);card.setFocusable(true);TextView eyebrow=new TextView(this);eyebrow.setText("FFSCOUTER PROVIDER");eyebrow.setTextColor(BLUE);eyebrow.setTextSize(9);eyebrow.setTypeface(Typeface.DEFAULT,Typeface.BOLD);eyebrow.setLetterSpacing(.10f);card.addView(eyebrow);TextView title=new TextView(this);title.setText("Faction Strength Intel  →");title.setTextColor(TEXT);title.setTextSize(18);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp090(4);card.addView(title,tp);TextView body=new TextView(this);body.setText("Battle-stat estimates • Fair Fight • source • freshness");body.setTextColor(MUTED);body.setTextSize(12);card.addView(body);card.setOnClickListener(v->openFeature(FeatureRouterActivity.TARGET_STRENGTH));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp090(104));p.bottomMargin=dp090(10);parent.addView(card,Math.min(index,parent.getChildCount()),p);}
 
-    private void retargetDeveloperConsole(View root){
-        TextView title=findText090(root,"DEVELOPER CONSOLE");
-        if(title==null||!(title.getParent() instanceof View))return;
-        View card=(View)title.getParent();card.setClickable(true);card.setOnClickListener(v->openDeveloperGate());
-    }
-
-    private void attachFooterDeveloperTrigger(View root){
-        TextView footer=findTextContaining090(root,"Duck Force Companion v0.9.1");
-        if(footer==null)return;
-        footer.setClickable(true);footer.setFocusable(true);footer.setPadding(footer.getPaddingLeft(),dp090(12),footer.getPaddingRight(),dp090(14));
-        if(DeveloperPreviewStore.isMemberPreview(this)&&!footer.getText().toString().contains("MEMBER PREVIEW"))footer.setText("Duck Force Companion v0.9.1 • MEMBER PREVIEW");
-        footer.setOnClickListener(v->{long now=System.currentTimeMillis();if(now-lastFooterTap>1500L)footerTapCount=0;lastFooterTap=now;footerTapCount++;if(footerTapCount>=3){footerTapCount=0;openDeveloperGate();}});
-    }
-
+    private void retargetDeveloperConsole(View root){TextView title=findText090(root,"DEVELOPER CONSOLE");if(title==null||!(title.getParent() instanceof View))return;View card=(View)title.getParent();card.setClickable(true);card.setOnClickListener(v->openDeveloperGate());}
+    private void attachFooterDeveloperTrigger(View root){TextView footer=findTextContaining090(root,"Duck Force Companion v0.9.2");if(footer==null)return;footer.setClickable(true);footer.setFocusable(true);footer.setPadding(footer.getPaddingLeft(),dp090(12),footer.getPaddingRight(),dp090(14));if(DeveloperPreviewStore.isMemberPreview(this)&&!footer.getText().toString().contains("MEMBER PREVIEW"))footer.setText("Duck Force Companion v0.9.2 • MEMBER PREVIEW");footer.setOnClickListener(v->{long now=System.currentTimeMillis();if(now-lastFooterTap>1500L)footerTapCount=0;lastFooterTap=now;footerTapCount++;if(footerTapCount>=3){footerTapCount=0;openDeveloperGate();}});}
     private void openDeveloperGate(){startActivity(new Intent(this,DeveloperGateActivity.class));}
-
-    private void applyMemberPreview(View root){
-        if(!DeveloperPreviewStore.isMemberPreview(this))return;
-        hideExactTextView(root,"Leadership");
-        hideExactTextView(root,"OWNER / DEVELOPER");
-        hideCard(root,"Leadership Attention  →");
-        hideCard(root,"Leadership Attention");
-        hideCard(root,"LEADERSHIP CONTROLS");
-        hideCard(root,"ARMORY AUDITOR");
-        hideCard(root,"DEVELOPER CONSOLE");
-        hideCard(root,"COMPANY TRAINING CALCULATOR");
-        TextView meta=findTextContaining090(root,"Leadership permissions");
-        if(meta!=null){String raw=meta.getText().toString();int cut=raw.indexOf(" • ");String faction=cut>0?raw.substring(0,cut):"Duck Force";meta.setText(faction+" • Member Preview • member-safe permissions");}
-    }
-
-    private void hideExactTextView(View root,String exact){
-        if(root instanceof TextView){CharSequence raw=((TextView)root).getText();if(raw!=null&&exact.equals(raw.toString()))root.setVisibility(View.GONE);}
-        if(root instanceof ViewGroup){ViewGroup g=(ViewGroup)root;for(int i=0;i<g.getChildCount();i++)hideExactTextView(g.getChildAt(i),exact);}
-    }
-
+    private void applyMemberPreview(View root){if(!DeveloperPreviewStore.isMemberPreview(this))return;hideExactTextView(root,"Leadership");hideExactTextView(root,"OWNER / DEVELOPER");hideCard(root,"Leadership Attention  →");hideCard(root,"Leadership Attention");hideCard(root,"LEADERSHIP CONTROLS");hideCard(root,"ARMORY AUDITOR");hideCard(root,"DEVELOPER CONSOLE");hideCard(root,"COMPANY TRAINING CALCULATOR");TextView meta=findTextContaining090(root,"Leadership permissions");if(meta!=null){String raw=meta.getText().toString();int cut=raw.indexOf(" • ");String faction=cut>0?raw.substring(0,cut):"Duck Force";meta.setText(faction+" • Member Preview • member-safe permissions");}}
+    private void hideExactTextView(View root,String exact){if(root instanceof TextView){CharSequence raw=((TextView)root).getText();if(raw!=null&&exact.equals(raw.toString()))root.setVisibility(View.GONE);}if(root instanceof ViewGroup){ViewGroup g=(ViewGroup)root;for(int i=0;i<g.getChildCount();i++)hideExactTextView(g.getChildAt(i),exact);}}
     private void hideCard(View root,String title){TextView t=findText090(root,title);if(t!=null&&t.getParent() instanceof View)((View)t.getParent()).setVisibility(View.GONE);}
-
-    private boolean containsText090(View view,String needle){
-        if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().contains(needle))return true;}
-        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)if(containsText090(g.getChildAt(i),needle))return true;}
-        return false;
-    }
-
+    private boolean containsText090(View view,String needle){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().contains(needle))return true;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)if(containsText090(g.getChildAt(i),needle))return true;}return false;}
     private boolean containsExactText090(View view,String exact){return findText090(view,exact)!=null;}
-
-    private TextView findText090(View view,String exact){
-        if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&exact.equals(raw.toString()))return (TextView)view;}
-        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView found=findText090(g.getChildAt(i),exact);if(found!=null)return found;}}
-        return null;
-    }
-
-    private TextView findTextContaining090(View view,String needle){
-        if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().contains(needle))return (TextView)view;}
-        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView found=findTextContaining090(g.getChildAt(i),needle);if(found!=null)return found;}}
-        return null;
-    }
+    private TextView findText090(View view,String exact){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&exact.equals(raw.toString()))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView found=findText090(g.getChildAt(i),exact);if(found!=null)return found;}}return null;}
+    private TextView findTextContaining090(View view,String needle){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().contains(needle))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView found=findTextContaining090(g.getChildAt(i),needle);if(found!=null)return found;}}return null;}
+    private void openFeature(String target){Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,target);startActivity(i);}
 }
