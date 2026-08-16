@@ -182,6 +182,7 @@ public final class TornFcaBrand {
                 .replace("Duck Force can remain the first tenant","the current faction can remain the first tenant")
                 .replace("DUCK FORCE •","TORNFCA •")
                 .replace("Leadership-focused member lookup with current Torn status and opted-in battle intelligence.","Search members with Torn status, FFScouter estimates and TornStats spy intelligence.")
+                .replace("capped at roughly 12 requests/minute","capped at roughly 30 direct requests/minute")
                 .replace("v0.9.6","v0.9.18")
                 .replace("v0.9.7","v0.9.18")
                 .replace("v0.9.8","v0.9.18")
