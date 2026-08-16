@@ -93,6 +93,7 @@ public final class TornFcaBrand {
         else if(c.equals(WarCenterActivity.class.getName()))target=TornFcaScreens.WarCenter.class;
         else if(c.equals(WarPayoutActivity.class.getName()))target=TornFcaScreens.WarPayout.class;
         else if(c.equals(BankingCompanionActivity.class.getName()))target=TornFcaScreens.BankingCompanion.class;
+        else if(c.equals(MemberDossierActivity.class.getName()))target=TornFcaScreens.MemberDossier.class;
         else if(c.equals(DeveloperGateActivity.class.getName()))target=TornFcaScreens.DeveloperGate.class;
         else if(c.equals(DeveloperPanelActivity.class.getName()))target=TornFcaScreens.DeveloperPanel.class;
         else if(c.equals(PremiumAdminActivity.class.getName()))target=TornFcaScreens.PremiumAdmin.class;
