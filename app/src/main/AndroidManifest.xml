@@ -2,16 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
-        <activity android:name=".AccessGateActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+        <activity android:name=".AccessGateActivity" android:exported="true" android:launchMode="singleTask" android:clearTaskOnLaunch="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
         <activity android:name=".V095CompanionActivity" android:exported="false"/>
         <activity android:name=".MoreActivity" android:exported="false"/>
         <activity android:name=".AboutActivity" android:exported="false"/>
-        <activity android:name=".V090CompanionActivity" android:exported="false"/>
         <activity android:name=".DeveloperGateActivity" android:exported="false"/>
         <activity android:name=".DeveloperPanelActivity" android:exported="false"/>
         <activity android:name=".LeadershipAttentionActivity" android:exported="false"/>
         <activity android:name=".FactionStrengthActivity" android:exported="false"/>
-        <activity android:name=".PolishedCompanionActivity" android:exported="false"/>
         <activity android:name=".MemberFactionActivity" android:exported="false"/>
         <activity android:name=".FeatureRouterActivity" android:exported="false"/>
         <activity android:name=".WarNoticeActivity" android:exported="false"/>
@@ -20,7 +18,6 @@
         <activity android:name=".QuickIntelActivity" android:exported="false"/>
         <activity android:name=".PremiumPreviewActivity" android:exported="false"/>
         <activity android:name=".DeveloperConsoleActivity" android:exported="false"/>
-        <activity android:name=".CompanionActivity" android:exported="false"/>
         <activity android:name=".ToolHostActivity" android:exported="false"/>
         <activity android:name=".ToolkitActivity" android:exported="false"/>
         <activity android:name=".MainActivity" android:exported="false"/>
