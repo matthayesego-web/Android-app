@@ -10,7 +10,7 @@
  * API load:
  * - scanPremiumPayments() is intended to run once per minute: one Torn /user log request/minute.
  */
-const TORNFCA_PREMIUM_VERSION='0.9.12';
+const TORNFCA_PREMIUM_VERSION='0.9.13';
 const TORNFCA_XANAX_ITEM_ID=206;
 const TORNFCA_ITEM_RECEIVE_LOG=4103;
 const P_SHEETS=Object.freeze({SETTINGS:'PremiumSettings',ENTITLEMENTS:'PremiumEntitlements',PAYMENTS:'PremiumPayments'});
