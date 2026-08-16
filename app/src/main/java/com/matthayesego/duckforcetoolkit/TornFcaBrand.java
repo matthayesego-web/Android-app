@@ -14,7 +14,7 @@ import android.widget.TextView;
 public final class TornFcaBrand {
     public static final String NAME="TornFCA";
     public static final String LONG_NAME="Torn Faction Companion App";
-    public static final String VERSION="0.9.11";
+    public static final String VERSION="0.9.12";
 
     private static final int[] LEGACY_BRAND_COLORS=new int[]{
             Color.rgb(241,190,86),Color.rgb(241,194,106),Color.rgb(243,184,52),Color.rgb(215,160,68),Color.rgb(242,197,107)
@@ -52,20 +52,10 @@ public final class TornFcaBrand {
         }
     }
 
-    private static boolean selectedNav(ViewGroup group,int accent){
-        for(int i=0;i<group.getChildCount();i++)if(group.getChildAt(i)instanceof TextView&&((TextView)group.getChildAt(i)).getCurrentTextColor()==accent)return true;
-        return false;
-    }
+    private static boolean selectedNav(ViewGroup group,int accent){for(int i=0;i<group.getChildCount();i++)if(group.getChildAt(i)instanceof TextView&&((TextView)group.getChildAt(i)).getCurrentTextColor()==accent)return true;return false;}
 
     private static void replaceLegacyArtwork(Context context,ImageView image){
-        try{
-            Drawable current=image.getDrawable();Drawable legacy=context.getDrawable(R.drawable.duckforce_noir_art);
-            if(current!=null&&legacy!=null&&current.getConstantState()!=null&&legacy.getConstantState()!=null&&current.getConstantState().equals(legacy.getConstantState())){
-                image.setImageResource(R.drawable.tornfca_mark);
-                int pad=Math.round(8*context.getResources().getDisplayMetrics().density);
-                image.setPadding(pad,pad,pad,pad);
-            }
-        }catch(Exception ignored){}
+        try{Drawable current=image.getDrawable();Drawable legacy=context.getDrawable(R.drawable.duckforce_noir_art);if(current!=null&&legacy!=null&&current.getConstantState()!=null&&legacy.getConstantState()!=null&&current.getConstantState().equals(legacy.getConstantState())){image.setImageResource(R.drawable.tornfca_mark);int pad=Math.round(8*context.getResources().getDisplayMetrics().density);image.setPadding(pad,pad,pad,pad);}}catch(Exception ignored){}
     }
 
     private static boolean isLegacyBrandColor(int color){for(int c:LEGACY_BRAND_COLORS)if(color==c)return true;return false;}
@@ -85,11 +75,12 @@ public final class TornFcaBrand {
                 .replace("Duck Force payout","faction payout")
                 .replace("Duck Force can remain the first tenant","the current faction can remain the first tenant")
                 .replace("DUCK FORCE •","TORNFCA •")
-                .replace("v0.9.6","v0.9.11")
-                .replace("v0.9.7","v0.9.11")
-                .replace("v0.9.8","v0.9.11")
-                .replace("v0.9.9","v0.9.11")
-                .replace("v0.9.10","v0.9.11");
+                .replace("v0.9.6","v0.9.12")
+                .replace("v0.9.7","v0.9.12")
+                .replace("v0.9.8","v0.9.12")
+                .replace("v0.9.9","v0.9.12")
+                .replace("v0.9.10","v0.9.12")
+                .replace("v0.9.11","v0.9.12");
     }
 
     /** Retargets existing feature intents through thin TornFCA wrappers so every screen receives branding/theme. */
@@ -101,8 +92,10 @@ public final class TornFcaBrand {
         else if(c.equals(FeatureRouterActivity.class.getName()))target=TornFcaScreens.FeatureRouter.class;
         else if(c.equals(WarCenterActivity.class.getName()))target=TornFcaScreens.WarCenter.class;
         else if(c.equals(WarPayoutActivity.class.getName()))target=TornFcaScreens.WarPayout.class;
+        else if(c.equals(BankingCompanionActivity.class.getName()))target=TornFcaScreens.BankingCompanion.class;
         else if(c.equals(DeveloperGateActivity.class.getName()))target=TornFcaScreens.DeveloperGate.class;
         else if(c.equals(DeveloperPanelActivity.class.getName()))target=TornFcaScreens.DeveloperPanel.class;
+        else if(c.equals(PremiumAdminActivity.class.getName()))target=TornFcaScreens.PremiumAdmin.class;
         else if(c.equals(LeadershipAttentionActivity.class.getName()))target=TornFcaScreens.LeadershipAttention.class;
         else if(c.equals(FactionStrengthActivity.class.getName()))target=TornFcaScreens.FactionStrength.class;
         else if(c.equals(MemberFactionActivity.class.getName()))target=TornFcaScreens.MemberFaction.class;
