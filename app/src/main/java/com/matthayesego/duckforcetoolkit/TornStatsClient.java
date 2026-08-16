@@ -22,11 +22,15 @@ public final class TornStatsClient {
     private static final String BASE="https://www.tornstats.com/api/v2/";
     public static final String TERMS_URL="https://www.tornstats.com/tos";
     public static final String FAQ_URL="https://www.tornstats.com/faq";
+    public static final String REGISTER_URL="https://www.tornstats.com/register";
     private static final String PREFS="tornfca_tornstats_consent_v2";
-    private static final String USER_AGENT="TornFCA/0.9.13 Android";
+    private static final String USER_AGENT="TornFCA/0.9.18 Android";
     private static final Pattern API_KEY=Pattern.compile("^[A-Za-z0-9]{16}$");
+    private static final long ACCOUNT_READY_MS=30L*60L*1000L;
     private static long nextRequestAtMs=0L;
     private static volatile String approvedFingerprint="";
+    private static volatile String accountReadyFingerprint="";
+    private static volatile long accountReadyUntilMs=0L;
     private static final ConcurrentHashMap<String,CacheEntry> CACHE=new ConcurrentHashMap<>();
     private TornStatsClient(){}
 
@@ -38,22 +42,65 @@ public final class TornStatsClient {
     public static void setConsent(Context c,boolean consent){
         if(c==null)return;SharedPreferences.Editor e=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit();
         if(consent){String key=new SecureApiKeyStore(c).load();if(key==null){e.clear();approvedFingerprint="";}else{String fp=fingerprint(key);e.putBoolean("consent",true).putString("key_fingerprint",fp);approvedFingerprint=fp;}}
-        else{e.clear();approvedFingerprint="";}e.apply();if(!consent)CACHE.clear();
+        else{e.clear();approvedFingerprint="";accountReadyFingerprint="";accountReadyUntilMs=0L;}e.apply();if(!consent)CACHE.clear();
     }
 
-    public static JSONObject factionRoster(String key)throws IOException{return getCached(path(key,"faction/roster"),120_000L);}
-    public static JSONObject userSpy(String key,int playerId)throws IOException{return getCached(path(key,"spy/user/"+playerId),120_000L);}
+    /**
+     * TornStats' key-root endpoint binds/refreshes the supplied Torn key to the existing TornStats
+     * account. Run this before roster/spy reads so a newly registered or recently changed key does
+     * not surface as a misleading "User not found" inside Member Dossier.
+     */
+    public static JSONObject syncAccount(String key)throws IOException{
+        String root=authorizedRoot(key);
+        JSONObject response;
+        try{response=get(root);}
+        catch(IOException e){throw translateAccountError(e);}
+        accountReadyFingerprint=fingerprint(key);accountReadyUntilMs=System.currentTimeMillis()+ACCOUNT_READY_MS;
+        return response;
+    }
+
+    public static JSONObject factionRoster(String key)throws IOException{ensureAccount(key);return getCached(path(key,"faction/roster"),120_000L);}
+    public static JSONObject userSpy(String key,int playerId)throws IOException{ensureAccount(key);return getCached(path(key,"spy/user/"+playerId),120_000L);}
+
+    private static void ensureAccount(String key)throws IOException{
+        String fp=authorize(key);
+        if(fp.equals(accountReadyFingerprint)&&accountReadyUntilMs>System.currentTimeMillis())return;
+        syncAccount(key);
+    }
+
+    private static String authorizedRoot(String key)throws IOException{
+        authorize(key);return BASE+URLEncoder.encode(key.trim(),StandardCharsets.UTF_8.name());
+    }
 
     private static String path(String key,String suffix)throws IOException{
-        if(key==null||!API_KEY.matcher(key.trim()).matches())throw new IOException("TornStats requires the same 16-character Torn API key. A preset Limited Access key is recommended.");
-        if(!fingerprint(key).equals(approvedFingerprint))throw new IOException("TornStats is disabled in TornFCA. Review TornStats Terms and explicitly enable the provider first.");
-        return BASE+URLEncoder.encode(key,StandardCharsets.UTF_8.name())+"/"+suffix;
+        authorize(key);return BASE+URLEncoder.encode(key.trim(),StandardCharsets.UTF_8.name())+"/"+suffix;
+    }
+
+    private static String authorize(String key)throws IOException{
+        if(key==null||!API_KEY.matcher(key.trim()).matches())throw new IOException("TornStats requires the same 16-character Torn API key. A Limited Access key is recommended.");
+        String fp=fingerprint(key);
+        if(!fp.equals(approvedFingerprint))throw new IOException("TornStats is disabled in TornFCA. Review TornStats Terms and explicitly enable the provider first.");
+        return fp;
+    }
+
+    private static IOException translateAccountError(IOException error){
+        String message=error==null||error.getMessage()==null?"":error.getMessage().trim();
+        String lower=message.toLowerCase(Locale.US);
+        if(lower.contains("user not found")||lower.contains("user.not found")){
+            return new IOException("TornStats account not found for this Torn ID. Create or recover the account at tornstats.com/register, then return to TornFCA and refresh TornStats.");
+        }
+        if(lower.contains("api")&&lower.contains("key")){
+            return new IOException("TornStats could not attach this API key to your account. Confirm your TornStats Torn ID matches your in-game Torn ID, then refresh TornStats.");
+        }
+        return error==null?new IOException("TornStats account verification failed."):error;
     }
 
     private static JSONObject getCached(String value,long ttl)throws IOException{
         String cacheKey=Integer.toHexString(value.hashCode());CacheEntry cached=CACHE.get(cacheKey);long now=System.currentTimeMillis();
         if(cached!=null&&cached.expiresAt>now)try{return new JSONObject(cached.body);}catch(Exception ignored){CACHE.remove(cacheKey);}
-        JSONObject result=get(value);CACHE.put(cacheKey,new CacheEntry(result.toString(),System.currentTimeMillis()+ttl));if(CACHE.size()>80)CACHE.clear();return result;
+        JSONObject result;
+        try{result=get(value);}catch(IOException e){throw translateAccountError(e);}
+        CACHE.put(cacheKey,new CacheEntry(result.toString(),System.currentTimeMillis()+ttl));if(CACHE.size()>80)CACHE.clear();return result;
     }
 
     private static JSONObject get(String value)throws IOException{
