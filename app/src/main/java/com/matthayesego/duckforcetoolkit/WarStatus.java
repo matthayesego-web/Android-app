@@ -5,6 +5,7 @@ import org.json.JSONObject;
 
 public final class WarStatus {
     public final boolean present;
+    public final boolean simulated;
     public final int warId;
     public final long start;
     public final long end;
@@ -14,9 +15,10 @@ public final class WarStatus {
     public final int ourScore;
     public final int opponentScore;
 
-    private WarStatus(boolean present, int warId, long start, long end, int target,
+    private WarStatus(boolean present, boolean simulated, int warId, long start, long end, int target,
                       int opponentFactionId, String opponent, int ourScore, int opponentScore) {
         this.present = present;
+        this.simulated = simulated;
         this.warId = warId;
         this.start = start;
         this.end = end;
@@ -27,9 +29,16 @@ public final class WarStatus {
         this.opponentScore = opponentScore;
     }
 
-    public static WarStatus none() { return new WarStatus(false, 0, 0, 0, 0, 0, "", 0, 0); }
+    public static WarStatus none() { return new WarStatus(false, false, 0, 0, 0, 0, 0, "", 0, 0); }
+
+    public static WarStatus simulated(int factionId) {
+        long now = System.currentTimeMillis() / 1000L;
+        return new WarStatus(true, true, -917, now + (45L * 60L), 0, 750,
+                factionId, "Simulation Opponent • test roster", 0, 0);
+    }
 
     public static WarStatus from(JSONObject root, int factionId) {
+        if (DeveloperSettings.runtimeSimulateWar()) return simulated(factionId);
         if (root == null) return none();
         JSONObject wars = root.optJSONObject("wars");
         JSONObject ranked = wars == null ? null : wars.optJSONObject("ranked");
@@ -55,25 +64,27 @@ public final class WarStatus {
                 }
             }
         }
-        return new WarStatus(true, warId, start, end, target, opponentFactionId, opponent, ourScore, opponentScore);
+        return new WarStatus(true, false, warId, start, end, target, opponentFactionId, opponent, ourScore, opponentScore);
     }
 
     public boolean isUpcoming(long nowSeconds) { return present && start > nowSeconds; }
     public boolean isLive(long nowSeconds) { return present && start > 0 && nowSeconds >= start && (end <= 0 || nowSeconds < end); }
 
     public String headline(long nowSeconds) {
+        String prefix = simulated ? "SIMULATION • " : "";
         if (!present) return "No ranked war currently scheduled";
-        if (isUpcoming(nowSeconds)) return "WAR STARTS IN " + duration(start - nowSeconds);
-        if (isLive(nowSeconds)) return "WAR LIVE — " + ourScore + " vs " + opponentScore;
-        return "Latest ranked war ended";
+        if (isUpcoming(nowSeconds)) return prefix + "WAR STARTS IN " + duration(start - nowSeconds);
+        if (isLive(nowSeconds)) return prefix + "WAR LIVE — " + ourScore + " vs " + opponentScore;
+        return prefix + "Latest ranked war ended";
     }
 
     public String detail(long nowSeconds) {
         if (!present) return "Tap for war status and leadership notices.";
         String targetText = target > 0 ? " • target " + target : "";
-        if (isUpcoming(nowSeconds)) return opponent + targetText;
-        if (isLive(nowSeconds)) return opponent + targetText + " • " + duration(Math.max(0, nowSeconds - start)) + " elapsed";
-        return opponent + " • final " + ourScore + "–" + opponentScore;
+        String simText = simulated ? " • developer simulation" : "";
+        if (isUpcoming(nowSeconds)) return opponent + targetText + simText;
+        if (isLive(nowSeconds)) return opponent + targetText + " • " + duration(Math.max(0, nowSeconds - start)) + " elapsed" + simText;
+        return opponent + " • final " + ourScore + "–" + opponentScore + simText;
     }
 
     public static String duration(long seconds) {
