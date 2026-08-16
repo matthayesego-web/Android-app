@@ -38,15 +38,21 @@ jobs:
           grep -q 'TornFcaActivity' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaScreens' app/src/main/AndroidManifest.xml
           grep -q 'BankingCompanionActivity' app/src/main/AndroidManifest.xml
+          grep -q 'MemberDossierActivity' app/src/main/AndroidManifest.xml
           grep -q 'PremiumAdminActivity' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "VERSION=\"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
           grep -q 'BuildConfig.DEVELOPER_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          grep -q 'BuildConfig.FACTION_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
+          grep -q 'BuildConfig.PREMIUM_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
           grep -q 'Limited Access or higher' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
           grep -q 'MIN_REQUEST_SPACING_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
           grep -q 'ACTIVE_WINDOW_MS' app/src/main/assets/listener/duckforce_chat_listener.user.js
+          grep -q 'FACTION_CHAT_ACTIVE' app/src/main/assets/listener/duckforce_chat_listener.user.js
           grep -q 'TORNFCA_XANAX_ITEM_ID=206' backend/TornFcaPremiumBackend.gs
+          grep -q 'TornStatsClient.hasConsent' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
+          grep -q 'FFScouterClient.getStats' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
           grep -q 'tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           if grep -q 'PREVIEW_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java; then echo "Legacy beta access-code gate must be removed"; exit 1; fi
           if grep -q 'android:name=".V090CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy V090 shell must not be restorable"; exit 1; fi
