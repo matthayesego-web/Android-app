@@ -1,45 +1,207 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
+import android.view.ViewOutlineProvider;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
-/** v0.9.x navigation/polish layer. Keeps developer tooling invisible except for the footer triple-tap. */
+import org.json.JSONObject;
+
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+/**
+ * v0.9.7 premium faction-OS shell.
+ * The working legacy feature handlers remain underneath, but the visible app is rebuilt around
+ * Home / Faction / War / Leadership / More with no duplicate top tabs.
+ */
 public class V095CompanionActivity extends V090CompanionActivity {
-    private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(12,18,26),BORDER=Color.rgb(38,49,64),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(145,156,172),GOLD=Color.rgb(241,194,106),BLUE=Color.rgb(88,166,255),GREEN=Color.rgb(63,185,80),RED=Color.rgb(248,81,73);
-    private TextView navHome,navFaction;
+    private static final String VERSION = "0.9.7";
+    private static final int BG=Color.rgb(5,8,12), SURFACE=Color.rgb(12,18,26), SURFACE_2=Color.rgb(8,13,20), BORDER=Color.rgb(36,47,61);
+    private static final int TEXT=Color.rgb(246,248,251), MUTED=Color.rgb(145,155,169), GOLD=Color.rgb(241,190,86), GOLD_DARK=Color.rgb(122,84,27);
+    private static final int BLUE=Color.rgb(82,153,235), GREEN=Color.rgb(76,190,102), RED=Color.rgb(239,88,82);
 
-    @Override public void setContentView(View view){boolean home=containsIgnoreCase(view,"Welcome back,");super.setContentView(view);stampCurrent(view);if(home){installBottomNavigation();attachCurrentObserver(view);}}
+    private View legacyRoot;
+    private LinearLayout pageHost;
+    private LinearLayout bottomNav;
+    private ImageView avatarView;
+    private Bitmap avatarBitmap;
+    private boolean leadershipAvailable;
+    private String playerName="Member", factionName="Duck Force", position="Member";
+    private int factionId=0;
+    private TextView warEyebrow,warTitle,warMeta,warStatus;
+    private int footerTapCount=0;
+    private long lastFooterTap=0L;
+
+    @Override public void setContentView(View view){
+        boolean home=containsIgnoreCase(view,"Welcome back,");
+        super.setContentView(view);
+        stampVersion(view);
+        if(!home)return;
+
+        ViewGroup host=findViewById(android.R.id.content);
+        if(host==null||host.getChildCount()==0)return;
+        View current=host.getChildAt(0);
+        if(current!=null&&"premium-v097-frame".equals(current.getTag()))return;
+        legacyRoot=current;
+        inferIdentity(legacyRoot);
+        leadershipAvailable=!DeveloperPreviewStore.isMemberPreview(this)
+                &&(containsExact(legacyRoot,"Leadership")||containsIgnoreCase(legacyRoot,"LEADERSHIP CONTROLS")||containsIgnoreCase(legacyRoot,"ARMORY AUDITOR"));
+        buildPremiumShell(host);
+    }
+
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
-    private GradientDrawable gradient(int a,int b,int stroke,int radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{a,b});d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
+    private GradientDrawable gradient(int a,int b,int stroke,int radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{a,b});d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
+    private GradientDrawable oval(int fill,int stroke){GradientDrawable d=new GradientDrawable();d.setShape(GradientDrawable.OVAL);d.setColor(fill);if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
+    private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setLineSpacing(0f,1.08f);if(bold)t.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));return t;}
+    private TextView eyebrow(String value,int color){TextView t=text(value,9.5f,color,true);t.setLetterSpacing(.12f);return t;}
 
-    private void installBottomNavigation(){ViewGroup host=findViewById(android.R.id.content);if(host==null||host.getChildCount()==0)return;View current=host.getChildAt(0);if("v096-frame".equals(current.getTag()))return;host.removeView(current);LinearLayout frame=new LinearLayout(this);frame.setTag("v096-frame");frame.setOrientation(LinearLayout.VERTICAL);frame.setBackgroundColor(BG);frame.addView(current,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f));LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);nav.setGravity(Gravity.CENTER);nav.setPadding(dp(5),dp(6),dp(5),dp(5));nav.setElevation(dp(10));nav.setBackground(gradient(Color.rgb(16,23,33),Color.rgb(8,12,18),BORDER,18));navHome=navItem("⌂","Home",GOLD,()->{clickExact(current,"Home");select(navHome);});navFaction=navItem("◆","Faction",MUTED,()->{clickExact(current,"Faction");select(navFaction);});TextView war=navItem("⚔","War",MUTED,()->openFeature(FeatureRouterActivity.TARGET_WAR));TextView chain=navItem("⛓","Chain",MUTED,()->openFeature(FeatureRouterActivity.TARGET_CHAIN));TextView more=navItem("⋯","More",MUTED,()->startActivity(new Intent(this,MoreActivity.class)));nav.addView((View)navHome.getParent(),navParams());nav.addView((View)navFaction.getParent(),navParams());nav.addView((View)war.getParent(),navParams());nav.addView((View)chain.getParent(),navParams());nav.addView((View)more.getParent(),navParams());int baseBottom=dp(5);nav.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(dp(5),dp(6),dp(5),baseBottom+i.getSystemWindowInsetBottom());return i;});frame.addView(nav,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(72)));host.addView(frame,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));nav.requestApplyInsets();}
+    private void inferIdentity(View root){
+        TextView welcome=findContainingIgnoreCase(root,"Welcome back,");
+        if(welcome!=null){String raw=welcome.getText().toString();int comma=raw.indexOf(',');if(comma>=0&&comma+1<raw.length())playerName=raw.substring(comma+1).trim();}
+        TextView meta=findContainingIgnoreCase(root,"Duck Force •");
+        if(meta!=null){String[] bits=meta.getText().toString().split(" • ");if(bits.length>0&&!bits[0].trim().isEmpty())factionName=bits[0].trim();if(bits.length>1&&!bits[1].trim().isEmpty())position=bits[1].trim();}
+        if(DeveloperPreviewStore.isMemberPreview(this))position="Member Preview";
+    }
 
-    private TextView navItem(String icon,String label,int color,Runnable action){LinearLayout item=new LinearLayout(this);item.setOrientation(LinearLayout.VERTICAL);item.setGravity(Gravity.CENTER);item.setClickable(true);item.setFocusable(true);TextView symbol=new TextView(this);symbol.setText(icon);symbol.setTextColor(color);symbol.setTextSize(21);symbol.setGravity(Gravity.CENTER);item.addView(symbol,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(28)));TextView text=new TextView(this);text.setText(label);text.setTextColor(color);text.setTextSize(10);text.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));text.setGravity(Gravity.CENTER);item.addView(text,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(22)));item.setOnClickListener(v->action.run());return text;}
+    private void buildPremiumShell(ViewGroup host){
+        host.removeAllViews();
+        LinearLayout frame=new LinearLayout(this);frame.setTag("premium-v097-frame");frame.setOrientation(LinearLayout.VERTICAL);frame.setBackgroundColor(BG);
+
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);scroll.setClipToPadding(false);scroll.setBackgroundColor(BG);
+        int l=dp(18),t=dp(12),r=dp(18),b=dp(22);scroll.setPadding(l,t,r,b);
+        scroll.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(l+i.getSystemWindowInsetLeft(),t+i.getSystemWindowInsetTop(),r+i.getSystemWindowInsetRight(),b);return i;});
+        pageHost=new LinearLayout(this);pageHost.setOrientation(LinearLayout.VERTICAL);scroll.addView(pageHost,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        frame.addView(scroll,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f));
+
+        bottomNav=buildBottomNav();frame.addView(bottomNav,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        host.addView(frame,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+        scroll.requestApplyInsets();bottomNav.requestApplyInsets();
+        renderHome();
+        loadAvatar();
+    }
+
+    private LinearLayout buildBottomNav(){
+        LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);nav.setGravity(Gravity.CENTER);nav.setPadding(dp(6),dp(7),dp(6),dp(6));nav.setElevation(dp(12));
+        nav.setBackground(gradient(Color.rgb(15,22,31),Color.rgb(7,11,17),BORDER,22));
+        nav.addView(navItem(R.drawable.ic_nav_home,"Home",()->renderHome()),navParams());
+        nav.addView(navItem(R.drawable.ic_nav_faction,"Faction",()->renderFaction()),navParams());
+        nav.addView(navItem(R.drawable.ic_nav_war,"War",()->openFeature(FeatureRouterActivity.TARGET_WAR)),navParams());
+        if(leadershipAvailable)nav.addView(navItem(R.drawable.ic_nav_leadership,"Leadership",()->renderLeadership()),navParams());
+        nav.addView(navItem(R.drawable.ic_nav_more,"More",()->startActivity(new Intent(this,MoreActivity.class))),navParams());
+        int baseBottom=dp(6);nav.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(dp(6),dp(7),dp(6),baseBottom+i.getSystemWindowInsetBottom());return i;});
+        return nav;
+    }
+
+    private LinearLayout navItem(int iconRes,String label,Runnable action){
+        LinearLayout item=new LinearLayout(this);item.setTag("nav:"+label);item.setOrientation(LinearLayout.VERTICAL);item.setGravity(Gravity.CENTER);item.setPadding(dp(3),dp(3),dp(3),dp(3));item.setClickable(true);item.setFocusable(true);
+        ImageView icon=new ImageView(this);icon.setImageResource(iconRes);icon.setColorFilter(MUTED);icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);item.addView(icon,new LinearLayout.LayoutParams(dp(26),dp(26)));
+        TextView name=text(label,9.5f,MUTED,true);name.setGravity(Gravity.CENTER);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(22));np.topMargin=dp(2);item.addView(name,np);
+        item.setOnClickListener(v->action.run());return item;
+    }
     private LinearLayout.LayoutParams navParams(){return new LinearLayout.LayoutParams(0,dp(58),1f);}
-    private void select(TextView selected){ViewGroup host=findViewById(android.R.id.content);if(host==null)return;setBottomColor(host,"Home",selected==navHome?GOLD:MUTED);setBottomColor(host,"Faction",selected==navFaction?GOLD:MUTED);}
-    private void setBottomColor(View root,String exact,int color){TextView t=findExactInBottom(root,exact);if(t!=null){t.setTextColor(color);if(t.getParent() instanceof ViewGroup){ViewGroup p=(ViewGroup)t.getParent();if(p.getChildCount()>0&&p.getChildAt(0) instanceof TextView)((TextView)p.getChildAt(0)).setTextColor(color);}}}
-    private TextView findExactInBottom(View root,String exact){if(root instanceof TextView&&exact.contentEquals(((TextView)root).getText()))return(TextView)root;if(root instanceof ViewGroup){ViewGroup g=(ViewGroup)root;for(int i=g.getChildCount()-1;i>=0;i--){TextView f=findExactInBottom(g.getChildAt(i),exact);if(f!=null)return f;}}return null;}
+    private void selectNav(String label){if(bottomNav==null)return;for(int i=0;i<bottomNav.getChildCount();i++){View v=bottomNav.getChildAt(i);if(!(v instanceof LinearLayout))continue;LinearLayout item=(LinearLayout)v;boolean on=("nav:"+label).equals(item.getTag());int color=on?GOLD:MUTED;item.setBackground(on?gradient(Color.rgb(45,34,17),Color.rgb(18,20,22),GOLD_DARK,16):Color.TRANSPARENT==0?null:null);if(item.getChildCount()>0&&item.getChildAt(0)instanceof ImageView)((ImageView)item.getChildAt(0)).setColorFilter(color);if(item.getChildCount()>1&&item.getChildAt(1)instanceof TextView)((TextView)item.getChildAt(1)).setTextColor(color);}}
 
-    private void attachCurrentObserver(View root){if(root==null||"v096-observed".equals(root.getTag()))return;root.setTag("v096-observed");root.getViewTreeObserver().addOnGlobalLayoutListener(()->polishCurrent(root));polishCurrent(root);}
-    private void polishCurrent(View root){stampCurrent(root);hideDeveloperConsole(root);renamePrivateTools(root);ensureStrengthIntel(root);}
-    private void stampCurrent(View view){if(view instanceof TextView){TextView t=(TextView)view;CharSequence raw=t.getText();if(raw!=null){String v=raw.toString().replace("v0.8.0","v0.9.6").replace("v0.9.0","v0.9.6").replace("v0.9.1","v0.9.6").replace("v0.9.2","v0.9.6").replace("v0.9.3","v0.9.6").replace("v0.9.4","v0.9.6").replace("v0.9.5","v0.9.6");if(!v.equals(raw.toString()))t.setText(v);}}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)stampCurrent(g.getChildAt(i));}}
-    private void hideDeveloperConsole(View root){TextView t=findContainingIgnoreCase(root,"developer console");if(t!=null&&t.getParent() instanceof View)((View)t.getParent()).setVisibility(View.GONE);}
-    private void renamePrivateTools(View root){TextView t=findExact(root,"OWNER / DEVELOPER");if(t!=null&&t.getVisibility()==View.VISIBLE)t.setText("PRIVATE TOOLS");}
+    private void renderHome(){
+        if(pageHost==null)return;pageHost.removeAllViews();selectNav("Home");
+        addHomeHeader(pageHost);
+        addBrandDivider(pageHost);
+        addWarHero(pageHost);
 
-    private void ensureStrengthIntel(View root){if(containsIgnoreCase(root,"Faction Strength Intel"))return;TextView section=findExact(root,"FACTION OVERVIEW");if(section==null||!(section.getParent() instanceof LinearLayout))return;LinearLayout parent=(LinearLayout)section.getParent();LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(16),dp(13),dp(16),dp(13));card.setBackground(gradient(Color.rgb(18,34,50),Color.rgb(10,16,24),BLUE,18));card.setClickable(true);card.setFocusable(true);TextView eyebrow=new TextView(this);eyebrow.setText("FFSCOUTER • PLAYER-OWNED KEY");eyebrow.setTextColor(BLUE);eyebrow.setTextSize(9);eyebrow.setTypeface(Typeface.DEFAULT,Typeface.BOLD);eyebrow.setLetterSpacing(.09f);card.addView(eyebrow);TextView title=new TextView(this);title.setText("Faction Strength Intel  →");title.setTextColor(TEXT);title.setTextSize(18);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(4);card.addView(title,tp);TextView body=new TextView(this);body.setText("Connect FFScouter once • estimates • Fair Fight • freshness");body.setTextColor(MUTED);body.setTextSize(12);card.addView(body);card.setOnClickListener(v->openFeature(FeatureRouterActivity.TARGET_STRENGTH));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(104));p.bottomMargin=dp(10);parent.addView(card,Math.min(parent.indexOfChild(section)+1,parent.getChildCount()),p);}
+        LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout chain=compactCard("CHAIN STATUS","Current chain readiness",GREEN,()->openFeature(FeatureRouterActivity.TARGET_CHAIN));
+        LinearLayout obligations=compactCard("MY OBLIGATIONS","War, OC and personal faction tasks",GOLD,()->openMember(MemberFactionActivity.MODE_OVERVIEW));
+        row.addView(chain,weighted(false));row.addView(obligations,weighted(true));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(144));rp.bottomMargin=dp(12);pageHost.addView(row,rp);
 
-    private boolean clickExact(View root,String exact){TextView t=findExact(root,exact);if(t!=null){t.performClick();return true;}return false;}
-    private TextView findExact(View view,String exact){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&exact.equals(raw.toString()))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView f=findExact(g.getChildAt(i),exact);if(f!=null)return f;}}return null;}
-    private TextView findContainingIgnoreCase(View view,String needle){String n=needle.toLowerCase();if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().toLowerCase().contains(n))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView f=findContainingIgnoreCase(g.getChildAt(i),needle);if(f!=null)return f;}}return null;}
-    private boolean containsIgnoreCase(View view,String needle){return findContainingIgnoreCase(view,needle)!=null;}
+        if(leadershipAvailable){
+            LinearLayout attention=premiumCard("LEADERSHIP ATTENTION","Who needs attention right now","Review war participation, OC gaps, inactivity and availability exceptions.",GOLD,()->startActivity(new Intent(this,LeadershipAttentionActivity.class)));
+            LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(122));ap.bottomMargin=dp(12);pageHost.addView(attention,ap);
+        }
+
+        LinearLayout digest=premiumCard("WHILE YOU WERE AWAY","Faction digest","See your latest faction status and anything that needs your action without hunting through separate tools.",BLUE,()->openMember(MemberFactionActivity.MODE_OVERVIEW));
+        LinearLayout.LayoutParams dpv=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(112));dpv.bottomMargin=dp(14);pageHost.addView(digest,dpv);
+        addDeveloperFooter(pageHost);
+        loadWarStatus();
+    }
+
+    private void addHomeHeader(LinearLayout root){
+        LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(2),dp(10),dp(2),dp(12));
+        avatarView=new ImageView(this);avatarView.setScaleType(ImageView.ScaleType.CENTER_CROP);avatarView.setImageResource(R.drawable.duckforce_noir_art);avatarView.setBackground(oval(Color.rgb(17,23,31),GOLD_DARK));avatarView.setClipToOutline(true);avatarView.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}});if(avatarBitmap!=null)avatarView.setImageBitmap(avatarBitmap);
+        header.addView(avatarView,new LinearLayout.LayoutParams(dp(78),dp(78)));
+        LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);TextView welcome=text("Welcome back,",13,MUTED,false);copy.addView(welcome);TextView name=text(playerName,28,TEXT,true);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);np.topMargin=dp(1);copy.addView(name,np);TextView role=text(factionName+"  •  "+position,12,DeveloperPreviewStore.isMemberPreview(this)?BLUE:GOLD,false);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);rp.topMargin=dp(4);copy.addView(role,rp);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f);cp.leftMargin=dp(14);header.addView(copy,cp);root.addView(header,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
+    private void addBrandDivider(LinearLayout root){LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);TextView brand=eyebrow("DUCK FORCE COMPANION",MUTED);row.addView(brand);View line=new View(this);line.setBackgroundColor(Color.rgb(29,38,49));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(1),1f);lp.leftMargin=dp(10);lp.rightMargin=dp(10);row.addView(line,lp);TextView version=text("v"+VERSION+" preview",10,MUTED,false);row.addView(version);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(30));p.bottomMargin=dp(8);root.addView(row,p);}
+
+    private void addWarHero(LinearLayout root){
+        LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(20),dp(18),dp(20),dp(18));hero.setBackground(gradient(Color.rgb(22,28,38),Color.rgb(9,14,21),BORDER,23));hero.setElevation(dp(2));
+        warEyebrow=eyebrow("CURRENT WAR",GOLD);hero.addView(warEyebrow);warTitle=text("Checking war status…",26,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(7);hero.addView(warTitle,tp);warMeta=text("Loading Torn ranked-war data",13,MUTED,false);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);mp.topMargin=dp(5);hero.addView(warMeta,mp);warStatus=text("",13,GOLD,true);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(12);hero.addView(warStatus,sp);
+        TextView open=text("OPEN WAR CENTER   →",12,GOLD,true);open.setGravity(Gravity.CENTER);open.setBackground(gradient(Color.rgb(42,32,16),Color.rgb(24,20,15),GOLD_DARK,12));open.setClickable(true);open.setFocusable(true);open.setOnClickListener(v->openFeature(FeatureRouterActivity.TARGET_WAR));LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48));op.topMargin=dp(16);hero.addView(open,op);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(220));hp.bottomMargin=dp(12);root.addView(hero,hp);
+    }
+
+    private LinearLayout compactCard(String title,String body,int accent,Runnable action){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setGravity(Gravity.CENTER_VERTICAL);c.setPadding(dp(16),dp(14),dp(16),dp(14));c.setBackground(gradient(SURFACE,SURFACE_2,BORDER,20));c.setClickable(true);c.setFocusable(true);c.setOnClickListener(v->action.run());TextView e=eyebrow(title,accent);c.addView(e);TextView b=text(body,13,TEXT,true);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(9);c.addView(b,bp);TextView hint=text("Tap to open  →",10,MUTED,false);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);hp.topMargin=dp(10);c.addView(hint,hp);return c;}
+    private LinearLayout.LayoutParams weighted(boolean margin){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.MATCH_PARENT,1f);if(margin)p.leftMargin=dp(10);return p;}
+
+    private LinearLayout premiumCard(String eye,String title,String body,int accent,Runnable action){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setGravity(Gravity.CENTER_VERTICAL);c.setPadding(dp(18),dp(14),dp(18),dp(14));c.setBackground(gradient(SURFACE,SURFACE_2,BORDER,20));c.setClickable(true);c.setFocusable(true);c.setOnClickListener(v->action.run());c.addView(eyebrow(eye,accent));TextView h=text(title,20,TEXT,true);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);hp.topMargin=dp(5);c.addView(h,hp);TextView b=text(body,12.5f,MUTED,false);b.setMaxLines(2);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(4);c.addView(b,bp);return c;}
+
+    private void renderFaction(){
+        pageHost.removeAllViews();selectNav("Faction");addPageTitle(pageHost,"FACTION","Your faction hub","Personal faction status, shared tools and strength intelligence without dashboard clutter.");
+        LinearLayout strength=premiumCard("FFSCOUTER INTEL","Faction Strength Intel","Estimated battle stats, Fair Fight, source and freshness using your own registered Torn key.",BLUE,()->openFeature(FeatureRouterActivity.TARGET_STRENGTH));addFull(pageHost,strength,128);
+        addSection(pageHost,"MY FACTION STATUS");
+        addFull(pageHost,premiumCard("PERSONAL","My Status","A single place for your OC, war participation, chain context and current obligations.",GOLD,()->openMember(MemberFactionActivity.MODE_OVERVIEW)),112);
+        LinearLayout pair=new LinearLayout(this);pair.setOrientation(LinearLayout.HORIZONTAL);pair.addView(compactCard("MY OC","Assignment and readiness",BLUE,()->openMember(MemberFactionActivity.MODE_OC)),weighted(false));pair.addView(compactCard("PARTICIPATION","My ranked-war activity",GREEN,()->openMember(MemberFactionActivity.MODE_PARTICIPATION)),weighted(true));LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(140));pp.bottomMargin=dp(14);pageHost.addView(pair,pp);
+        if(containsIgnoreCase(legacyRoot,"BANKING")){addSection(pageHost,"SHARED TOOLS");addFull(pageHost,premiumCard("FACTION OPERATIONS","Banking","Request faction payouts and review the shared request queue when your permissions allow it.",BLUE,()->invokeLegacy("BANKING")),116);}
+        addDeveloperFooter(pageHost);
+    }
+
+    private void renderLeadership(){
+        if(!leadershipAvailable){renderHome();return;}pageHost.removeAllViews();selectNav("Leadership");addPageTitle(pageHost,"LEADERSHIP","Command center","Exceptions first: who needs attention, why they need it, and the tools required to act.");
+        addFull(pageHost,premiumCard("PRIORITY","Leadership Attention","War-hit gaps, missing OC assignments, inactivity and availability exceptions in one view.",GOLD,()->startActivity(new Intent(this,LeadershipAttentionActivity.class))),124);
+        addSection(pageHost,"MEMBERS");
+        addFull(pageHost,premiumCard("MEMBER INTELLIGENCE","Member Dossier","Leadership-focused member lookup. Current status now; participation, OC and FFScouter context expand here next.",BLUE,()->openFeature(FeatureRouterActivity.TARGET_LOOKUP)),120);
+        addSection(pageHost,"WAR & OC");
+        LinearLayout pair=new LinearLayout(this);pair.setOrientation(LinearLayout.HORIZONTAL);pair.addView(compactCard("WAR","Participation command",RED,()->openFeature(FeatureRouterActivity.TARGET_WAR)),weighted(false));pair.addView(compactCard("OC","OC management",BLUE,()->openFeature(FeatureRouterActivity.TARGET_OC)),weighted(true));LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(140));pp.bottomMargin=dp(14);pageHost.addView(pair,pp);
+        addSection(pageHost,"OPERATIONS");
+        if(containsIgnoreCase(legacyRoot,"BANKING"))addFull(pageHost,premiumCard("OPERATIONS","Banking","Faction payout requests, queue review and reconciliation tools.",BLUE,()->invokeLegacy("BANKING")),112);
+        if(containsIgnoreCase(legacyRoot,"ARMORY AUDITOR"))addFull(pageHost,premiumCard("OPERATIONS","Armory Auditor","Audit faction armory items, member totals, deposits, restocks and detailed activity.",GREEN,()->invokeLegacy("ARMORY AUDITOR")),118);
+        if(containsIgnoreCase(legacyRoot,"LEADERSHIP CONTROLS"))addFull(pageHost,premiumCard("ADMINISTRATION","Leadership Controls","Faction permissions, listener guidance and administration.",GOLD,()->invokeLegacy("LEADERSHIP CONTROLS")),112);
+        addDeveloperFooter(pageHost);
+    }
+
+    private void addPageTitle(LinearLayout root,String eye,String title,String body){LinearLayout h=new LinearLayout(this);h.setOrientation(LinearLayout.VERTICAL);h.setPadding(dp(2),dp(18),dp(2),dp(18));h.addView(eyebrow(eye,GOLD));TextView t=text(title,30,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(5);h.addView(t,tp);TextView b=text(body,13,MUTED,false);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(6);h.addView(b,bp);root.addView(h);}
+    private void addSection(LinearLayout root,String value){TextView s=eyebrow(value,MUTED);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(5);p.bottomMargin=dp(8);root.addView(s,p);}
+    private void addFull(LinearLayout root,View card,int height){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(height));p.bottomMargin=dp(12);root.addView(card,p);}
+
+    private void addDeveloperFooter(LinearLayout root){TextView footer=text("Duck Force Companion v"+VERSION+" preview",10.5f,MUTED,false);footer.setGravity(Gravity.CENTER);footer.setPadding(dp(6),dp(15),dp(6),dp(18));footer.setClickable(true);footer.setOnClickListener(v->{long now=System.currentTimeMillis();if(now-lastFooterTap>1500L)footerTapCount=0;lastFooterTap=now;if(++footerTapCount>=3){footerTapCount=0;startActivity(new Intent(this,DeveloperGateActivity.class));}});root.addView(footer,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));}
+
+    private void loadWarStatus(){String key=new SecureApiKeyStore(this).load();if(key==null)return;new Thread(()->{try{JSONObject factionRoot=TornApiClient.getJson("/user/faction",key);JSONObject faction=factionRoot.optJSONObject("faction");int id=faction==null?0:faction.optInt("id",0);if(id>0)factionId=id;WarStatus status=WarStatus.from(TornApiClient.getJson("/faction/wars",key),id);long now=System.currentTimeMillis()/1000L;runOnUiThread(()->applyWarStatus(status,now));}catch(Exception e){runOnUiThread(()->{if(warTitle!=null){warEyebrow.setText("WAR STATUS");warEyebrow.setTextColor(MUTED);warTitle.setText("War status unavailable");warMeta.setText("Open War Center to retry live Torn data.");warStatus.setText("");}});}}).start();}
+    private void applyWarStatus(WarStatus status,long now){if(warTitle==null)return;if(!status.present){warEyebrow.setText("WAR STATUS");warEyebrow.setTextColor(GREEN);warTitle.setText("No Ranked War Scheduled");warMeta.setText("Duck Force has no current or upcoming ranked war.");warStatus.setText("Ready for the next operation");warStatus.setTextColor(GREEN);}else if(status.isUpcoming(now)){warEyebrow.setText("UPCOMING WAR");warEyebrow.setTextColor(GOLD);warTitle.setText("War Starts Soon");warMeta.setText("vs "+status.opponent+(status.target>0?"  •  target "+status.target:""));warStatus.setText("Starts in "+WarStatus.duration(status.start-now));warStatus.setTextColor(GOLD);}else if(status.isLive(now)){warEyebrow.setText("CURRENT WAR");warEyebrow.setTextColor(RED);warTitle.setText("War In Progress");warMeta.setText("vs "+status.opponent+"  •  "+status.ourScore+" – "+status.opponentScore);warStatus.setText(WarStatus.duration(now-status.start)+" elapsed");warStatus.setTextColor(RED);}else{warEyebrow.setText("LATEST WAR");warEyebrow.setTextColor(MUTED);warTitle.setText("Latest Ranked War Ended");warMeta.setText(status.opponent+"  •  final "+status.ourScore+" – "+status.opponentScore);warStatus.setText("Open War Center for participation details");warStatus.setTextColor(MUTED);}}
+
+    private void loadAvatar(){if(avatarBitmap!=null||avatarView==null)return;String key=new SecureApiKeyStore(this).load();if(key==null)return;new Thread(()->{HttpURLConnection connection=null;try{JSONObject root=TornApiClient.getJson("/user/profile",key);JSONObject profile=root.optJSONObject("profile");String image=profile==null?"":profile.optString("image","").trim();if(image.isEmpty())return;if(image.startsWith("//"))image="https:"+image;else if(image.startsWith("/"))image="https://www.torn.com"+image;connection=(HttpURLConnection)new URL(image).openConnection();connection.setConnectTimeout(12000);connection.setReadTimeout(18000);connection.setRequestProperty("User-Agent","DuckForceCompanion/0.9.7 Android");try(InputStream in=connection.getInputStream()){Bitmap bitmap=BitmapFactory.decodeStream(in);if(bitmap!=null){avatarBitmap=bitmap;runOnUiThread(()->{if(avatarView!=null)avatarView.setImageBitmap(bitmap);});}}}catch(Exception ignored){}finally{if(connection!=null)connection.disconnect();}}).start();}
+
     private void openFeature(String target){Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,target);startActivity(i);}
+    private void openMember(String mode){Intent i=new Intent(this,MemberFactionActivity.class);i.putExtra(MemberFactionActivity.EXTRA_MODE,mode);startActivity(i);}
+    private void invokeLegacy(String title){if(legacyRoot==null||!performClickableAncestor(findContainingIgnoreCase(legacyRoot,title))){Toast.makeText(this,title+" is unavailable for this account.",Toast.LENGTH_SHORT).show();}}
+    private boolean performClickableAncestor(View start){View v=start;while(v!=null){if(v.isClickable()&&v.performClick())return true;if(!(v.getParent() instanceof View))break;v=(View)v.getParent();}return false;}
+
+    private void stampVersion(View view){if(view instanceof TextView){TextView t=(TextView)view;CharSequence raw=t.getText();if(raw!=null){String v=raw.toString().replace("v0.8.0","v"+VERSION).replace("v0.9.0","v"+VERSION).replace("v0.9.1","v"+VERSION).replace("v0.9.2","v"+VERSION).replace("v0.9.3","v"+VERSION).replace("v0.9.4","v"+VERSION).replace("v0.9.5","v"+VERSION).replace("v0.9.6","v"+VERSION);if(!v.equals(raw.toString()))t.setText(v);}}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)stampVersion(g.getChildAt(i));}}
+    private TextView findExact(View view,String exact){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&exact.equals(raw.toString()))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView f=findExact(g.getChildAt(i),exact);if(f!=null)return f;}}return null;}
+    private boolean containsExact(View view,String exact){return findExact(view,exact)!=null;}
+    private TextView findContainingIgnoreCase(View view,String needle){if(view==null)return null;String n=needle.toLowerCase();if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().toLowerCase().contains(n))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView f=findContainingIgnoreCase(g.getChildAt(i),needle);if(f!=null)return f;}}return null;}
+    private boolean containsIgnoreCase(View view,String needle){return findContainingIgnoreCase(view,needle)!=null;}
 }
