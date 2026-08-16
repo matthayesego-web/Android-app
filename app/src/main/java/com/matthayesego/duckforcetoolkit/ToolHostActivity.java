@@ -29,7 +29,7 @@ import java.util.Map;
 
 public class ToolHostActivity extends Activity {
     public static final String EXTRA_TOOL="tool";
-    private static final String APP_VERSION="0.9.13";
+    private static final String APP_VERSION="0.9.15";
     private static final String MANAGED_KEY_SENTINEL="TORNFCA_MANAGED_KEY";
     private static final int BG=Color.rgb(8,12,18),PANEL=Color.rgb(20,27,38),TEXT=Color.rgb(245,248,252);
     private WebView webView;private SecureApiKeyStore keyStore;
