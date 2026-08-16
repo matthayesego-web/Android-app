@@ -93,7 +93,9 @@ public class WarPayoutActivity extends Activity {
             JSONObject w=history.optJSONObject(i);if(w==null)continue;int id=w.optInt("id",0);JSONArray fs=w.optJSONArray("factions");String opponent="Opponent";int our=0,their=0,winner=w.isNull("winner")?0:w.optInt("winner",0);
             for(int j=0;fs!=null&&j<fs.length();j++){JSONObject f=fs.optJSONObject(j);if(f==null)continue;if(f.optInt("id",0)==factionId)our=f.optInt("score",0);else{opponent=f.optString("name",opponent);their=f.optInt("score",0);}}
             String result=winner==factionId?"WIN":winner==0?"DRAW":"LOSS";int accent="WIN".equals(result)?GREEN:"LOSS".equals(result)?RED:MUTED;
-            LinearLayout c=card(Color.TRANSPARENT);c.addView(eyebrow(result+" • WAR #"+id,accent));c.addView(text("vs "+opponent,19,TEXT,true));c.addView(text("Final "+our+" – "+their,13,MUTED,false));Button use=button("Use This War",accent);LinearLayout.LayoutParams up=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));up.topMargin=dp(10);c.addView(use,up);use.setOnClickListener(v->loadReport(id));add(r,c);
+            LinearLayout c=card(Color.TRANSPARENT);c.addView(eyebrow(result+" • WAR #"+id,accent));c.addView(text("vs "+opponent,19,TEXT,true));c.addView(text("Final "+our+" – "+their,13,MUTED,false));Button use=button("Use This War",accent);LinearLayout.LayoutParams up=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));up.topMargin=dp(10);c.addView(use,up);use.setOnClickListener(v->loadReport(id));
+            if(WarPayoutReceiptStore.has(this,id)){Button receipt=button("View Saved Receipt",GREEN);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));rp.topMargin=dp(7);c.addView(receipt,rp);receipt.setOnClickListener(v->openReceipt(id));}
+            add(r,c);
         }
         setContentView(s);s.requestApplyInsets();
     }
@@ -190,12 +192,15 @@ public class WarPayoutActivity extends Activity {
         for(int i=0;i<rows.size();i++){PayoutRow row=rows.get(i);if(i==rows.size()-1)row.gross=pool-assignedGross;else{row.gross=(long)Math.floor(pool*(row.composite/totalComposite));assignedGross+=row.gross;}long requested=parseMoneySafe(row.member.penaltyField==null?"":row.member.penaltyField.getText().toString());row.penalty=Math.min(Math.max(0,requested),row.gross);row.net=row.gross-row.penalty;row.reason=row.member.reasonField==null?"":row.member.reasonField.getText().toString().trim();}
         Collections.sort(rows,(a,b)->Long.compare(b.net,a.net));
         long totalPaid=0,totalPenalty=0;for(PayoutRow row:rows){totalPaid+=row.net;totalPenalty+=row.penalty;}
+        JSONObject receipt=buildReceipt(pool,totalPaid,totalPenalty,rows);if(receipt!=null)WarPayoutReceiptStore.save(this,receipt);
         LinearLayout summary=card(GREEN);summary.addView(eyebrow("WARPAY CALCULATED",GREEN));summary.addView(text(money(totalPaid)+" queued to members",20,TEXT,true));summary.addView(text("Pool "+money(pool)+" • penalties retained "+money(totalPenalty)+" • "+rows.size()+" weighted members",12.5f,MUTED,false));
-        Button copy=button("Copy Payout List",GREEN);LinearLayout.LayoutParams cop=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));cop.topMargin=dp(10);summary.addView(copy,cop);host.addView(summary,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        Button copy=button("Copy Full Receipt",GREEN);LinearLayout.LayoutParams cop=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));cop.topMargin=dp(10);summary.addView(copy,cop);
+        if(receipt!=null){Button view=button("View Saved Receipt",BLUE);LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));vp.topMargin=dp(7);summary.addView(view,vp);int warId=selectedReport.optInt("id",0);view.setOnClickListener(v->openReceipt(warId));copy.setOnClickListener(v->copy(WarPayoutReceiptStore.text(receipt)));}
+        host.addView(summary,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
         StringBuilder paste=new StringBuilder("War #").append(selectedReport.optInt("id",0)).append(" WarPay — ").append(money(totalPaid)).append(" paid from ").append(money(pool)).append(" pool\n");
         List<PayoutRow> paymentQueue=new ArrayList<>();int rank=1;
         for(PayoutRow row:rows){LinearLayout c=card(Color.TRANSPARENT);c.addView(text(rank+". "+row.member.name,17,TEXT,true));String detail=money(row.net)+" net • gross "+money(row.gross)+" • "+row.member.warHits+" hits • "+row.member.outsideHits+" outside • "+String.format(Locale.US,"%.2f",row.member.respectEarned)+" respect";if(row.penalty>0)detail+="\nPenalty: -"+money(row.penalty)+(row.reason.isEmpty()?"":" • "+row.reason);c.addView(text(detail,12.5f,row.penalty>0?GOLD:MUTED,false));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(10);host.addView(c,p);paste.append(rank).append(". ").append(row.member.name).append(" [").append(row.member.id).append("] — ").append(money(row.net));if(row.penalty>0)paste.append(" (penalty -").append(money(row.penalty)).append(row.reason.isEmpty()?"":", "+row.reason).append(")");paste.append("\n");if(row.net>0)paymentQueue.add(row);rank++;}
-        String out=paste.toString().trim();copy.setOnClickListener(v->copy(out));
+        if(receipt==null){String out=paste.toString().trim();copy.setOnClickListener(v->copy(out));}
         if(!paymentQueue.isEmpty()){
             LinearLayout pay=card(BLUE);pay.addView(eyebrow("TORN PAYMENT HANDOFF",BLUE));pay.addView(text("Open each calculated transfer directly in Torn's faction Give to User screen with the player and amount prefilled. Confirm the payment in Torn, return here, then open the next one.",13,TEXT,false));
             Button next=button("Open Payment 1 of "+paymentQueue.size()+" in Torn",BLUE);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));np.topMargin=dp(10);pay.addView(next,np);final int[] index={0};next.setOnClickListener(v->{if(index[0]>=paymentQueue.size()){next.setText("Payment Queue Opened");next.setEnabled(false);return;}PayoutRow row=paymentQueue.get(index[0]);openTornPayment(row.member.id,row.net);index[0]++;if(index[0]<paymentQueue.size())next.setText("Open Payment "+(index[0]+1)+" of "+paymentQueue.size()+" in Torn");else next.setText("All Payments Opened — tap to finish");});
@@ -203,6 +208,11 @@ public class WarPayoutActivity extends Activity {
         }
     }
 
+    private JSONObject buildReceipt(long pool,long totalPaid,long totalPenalty,List<PayoutRow> rows){
+        try{JSONObject receipt=new JSONObject();receipt.put("war_id",selectedReport==null?0:selectedReport.optInt("id",0));receipt.put("created_at",System.currentTimeMillis());receipt.put("pool",pool);receipt.put("total_paid",totalPaid);receipt.put("total_penalty",totalPenalty);receipt.put("member_count",rows.size());JSONArray items=new JSONArray();for(PayoutRow row:rows){JSONObject item=new JSONObject();item.put("player_id",row.member.id);item.put("name",row.member.name);item.put("gross",row.gross);item.put("penalty",row.penalty);item.put("net",row.net);item.put("reason",row.reason);item.put("war_hits",row.member.warHits);item.put("outside_hits",row.member.outsideHits);item.put("respect",row.member.respectEarned);items.put(item);}receipt.put("rows",items);return receipt;}catch(Exception e){Toast.makeText(this,"Payout calculated, but the local receipt could not be saved.",Toast.LENGTH_SHORT).show();return null;}
+    }
+
+    private void openReceipt(int warId){Intent i=new Intent(this,WarPayoutReceiptActivity.class);i.putExtra(WarPayoutReceiptActivity.EXTRA_WAR_ID,warId);i.putExtra(WarPayoutReceiptActivity.EXTRA_POSITION,position);startActivity(i);}
     private void openTornPayment(int playerId,long amount){
         String url="https://www.torn.com/factions.php?step=your#/tab=controls&option=give-to-user&giveMoneyTo="+playerId+"&money="+amount;
         try{startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));}catch(Exception e){Toast.makeText(this,"Unable to open Torn payment page.",Toast.LENGTH_SHORT).show();}
@@ -210,7 +220,7 @@ public class WarPayoutActivity extends Activity {
     private static long parseMoney(String raw){return (long)Double.parseDouble(raw.replace(",","").replace("$","").trim());}
     private static long parseMoneySafe(String raw){try{return parseMoney(raw);}catch(Exception e){return 0L;}}
     private static String money(long value){return "$"+NumberFormat.getIntegerInstance(Locale.US).format(value);}
-    private void copy(String value){ClipboardManager c=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);if(c!=null){c.setPrimaryClip(ClipData.newPlainText("WarPay",value));Toast.makeText(this,"WarPay list copied.",Toast.LENGTH_SHORT).show();}}
+    private void copy(String value){ClipboardManager c=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);if(c!=null){c.setPrimaryClip(ClipData.newPlainText("WarPay",value));Toast.makeText(this,"WarPay receipt copied.",Toast.LENGTH_SHORT).show();}}
     private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);header(r);LinearLayout c=card(RED);c.addView(eyebrow("WARPAY UNAVAILABLE",RED));c.addView(text(message,14,TEXT,false));Button retry=button("Back to War List",GOLD);retry.setOnClickListener(v->loadHistory());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48));p.topMargin=dp(12);c.addView(retry,p);add(r,c);setContentView(s);s.requestApplyInsets();});}
 
     private static final class MemberMetric{
