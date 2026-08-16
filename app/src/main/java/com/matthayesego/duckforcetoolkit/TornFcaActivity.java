@@ -69,8 +69,15 @@ public class TornFcaActivity extends V098CompanionActivity {
 
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
 
+    private TextView findLoginTitle(View root){
+        TextView title=findText(root,"Sign in to TornFCA");
+        if(title==null)title=findText(root,"Sign in to Duck Force");
+        if(title==null)title=findText(root,"Connect your Torn account");
+        return title;
+    }
+
     private void addApiRequirementNotice(View root){
-        TextView title=findText(root,"Connect your Torn account");
+        TextView title=findLoginTitle(root);
         if(title==null||!(title.getParent() instanceof LinearLayout))return;
         LinearLayout card=(LinearLayout)title.getParent();
         for(int i=0;i<card.getChildCount();i++)if("tornfca-api-requirement".equals(card.getChildAt(i).getTag()))return;
@@ -85,7 +92,7 @@ public class TornFcaActivity extends V098CompanionActivity {
     }
 
     private void addKeyRetentionControls(View root){
-        TextView title=findText(root,"Connect your Torn account");
+        TextView title=findLoginTitle(root);
         if(title==null||!(title.getParent() instanceof LinearLayout))return;
         LinearLayout card=(LinearLayout)title.getParent();
         for(int i=0;i<card.getChildCount();i++)if("tornfca-key-retention".equals(card.getChildAt(i).getTag()))return;
