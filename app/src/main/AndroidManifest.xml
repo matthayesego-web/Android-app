@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
+    <application android:allowBackup="false" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
         <activity android:name=".AccessGateActivity" android:exported="true" android:launchMode="singleTask" android:clearTaskOnLaunch="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
         <activity android:name=".TornFcaActivity" android:exported="false"/>
         <activity android:name=".TornFcaScreens$More" android:exported="false"/>
@@ -24,9 +24,7 @@
         <activity android:name=".TornFcaScreens$PremiumPreview" android:exported="false"/>
         <activity android:name=".TornFcaScreens$DeveloperConsole" android:exported="false"/>
 
-        <!-- Legacy implementation classes remain packaged as the proven feature layer underneath TornFCA. -->
-        <activity android:name=".V098CompanionActivity" android:exported="false"/>
-        <activity android:name=".V095CompanionActivity" android:exported="false"/>
+        <!-- Working feature implementations. Base/legacy shells are intentionally not launchable activities. -->
         <activity android:name=".WarCenterActivity" android:exported="false"/>
         <activity android:name=".WarPayoutActivity" android:exported="false"/>
         <activity android:name=".BankingCompanionActivity" android:exported="false"/>
@@ -47,7 +45,5 @@
         <activity android:name=".PremiumPreviewActivity" android:exported="false"/>
         <activity android:name=".DeveloperConsoleActivity" android:exported="false"/>
         <activity android:name=".ToolHostActivity" android:exported="false"/>
-        <activity android:name=".ToolkitActivity" android:exported="false"/>
-        <activity android:name=".MainActivity" android:exported="false"/>
     </application>
 </manifest>
