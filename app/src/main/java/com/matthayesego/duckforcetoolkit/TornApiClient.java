@@ -17,23 +17,25 @@ import java.util.regex.Pattern;
 /**
  * Shared Torn API boundary.
  *
- * TornFCA deliberately stays far below Torn's user-wide request ceiling. Requests are serialized,
- * spaced, cached where safe, and only transient/rate-limit failures are backed off. Permanent
- * invalid-key/access errors are never automatically retried.
+ * TornFCA deliberately stays below Torn's user-wide request ceiling. Requests are rate-spaced,
+ * cached where safe, and only transient/rate-limit failures are backed off. Permanent invalid-key
+ * or access errors are never automatically retried.
  */
 public final class TornApiClient {
     private static final String BASE = "https://api.torn.com/v2";
-    private static final String USER_AGENT = "TornFCA/0.9.13 Android";
+    private static final String USER_AGENT = "TornFCA/0.9.14 Android";
     private static final Pattern API_KEY = Pattern.compile("^[A-Za-z0-9]{16}$");
     private static final Pattern QUERY_KEY = Pattern.compile("([?&])key=[^&]*", Pattern.CASE_INSENSITIVE);
 
-    // Torn documents 100 requests/minute per user across all of that user's keys. TornFCA caps its
-    // Android-side Torn traffic at 12/minute (one request every 5 seconds), reserving most of the
-    // user's quota for TornFCA backend verification, TornStats, FFScouter, TornPDA and other tools.
-    private static final long MIN_REQUEST_SPACING_MS = 5000L;
+    // Torn documents a 100 requests/minute per-user ceiling. TornFCA caps direct Android traffic
+    // at 30/minute (one request every 2 seconds), leaving substantial headroom for its backend and
+    // other user-authorized Torn tools while removing the old 5-second-per-call UI penalty.
+    private static final long MIN_REQUEST_SPACING_MS = 2000L;
+    private static final long SESSION_CACHE_MS = 30L * 60L * 1000L;
     private static long nextRequestAtMs = 0L;
 
     private static final ConcurrentHashMap<String, CacheEntry> CACHE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, SessionEntry> SESSION_CACHE = new ConcurrentHashMap<>();
 
     private TornApiClient() {}
 
@@ -56,17 +58,28 @@ public final class TornApiClient {
         int playerId = keyUser.optInt("id", 0);
         if (playerId <= 0) throw new IOException("Unable to determine the Torn player ID.");
 
-        JSONObject basicRoot = getJson("/user/basic", key);
-        JSONObject basic = basicRoot.optJSONObject("profile");
-        String playerName = basic == null ? "Unknown" : basic.optString("name", "Unknown");
+        // Pull profile + faction in one v2 request instead of two sequential calls. The component
+        // responses are also seeded into the normal cache so Home/avatar consumers reuse them.
+        JSONObject identity = getJson("/user?selections=profile,faction", key);
+        JSONObject profile = identity.optJSONObject("profile");
+        String playerName = profile == null ? "Unknown" : profile.optString("name", "Unknown");
 
-        JSONObject factionResponse = getJson("/user/faction", key);
-        JSONObject faction = factionResponse.optJSONObject("faction");
+        JSONObject faction = identity.optJSONObject("faction");
         if (faction == null) throw new IOException("This Torn account is not currently in a faction.");
         int factionId = faction.optInt("id", 0);
         String factionName = faction.optString("name", "");
         String position = faction.optString("position", "");
         if (factionId <= 0 || factionName.isEmpty()) throw new IOException("Unable to verify the Torn faction.");
+
+        try {
+            if (profile != null) {
+                JSONObject profileAlias = new JSONObject();profileAlias.put("profile", profile);
+                cachePath("/user/profile", key, profileAlias, 10L * 60L * 1000L);
+                cachePath("/user/basic", key, profileAlias, 10L * 60L * 1000L);
+            }
+            JSONObject factionAlias = new JSONObject();factionAlias.put("faction", faction);
+            cachePath("/user/faction", key, factionAlias, 10L * 60L * 1000L);
+        } catch (Exception ignored) {}
 
         JSONArray positions = new JSONArray();
         JSONArray abilities = new JSONArray();
@@ -101,8 +114,22 @@ public final class TornApiClient {
 
         if (AccessPolicy.isLeaderPosition(position) && !permissionsResolved) permissionsResolved = true;
 
-        return new AuthSession(playerId, playerName, factionId, factionName, position,
+        AuthSession session = new AuthSession(playerId, playerName, factionId, factionName, position,
                 factionApiAccess, tier, positions, abilities, permissionsResolved);
+        SESSION_CACHE.put(sessionKey(key), new SessionEntry(session, System.currentTimeMillis() + SESSION_CACHE_MS));
+        return session;
+    }
+
+    /** Returns the already verified in-process session so feature navigation does not re-authenticate. */
+    public static AuthSession cachedSession(String key) {
+        if (key == null || key.trim().isEmpty()) return null;
+        SessionEntry entry = SESSION_CACHE.get(sessionKey(key));
+        if (entry == null) return null;
+        if (entry.expiresAtMs <= System.currentTimeMillis()) {
+            SESSION_CACHE.remove(sessionKey(key));
+            return null;
+        }
+        return entry.session;
     }
 
     public static JSONObject getJson(String path, String key) throws IOException {
@@ -112,8 +139,8 @@ public final class TornApiClient {
                 + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name()), key);
     }
 
-    /** Serializes Torn requests across the whole app so parallel screens cannot burst the API. */
-    public static synchronized JSONObject getJsonAbsolute(String absoluteUrl, String key) throws IOException {
+    /** Requests may overlap in flight, but starts are globally spaced by waitForRequestSlot(). */
+    public static JSONObject getJsonAbsolute(String absoluteUrl, String key) throws IOException {
         validateKey(key);
         String urlValue = canonicalizeTornUrl(absoluteUrl, key);
 
@@ -206,7 +233,7 @@ public final class TornApiClient {
         return out;
     }
 
-    public static void clearMemoryCache(){ CACHE.clear(); }
+    public static void clearMemoryCache(){ CACHE.clear();SESSION_CACHE.clear(); }
 
     public static void validateKey(String key) throws IOException {
         if (key == null || !API_KEY.matcher(key.trim()).matches()) {
@@ -225,7 +252,7 @@ public final class TornApiClient {
     private static boolean isTransientTornError(int code) { return code == 5 || code == 17; }
     private static long backoffMs(int tornCode, int attempt) { if (tornCode == 5) return (attempt + 1L) * 10000L;return (attempt + 1L) * 6000L; }
 
-    private static void waitForRequestSlot() {
+    private static synchronized void waitForRequestSlot() {
         long now = System.currentTimeMillis();
         long wait = Math.max(0L, nextRequestAtMs - now);
         if (wait > 0L) sleepQuietly(wait);
@@ -234,10 +261,11 @@ public final class TornApiClient {
 
     private static long ttlFor(String url) {
         if (url.contains("/key/info")) return 10L * 60L * 1000L;
+        if (url.contains("/user?selections=profile,faction")) return 10L * 60L * 1000L;
         if (url.contains("/user/basic")) return 10L * 60L * 1000L;
         if (url.contains("/user/profile")) return 10L * 60L * 1000L;
-        if (url.contains("/user/faction")) return 5L * 60L * 1000L;
-        if (url.contains("/faction/positions")) return 5L * 60L * 1000L;
+        if (url.contains("/user/faction")) return 10L * 60L * 1000L;
+        if (url.contains("/faction/positions")) return 10L * 60L * 1000L;
         if (url.contains("/rankedwarreport")) return 24L * 60L * 60L * 1000L;
         if (url.contains("/rankedwars")) return 2L * 60L * 1000L;
         if (url.contains("/faction/attacks") || url.contains("/user/attacks")) {
@@ -248,11 +276,20 @@ public final class TornApiClient {
         if (url.contains("/faction/news")) return 2L * 60L * 1000L;
         if (url.contains("/faction/crimes")) return 30L * 1000L;
         if (url.contains("/user/organizedcrime")) return 30L * 1000L;
-        if (url.contains("/faction/balance")) return 15L * 1000L;
-        if (url.contains("/faction/wars")) return 20L * 1000L;
-        if (url.contains("/faction/chain")) return 15L * 1000L;
-        if (url.contains("/members")) return 60L * 1000L;
+        if (url.contains("/faction/balance")) return 20L * 1000L;
+        if (url.contains("/faction/wars")) return 45L * 1000L;
+        if (url.contains("/faction/chain")) return 30L * 1000L;
+        if (url.contains("/members")) return 90L * 1000L;
         return 20L * 1000L;
+    }
+
+    private static void cachePath(String path, String key, JSONObject json, long ttl) {
+        try {
+            String joiner = path.contains("?") ? "&" : "?";
+            String url = canonicalizeTornUrl(BASE + path + joiner + "key="
+                    + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name()), key);
+            CACHE.put(cacheKey(url, key), new CacheEntry(json.toString(), System.currentTimeMillis() + ttl));
+        } catch (Exception ignored) {}
     }
 
     private static long queryLong(String url, String name) {
@@ -268,10 +305,12 @@ public final class TornApiClient {
         return 0L;
     }
 
+    private static String sessionKey(String key){return Integer.toHexString(key==null?0:key.trim().hashCode());}
     private static String cacheKey(String url, String key) {String sanitized = url.replaceAll("([?&])key=[^&]*", "$1key=*");return Integer.toHexString(key == null ? 0 : key.hashCode()) + "|" + sanitized;}
     private static void trimCache() {if (CACHE.size() <= 160) return;long now = System.currentTimeMillis();CACHE.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);if (CACHE.size() > 200) CACHE.clear();}
     private static void sleepQuietly(long ms) {try { Thread.sleep(Math.max(0L, ms)); }catch (InterruptedException e) { Thread.currentThread().interrupt(); }}
-    private static String readAll(InputStream input) throws IOException {try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {byte[] buffer = new byte[4096];int n;while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);return out.toString(StandardCharsets.UTF_8.name());}}
+    private static String readAll(InputStream input) throws IOException {try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {byte[] buffer=new byte[4096];int n;while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);return out.toString(StandardCharsets.UTF_8.name());}}
     private static final class CacheEntry {final String body;final long expiresAtMs;CacheEntry(String body,long expiresAtMs){this.body=body;this.expiresAtMs=expiresAtMs;}}
+    private static final class SessionEntry {final AuthSession session;final long expiresAtMs;SessionEntry(AuthSession session,long expiresAtMs){this.session=session;this.expiresAtMs=expiresAtMs;}}
     private static final class PermanentApiException extends IOException {PermanentApiException(String message){super(message);}}
 }
