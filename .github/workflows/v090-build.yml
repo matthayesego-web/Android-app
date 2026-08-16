@@ -35,6 +35,8 @@ jobs:
           test -n "$VERSION_CODE"
           case "$VERSION_NAME" in 0.9.*) ;; *) echo "TornFCA beta branch must stay in 0.9.x"; exit 1;; esac
           grep -q 'manifestPlaceholders\["appLabel"\] = "TornFCA"' app/build.gradle.kts
+          grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
+          grep -q 'android:usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaActivity' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaScreens' app/src/main/AndroidManifest.xml
           grep -q 'BankingCompanionActivity' app/src/main/AndroidManifest.xml
@@ -43,21 +45,43 @@ jobs:
           grep -q 'TornFcaActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "VERSION=\"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q "VERSION = \"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/V095CompanionActivity.java
           grep -q 'BuildConfig.DEVELOPER_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
           grep -q 'BuildConfig.FACTION_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           grep -q 'BuildConfig.PREMIUM_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
-          grep -q 'Limited Access or higher' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
-          grep -q 'MIN_REQUEST_SPACING_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+
+          # One-key / Torn rate-safety gates.
+          grep -q 'Limited Access Torn API key' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
+          grep -q 'MIN_REQUEST_SPACING_MS = 5000L' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          grep -q 'PermanentApiException' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          grep -q 'TornApiClient.validateKey' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
+          grep -q '10000L' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
+
+          # Embedded tools must share the native throttle and never receive the actual key in JS.
+          grep -q 'TornApiClient.getJsonAbsolute' app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java
+          grep -q 'MANAGED_KEY_SENTINEL' app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java
+          if grep -q 'JSONObject.quote(key)' app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java; then echo "Real Torn key must never be injected into embedded JavaScript"; exit 1; fi
+
+          # Provider consent/rate gates.
+          grep -q 'requireAuthorizedKey' app/src/main/java/com/matthayesego/duckforcetoolkit/FFScouterClient.java
+          grep -q 'renderProviderConsent' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionStrengthActivity.java
+          grep -q 'FFScouterClient.hasConsent' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
+          grep -q 'TornStatsClient.hasConsent' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
+          grep -q 'Open TornStats Terms' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
+          grep -q 'approvedFingerprint' app/src/main/java/com/matthayesego/duckforcetoolkit/TornStatsClient.java
+          grep -q '5000L' app/src/main/java/com/matthayesego/duckforcetoolkit/TornStatsClient.java
+
+          # Banking listener is interaction-scoped and does not use Torn API.
           grep -q 'ACTIVE_WINDOW_MS' app/src/main/assets/listener/duckforce_chat_listener.user.js
           grep -q 'FACTION_CHAT_ACTIVE' app/src/main/assets/listener/duckforce_chat_listener.user.js
           grep -q 'TORNFCA_XANAX_ITEM_ID=206' backend/TornFcaPremiumBackend.gs
-          grep -q 'TornStatsClient.hasConsent' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
-          grep -q 'FFScouterClient.getStats' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
           grep -q 'tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+
           if grep -q 'PREVIEW_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java; then echo "Legacy beta access-code gate must be removed"; exit 1; fi
-          if grep -q 'android:name=".V090CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy V090 shell must not be restorable"; exit 1; fi
-          if grep -q 'android:name=".PolishedCompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy v0.8 shell must not be restorable"; exit 1; fi
-          if grep -q 'android:name=".CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy base shell must not be restorable"; exit 1; fi
+          if grep -q 'android:allowBackup="true"' app/src/main/AndroidManifest.xml; then echo "API-key application backup must remain disabled"; exit 1; fi
+          for legacy in V090CompanionActivity PolishedCompanionActivity CompanionActivity V095CompanionActivity V098CompanionActivity MainActivity ToolkitActivity; do
+            if grep -q "android:name=\".${legacy}\"" app/src/main/AndroidManifest.xml; then echo "Legacy/bypass activity ${legacy} must not be launchable"; exit 1; fi
+          done
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
