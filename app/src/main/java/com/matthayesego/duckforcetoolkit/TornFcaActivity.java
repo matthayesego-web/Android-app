@@ -106,21 +106,30 @@ public class TornFcaActivity extends V098CompanionActivity {
         File cached=avatarFile(playerId);
         if(cached.exists()){
             Bitmap local=BitmapFactory.decodeFile(cached.getAbsolutePath());
-            if(local!=null)avatar.setImageBitmap(local);
-            if(System.currentTimeMillis()-cached.lastModified()<AVATAR_REFRESH_MS)return;
+            if(local!=null)applyAvatar(avatar,local);
+            if(local!=null&&System.currentTimeMillis()-cached.lastModified()<AVATAR_REFRESH_MS)return;
         }
         if(avatarRefreshInFlight)return;avatarRefreshInFlight=true;final int id=playerId;
         new Thread(()->{
             try{
-                JSONObject rootJson=TornApiClient.getJson("/user/profile",key);JSONObject profile=rootJson.optJSONObject("profile");
-                String image=profile==null?"":profile.optString("image","").trim();
-                if(image.isEmpty()||"null".equalsIgnoreCase(image)){cached.delete();return;}
+                // Always use Torn's dedicated v2 profile endpoint. Do not reuse the generic
+                // profile/faction response because those selection schemas have changed separately.
+                JSONObject rootJson=TornApiClient.getJson("/user/profile",key);
+                JSONObject profile=rootJson.optJSONObject("profile");
+                if(profile==null)profile=rootJson;
+                String image=firstNonBlank(profile.optString("image",""),profile.optString("profile_image",""));
+                image=normalizeImageUrl(image);
+                if(image.isEmpty())return;
                 BitmapDownload result=downloadBitmap(image);if(result==null||result.bitmap==null)return;
                 try(FileOutputStream out=new FileOutputStream(avatarFile(id))){out.write(result.bytes);}
-                runOnUiThread(()->{ViewGroup current=findViewById(android.R.id.content);ImageView currentAvatar=current==null?null:findHeaderAvatar(current);if(currentAvatar!=null)currentAvatar.setImageBitmap(result.bitmap);});
+                runOnUiThread(()->{ViewGroup current=findViewById(android.R.id.content);ImageView currentAvatar=current==null?null:findHeaderAvatar(current);if(currentAvatar!=null)applyAvatar(currentAvatar,result.bitmap);});
             }catch(Exception ignored){}finally{avatarRefreshInFlight=false;}
         },"TornFCA-ProfileAvatar").start();
     }
+
+    private void applyAvatar(ImageView target,Bitmap bitmap){target.setPadding(0,0,0,0);target.setScaleType(ImageView.ScaleType.CENTER_CROP);target.setImageBitmap(bitmap);}
+    private String firstNonBlank(String a,String b){if(a!=null&&!a.trim().isEmpty()&&!"null".equalsIgnoreCase(a.trim()))return a.trim();if(b!=null&&!b.trim().isEmpty()&&!"null".equalsIgnoreCase(b.trim()))return b.trim();return"";}
+    private String normalizeImageUrl(String raw){if(raw==null)return"";String value=raw.trim();if(value.isEmpty()||"null".equalsIgnoreCase(value))return"";if(value.startsWith("//"))value="https:"+value;else if(value.startsWith("/"))value="https://www.torn.com"+value;else if(value.startsWith("http://profileimages.torn.com/"))value="https://"+value.substring("http://".length());try{URL url=new URL(value);return"https".equalsIgnoreCase(url.getProtocol())?value:"";}catch(Exception e){return"";}}
 
     private File avatarFile(int playerId){return new File(getCacheDir(),"torn-profile-"+playerId+".img");}
 
@@ -128,8 +137,12 @@ public class TornFcaActivity extends V098CompanionActivity {
         URL url=new URL(value);if(!"https".equalsIgnoreCase(url.getProtocol()))return null;
         HttpURLConnection c=(HttpURLConnection)url.openConnection();
         try{
-            c.setConnectTimeout(8000);c.setReadTimeout(12000);c.setUseCaches(true);c.setInstanceFollowRedirects(true);c.setRequestProperty("User-Agent","TornFCA/0.9.14 Android");
-            if(c.getResponseCode()<200||c.getResponseCode()>=300)return null;
+            c.setConnectTimeout(8000);c.setReadTimeout(12000);c.setUseCaches(true);c.setInstanceFollowRedirects(true);
+            c.setRequestProperty("User-Agent","Mozilla/5.0 (Android) TornFCA/0.9.15");
+            c.setRequestProperty("Accept","image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
+            c.setRequestProperty("Referer","https://www.torn.com/");
+            int code=c.getResponseCode();if(code<200||code>=300)return null;
+            String contentType=c.getContentType();if(contentType!=null&&!contentType.toLowerCase().startsWith("image/"))return null;
             try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
                 byte[] buffer=new byte[8192];int n,total=0;while((n=in.read(buffer))!=-1){total+=n;if(total>4*1024*1024)return null;out.write(buffer,0,n);}byte[] bytes=out.toByteArray();Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length);return bitmap==null?null:new BitmapDownload(bitmap,bytes);
             }
@@ -137,7 +150,7 @@ public class TornFcaActivity extends V098CompanionActivity {
     }
 
     private ImageView findHeaderAvatar(View view){
-        if(view instanceof ImageView){ViewGroup.LayoutParams p=view.getLayoutParams();if(p!=null&&p.width==dp(78)&&p.height==dp(78))return(ImageView)view;}
+        if(view instanceof ImageView){ViewGroup.LayoutParams p=view.getLayoutParams();if(p!=null&&Math.abs(p.width-dp(78))<=dp(2)&&Math.abs(p.height-dp(78))<=dp(2))return(ImageView)view;}
         if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){ImageView found=findHeaderAvatar(g.getChildAt(i));if(found!=null)return found;}}
         return null;
     }
