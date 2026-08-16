@@ -42,10 +42,16 @@ jobs:
       - name: Build unsigned internal beta and release
         run: gradle --no-daemon :app:assembleBeta :app:assembleRelease
 
-      - name: Name APKs
+      - name: Name APKs and package signing tool
         run: |
           cp app/build/outputs/apk/beta/app-beta-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-internal-beta-unsigned.apk"
           cp app/build/outputs/apk/release/app-release-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-unsigned-release.apk"
+          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -x "$APKSIGNER"
+          mkdir -p android-signing-tool/lib
+          cp "$APKSIGNER" android-signing-tool/apksigner
+          cp "$(dirname "$APKSIGNER")/lib/apksigner.jar" android-signing-tool/lib/apksigner.jar
+          chmod +x android-signing-tool/apksigner
 
       - name: Upload v0.9 APKs
         uses: actions/upload-artifact@v7
@@ -54,5 +60,7 @@ jobs:
           path: |
             DuckForce-Companion-v${{ env.VERSION_NAME }}-internal-beta-unsigned.apk
             DuckForce-Companion-v${{ env.VERSION_NAME }}-unsigned-release.apk
+            android-signing-tool/apksigner
+            android-signing-tool/lib/apksigner.jar
           if-no-files-found: error
           retention-days: 14
