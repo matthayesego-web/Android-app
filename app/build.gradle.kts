@@ -1,23 +1,19 @@
 plugins {
-    id("com.android.application")
+    id("com.android.application") version "8.10.1"
 }
 
-fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+import java.util.Properties
 
-val configuredDeveloperHash = providers.gradleProperty("TORNFCA_DEV_PASSWORD_SHA256").orNull
-    ?.trim()?.takeIf { it.isNotEmpty() }
-    ?: System.getenv("TORNFCA_DEV_PASSWORD_SHA256")?.trim()?.takeIf { it.isNotEmpty() }
-    ?: "8AC1118BA3EAA1A258BF399E88EEB2A32683C1993A2373C44B939F4CEF5C0012"
+fun localOrEnv(name: String, fallback: String = ""): String {
+    val fromEnv = System.getenv(name)
+    if (!fromEnv.isNullOrBlank()) return fromEnv.trim()
+    val props = Properties()
+    val local = rootProject.file("local.properties")
+    if (local.exists()) local.inputStream().use { props.load(it) }
+    return props.getProperty(name, fallback).trim()
+}
 
-val factionBackendUrl = providers.gradleProperty("TORNFCA_FACTION_BACKEND_URL").orNull
-    ?.trim()?.takeIf { it.isNotEmpty() }
-    ?: System.getenv("TORNFCA_FACTION_BACKEND_URL")?.trim()?.takeIf { it.isNotEmpty() }
-    ?: ""
-
-val premiumBackendUrl = providers.gradleProperty("TORNFCA_PREMIUM_BACKEND_URL").orNull
-    ?.trim()?.takeIf { it.isNotEmpty() }
-    ?: System.getenv("TORNFCA_PREMIUM_BACKEND_URL")?.trim()?.takeIf { it.isNotEmpty() }
-    ?: ""
+fun quotedBuildValue(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.matthayesego.duckforcetoolkit"
@@ -27,42 +23,39 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 27
-        versionName = "0.9.12"
+        versionCode = 28
+        versionName = "0.9.13"
         manifestPlaceholders["appLabel"] = "TornFCA"
-        buildConfigField("String", "DEVELOPER_ACCESS_SHA256", configuredDeveloperHash.asBuildConfigString())
-        buildConfigField("String", "FACTION_BACKEND_URL", factionBackendUrl.asBuildConfigString())
-        buildConfigField("String", "PREMIUM_BACKEND_URL", premiumBackendUrl.asBuildConfigString())
+
+        val devHash = localOrEnv("TORNFCA_DEV_PASSWORD_SHA256")
+        val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL")
+        val premiumBackend = localOrEnv("TORNFCA_PREMIUM_BACKEND_URL")
+        buildConfigField("String", "DEVELOPER_ACCESS_SHA256", quotedBuildValue(devHash))
+        buildConfigField("String", "FACTION_BACKEND_URL", quotedBuildValue(factionBackend))
+        buildConfigField("String", "PREMIUM_BACKEND_URL", quotedBuildValue(premiumBackend))
     }
 
     buildFeatures {
         buildConfig = true
     }
 
-    signingConfigs {
-        getByName("debug") {
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
-        }
-    }
-
     buildTypes {
-        getByName("debug") {
+        debug {
             applicationIdSuffix = ".internal"
             versionNameSuffix = "-internal"
-            manifestPlaceholders["appLabel"] = "TornFCA INTERNAL"
+            manifestPlaceholders["appLabel"] = "TornFCA Internal"
         }
         create("beta") {
+            initWith(getByName("debug"))
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
-            manifestPlaceholders["appLabel"] = "TornFCA BETA"
-            isDebuggable = true
-            isMinifyEnabled = false
+            manifestPlaceholders["appLabel"] = "TornFCA Beta"
+            isDebuggable = false
+            signingConfig = null
         }
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = null
         }
     }
 
@@ -73,5 +66,5 @@ android {
 }
 
 dependencies {
-    implementation("androidx.webkit:webkit:1.16.0")
+    implementation("androidx.webkit:webkit:1.14.0")
 }
