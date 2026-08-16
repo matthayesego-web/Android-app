@@ -11,28 +11,31 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Shared Torn API boundary.
  *
- * TornFCA deliberately stays below Torn's user-wide request ceiling. Requests are rate-spaced,
- * cached where safe, and only transient/rate-limit failures are backed off. Permanent invalid-key
- * or access errors are never automatically retried.
+ * TornFCA deliberately stays below Torn's user-wide request ceiling. A small token bucket allows
+ * a login/navigation burst while keeping sustained direct Android traffic at roughly 30/minute.
+ * Safe responses are cached and only transient/rate-limit failures are backed off.
  */
 public final class TornApiClient {
     private static final String BASE = "https://api.torn.com/v2";
-    private static final String USER_AGENT = "TornFCA/0.9.14 Android";
+    private static final String USER_AGENT = "TornFCA/0.9.15 Android";
     private static final Pattern API_KEY = Pattern.compile("^[A-Za-z0-9]{16}$");
     private static final Pattern QUERY_KEY = Pattern.compile("([?&])key=[^&]*", Pattern.CASE_INSENSITIVE);
 
-    // Torn documents a 100 requests/minute per-user ceiling. TornFCA caps direct Android traffic
-    // at 30/minute (one request every 2 seconds), leaving substantial headroom for its backend and
-    // other user-authorized Torn tools while removing the old 5-second-per-call UI penalty.
-    private static final long MIN_REQUEST_SPACING_MS = 2000L;
+    // Three requests may start promptly for an interactive login. Tokens then refill at one every
+    // two seconds, preserving the same ~30/minute sustained TornFCA ceiling used in v0.9.14.
+    private static final long TOKEN_REFILL_MS = 2000L;
+    private static final double TOKEN_CAPACITY = 3.0;
+    private static double requestTokens = TOKEN_CAPACITY;
+    private static long tokenRefillAtMs = System.currentTimeMillis();
     private static final long SESSION_CACHE_MS = 30L * 60L * 1000L;
-    private static long nextRequestAtMs = 0L;
 
     private static final ConcurrentHashMap<String, CacheEntry> CACHE = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, SessionEntry> SESSION_CACHE = new ConcurrentHashMap<>();
@@ -41,7 +44,17 @@ public final class TornApiClient {
 
     public static AuthSession authenticate(String key) throws IOException {
         validateKey(key);
-        JSONObject keyInfoRoot = getJson("/key/info", key);
+
+        // key/info and public identity are independent. Running them together removes the former
+        // artificial two-second login waterfall while the token bucket still bounds total traffic.
+        FutureTask<JSONObject> keyInfoTask = new FutureTask<>(() -> getJson("/key/info", key));
+        FutureTask<JSONObject> identityTask = new FutureTask<>(() -> getJson("/user?selections=profile,faction", key));
+        Thread keyThread = new Thread(keyInfoTask, "TornFCA-KeyInfo");
+        Thread identityThread = new Thread(identityTask, "TornFCA-Identity");
+        keyThread.start();identityThread.start();
+
+        JSONObject keyInfoRoot = await(keyInfoTask);
+        JSONObject identity = await(identityTask);
         JSONObject keyInfo = keyInfoRoot.optJSONObject("info");
         if (keyInfo == null) throw new IOException("Torn key information was unavailable.");
 
@@ -58,9 +71,6 @@ public final class TornApiClient {
         int playerId = keyUser.optInt("id", 0);
         if (playerId <= 0) throw new IOException("Unable to determine the Torn player ID.");
 
-        // Pull profile + faction in one v2 request instead of two sequential calls. The component
-        // responses are also seeded into the normal cache so Home/avatar consumers reuse them.
-        JSONObject identity = getJson("/user?selections=profile,faction", key);
         JSONObject profile = identity.optJSONObject("profile");
         String playerName = profile == null ? "Unknown" : profile.optString("name", "Unknown");
 
@@ -71,12 +81,10 @@ public final class TornApiClient {
         String position = faction.optString("position", "");
         if (factionId <= 0 || factionName.isEmpty()) throw new IOException("Unable to verify the Torn faction.");
 
+        // Faction identity is safe to alias. Do not alias /user/profile here: the generic user
+        // selection and dedicated profile endpoint have changed independently in Torn API history,
+        // and the avatar loader deliberately reads the dedicated endpoint.
         try {
-            if (profile != null) {
-                JSONObject profileAlias = new JSONObject();profileAlias.put("profile", profile);
-                cachePath("/user/profile", key, profileAlias, 10L * 60L * 1000L);
-                cachePath("/user/basic", key, profileAlias, 10L * 60L * 1000L);
-            }
             JSONObject factionAlias = new JSONObject();factionAlias.put("faction", faction);
             cachePath("/user/faction", key, factionAlias, 10L * 60L * 1000L);
         } catch (Exception ignored) {}
@@ -87,8 +95,6 @@ public final class TornApiClient {
         boolean factionApiAccess = access != null && access.optBoolean("faction", false);
         AccessTier tier = AccessTier.GREEN;
 
-        // Do not make a known-to-fail /faction/positions request for ordinary members. key/info
-        // already tells us whether this key currently has the in-game Faction API Access permission.
         if (factionApiAccess) {
             try {
                 JSONObject positionsResponse = getJson("/faction/positions", key);
@@ -107,8 +113,7 @@ public final class TornApiClient {
                     }
                 }
             } catch (IOException ignored) {
-                // A temporary Torn failure must not be converted into "no Faction API Access".
-                // key/info remains the source of truth for the boolean permission.
+                // key/info remains the source of truth for the Faction API Access boolean.
             }
         }
 
@@ -118,6 +123,12 @@ public final class TornApiClient {
                 factionApiAccess, tier, positions, abilities, permissionsResolved);
         SESSION_CACHE.put(sessionKey(key), new SessionEntry(session, System.currentTimeMillis() + SESSION_CACHE_MS));
         return session;
+    }
+
+    private static JSONObject await(FutureTask<JSONObject> task) throws IOException {
+        try {return task.get();}
+        catch (InterruptedException e) {Thread.currentThread().interrupt();throw new IOException("Torn login verification was interrupted.");}
+        catch (ExecutionException e) {Throwable cause=e.getCause();if(cause instanceof IOException)throw(IOException)cause;throw new IOException(cause==null?"Torn login verification failed.":cause.getMessage());}
     }
 
     /** Returns the already verified in-process session so feature navigation does not re-authenticate. */
@@ -139,7 +150,7 @@ public final class TornApiClient {
                 + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name()), key);
     }
 
-    /** Requests may overlap in flight, but starts are globally spaced by waitForRequestSlot(). */
+    /** Requests may overlap in flight; the token bucket bounds aggregate request starts. */
     public static JSONObject getJsonAbsolute(String absoluteUrl, String key) throws IOException {
         validateKey(key);
         String urlValue = canonicalizeTornUrl(absoluteUrl, key);
@@ -253,10 +264,14 @@ public final class TornApiClient {
     private static long backoffMs(int tornCode, int attempt) { if (tornCode == 5) return (attempt + 1L) * 10000L;return (attempt + 1L) * 6000L; }
 
     private static synchronized void waitForRequestSlot() {
-        long now = System.currentTimeMillis();
-        long wait = Math.max(0L, nextRequestAtMs - now);
-        if (wait > 0L) sleepQuietly(wait);
-        nextRequestAtMs = Math.max(System.currentTimeMillis(), nextRequestAtMs) + MIN_REQUEST_SPACING_MS;
+        while (true) {
+            long now=System.currentTimeMillis();
+            long elapsed=Math.max(0L,now-tokenRefillAtMs);
+            if(elapsed>0L){requestTokens=Math.min(TOKEN_CAPACITY,requestTokens+(double)elapsed/(double)TOKEN_REFILL_MS);tokenRefillAtMs=now;}
+            if(requestTokens>=1.0){requestTokens-=1.0;return;}
+            long wait=Math.max(25L,(long)Math.ceil((1.0-requestTokens)*TOKEN_REFILL_MS));
+            sleepQuietly(wait);
+        }
     }
 
     private static long ttlFor(String url) {
@@ -270,8 +285,8 @@ public final class TornApiClient {
         if (url.contains("/rankedwars")) return 2L * 60L * 1000L;
         if (url.contains("/faction/attacks") || url.contains("/user/attacks")) {
             long to = queryLong(url, "to");
-            long now = System.currentTimeMillis() / 1000L;
-            return to > 0 && to < now - 300L ? 30L * 60L * 1000L : 20L * 1000L;
+            long current = System.currentTimeMillis() / 1000L;
+            return to > 0 && to < current - 300L ? 30L * 60L * 1000L : 20L * 1000L;
         }
         if (url.contains("/faction/news")) return 2L * 60L * 1000L;
         if (url.contains("/faction/crimes")) return 30L * 1000L;
