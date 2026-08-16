@@ -26,18 +26,19 @@ public final class TornStatsClient {
     private static final String USER_AGENT="TornFCA/0.9.13 Android";
     private static final Pattern API_KEY=Pattern.compile("^[A-Za-z0-9]{16}$");
     private static long nextRequestAtMs=0L;
+    private static volatile String approvedFingerprint="";
     private static final ConcurrentHashMap<String,CacheEntry> CACHE=new ConcurrentHashMap<>();
     private TornStatsClient(){}
 
     public static boolean hasConsent(Context c){
-        if(c==null)return false;String key=new SecureApiKeyStore(c).load();if(key==null)return false;
-        SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
-        return p.getBoolean("consent",false)&&fingerprint(key).equals(p.getString("key_fingerprint",""));
+        if(c==null)return false;String key=new SecureApiKeyStore(c).load();if(key==null){approvedFingerprint="";return false;}
+        SharedPreferences p=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);String fp=fingerprint(key);
+        boolean enabled=p.getBoolean("consent",false)&&fp.equals(p.getString("key_fingerprint",""));approvedFingerprint=enabled?fp:"";return enabled;
     }
     public static void setConsent(Context c,boolean consent){
         if(c==null)return;SharedPreferences.Editor e=c.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit();
-        if(consent){String key=new SecureApiKeyStore(c).load();if(key==null){e.clear();}else{e.putBoolean("consent",true).putString("key_fingerprint",fingerprint(key));}}
-        else e.clear();e.apply();if(!consent)CACHE.clear();
+        if(consent){String key=new SecureApiKeyStore(c).load();if(key==null){e.clear();approvedFingerprint="";}else{String fp=fingerprint(key);e.putBoolean("consent",true).putString("key_fingerprint",fp);approvedFingerprint=fp;}}
+        else{e.clear();approvedFingerprint="";}e.apply();if(!consent)CACHE.clear();
     }
 
     public static JSONObject factionRoster(String key)throws IOException{return getCached(path(key,"faction/roster"),120_000L);}
@@ -45,6 +46,7 @@ public final class TornStatsClient {
 
     private static String path(String key,String suffix)throws IOException{
         if(key==null||!API_KEY.matcher(key.trim()).matches())throw new IOException("TornStats requires the same 16-character Torn API key. A preset Limited Access key is recommended.");
+        if(!fingerprint(key).equals(approvedFingerprint))throw new IOException("TornStats is disabled in TornFCA. Review TornStats Terms and explicitly enable the provider first.");
         return BASE+URLEncoder.encode(key,StandardCharsets.UTF_8.name())+"/"+suffix;
     }
 
@@ -55,17 +57,8 @@ public final class TornStatsClient {
     }
 
     private static JSONObject get(String value)throws IOException{
-        waitForSlot();
-        HttpURLConnection c=(HttpURLConnection)new URL(value).openConnection();
-        try{
-            c.setRequestMethod("GET");c.setConnectTimeout(12000);c.setReadTimeout(18000);c.setUseCaches(false);
-            c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent",USER_AGENT);
-            int code=c.getResponseCode();InputStream in=code>=200&&code<300?c.getInputStream():c.getErrorStream();String raw=read(in);
-            JSONObject response;try{response=new JSONObject(raw);}catch(Exception e){throw new IOException("TornStats returned an unreadable response.");}
-            if(code<200||code>=300)throw new IOException(response.optString("message","TornStats request failed (HTTP "+code+")."));
-            if(response.has("status")&&!response.optBoolean("status",false))throw new IOException(response.optString("message","TornStats could not return this data."));
-            return response;
-        }finally{c.disconnect();}
+        waitForSlot();HttpURLConnection c=(HttpURLConnection)new URL(value).openConnection();
+        try{c.setRequestMethod("GET");c.setConnectTimeout(12000);c.setReadTimeout(18000);c.setUseCaches(false);c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent",USER_AGENT);int code=c.getResponseCode();InputStream in=code>=200&&code<300?c.getInputStream():c.getErrorStream();String raw=read(in);JSONObject response;try{response=new JSONObject(raw);}catch(Exception e){throw new IOException("TornStats returned an unreadable response.");}if(code<200||code>=300)throw new IOException(response.optString("message","TornStats request failed (HTTP "+code+")."));if(response.has("status")&&!response.optBoolean("status",false))throw new IOException(response.optString("message","TornStats could not return this data."));return response;}finally{c.disconnect();}
     }
 
     /** TornStats documents 100/min; TornFCA intentionally limits itself to 12/min locally. */
