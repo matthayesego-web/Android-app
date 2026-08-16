@@ -17,10 +17,12 @@ public final class DeveloperSettings {
     private static final String KEY_VERBOSE = "verbose_diagnostics";
     private static final String KEY_PUBLIC_ONLY = "simulate_public_only";
     private static final String KEY_PREMIUM_SIM = "simulate_premium";
+    private static final String KEY_WAR_SIM = "simulate_ranked_war";
     private static final String KEY_ACTIVITY_DAYS = "activity_days";
     private static final String KEY_ACTIVITY_PAGES = "activity_pages";
     private static final String KEY_FEATURE_PREFIX = "feature_";
     private static volatile int runtimeActivityPages = 20;
+    private static volatile boolean runtimeWarSimulation = false;
 
     private DeveloperSettings() {}
 
@@ -62,6 +64,20 @@ public final class DeveloperSettings {
         prefs(context).edit().putBoolean(KEY_PREMIUM_SIM, enabled).apply();
     }
 
+    public static boolean simulateWar(Context context) {
+        runtimeWarSimulation = prefs(context).getBoolean(KEY_WAR_SIM, false);
+        return runtimeWarSimulation;
+    }
+
+    public static void setSimulateWar(Context context, boolean enabled) {
+        runtimeWarSimulation = enabled;
+        prefs(context).edit().putBoolean(KEY_WAR_SIM, enabled).apply();
+    }
+
+    public static boolean runtimeSimulateWar() {
+        return runtimeWarSimulation;
+    }
+
     public static int activityDays(Context context) {
         int days = prefs(context).getInt(KEY_ACTIVITY_DAYS, 30);
         return days == 7 || days == 14 || days == 30 ? days : 30;
@@ -98,6 +114,7 @@ public final class DeveloperSettings {
 
     public static void reset(Context context) {
         runtimeActivityPages = 20;
+        runtimeWarSimulation = false;
         prefs(context).edit().clear().apply();
     }
 }
