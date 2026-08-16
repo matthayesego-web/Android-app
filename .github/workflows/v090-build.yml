@@ -42,25 +42,34 @@ jobs:
       - name: Build unsigned internal beta and release
         run: gradle --no-daemon :app:assembleBeta :app:assembleRelease
 
-      - name: Name APKs and package signing tool
+      - name: Align APKs and package signing tools
         run: |
-          cp app/build/outputs/apk/beta/app-beta-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-internal-beta-unsigned.apk"
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-unsigned-release.apk"
-          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          ZIPALIGN="$(find "$SDK_ROOT/build-tools" -type f -name zipalign | sort -V | tail -1)"
           test -x "$APKSIGNER"
+          test -x "$ZIPALIGN"
+
+          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/beta/app-beta-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-internal-beta-aligned-unsigned.apk"
+          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/release/app-release-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-aligned-unsigned-release.apk"
+          "$ZIPALIGN" -c -P 16 -v 4 "DuckForce-Companion-v${VERSION_NAME}-internal-beta-aligned-unsigned.apk"
+          "$ZIPALIGN" -c -P 16 -v 4 "DuckForce-Companion-v${VERSION_NAME}-aligned-unsigned-release.apk"
+
           mkdir -p android-signing-tool/lib
           cp "$APKSIGNER" android-signing-tool/apksigner
           cp "$(dirname "$APKSIGNER")/lib/apksigner.jar" android-signing-tool/lib/apksigner.jar
-          chmod +x android-signing-tool/apksigner
+          cp "$ZIPALIGN" android-signing-tool/zipalign
+          chmod +x android-signing-tool/apksigner android-signing-tool/zipalign
 
       - name: Upload v0.9 APKs
         uses: actions/upload-artifact@v7
         with:
           name: DuckForce-Companion-v${{ env.VERSION_NAME }}-branch-builds
           path: |
-            DuckForce-Companion-v${{ env.VERSION_NAME }}-internal-beta-unsigned.apk
-            DuckForce-Companion-v${{ env.VERSION_NAME }}-unsigned-release.apk
+            DuckForce-Companion-v${{ env.VERSION_NAME }}-internal-beta-aligned-unsigned.apk
+            DuckForce-Companion-v${{ env.VERSION_NAME }}-aligned-unsigned-release.apk
             android-signing-tool/apksigner
             android-signing-tool/lib/apksigner.jar
+            android-signing-tool/zipalign
           if-no-files-found: error
           retention-days: 14
