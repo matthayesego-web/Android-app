@@ -23,8 +23,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 31
-        versionName = "0.9.16"
+        versionCode = 32
+        versionName = "0.9.17"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
         // Closed-beta temporary developer gate. Only the one-way SHA-256 hash is shipped; the
