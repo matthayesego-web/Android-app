@@ -10,8 +10,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.9.2"
+        versionCode = 18
+        versionName = "0.9.3"
         manifestPlaceholders["appLabel"] = "Duck Force Companion"
     }
 
@@ -30,9 +30,9 @@ android {
             manifestPlaceholders["appLabel"] = "Duck Force Companion INTERNAL"
         }
         create("beta") {
-            applicationIdSuffix = ".internal"
-            versionNameSuffix = "-internal"
-            manifestPlaceholders["appLabel"] = "Duck Force Companion INTERNAL"
+            applicationIdSuffix = ".beta"
+            versionNameSuffix = "-beta"
+            manifestPlaceholders["appLabel"] = "Duck Force Companion BETA"
             isDebuggable = true
             isMinifyEnabled = false
         }
