@@ -7,7 +7,7 @@ import android.os.Bundle;
 
 /**
  * TornFCA launcher shim.
- * v0.9.17 keeps the old beta access-code wall removed; this activity only clears stale tasks and
+ * v0.9.18 keeps the old beta access-code wall removed; this activity only clears stale tasks and
  * forwards directly into the current TornFCA shell.
  */
 public class AccessGateActivity extends Activity {
