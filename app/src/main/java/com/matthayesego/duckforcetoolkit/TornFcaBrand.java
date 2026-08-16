@@ -3,10 +3,13 @@ package com.matthayesego.duckforcetoolkit;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,6 +41,7 @@ public final class TornFcaBrand {
         FactionTheme theme=FactionTheme.forContext(activity);
         activity.getWindow().setStatusBarColor(theme.accentDark);
         activity.getWindow().setNavigationBarColor(theme.background);
+        if(Build.VERSION.SDK_INT>=28)activity.getWindow().setNavigationBarDividerColor(theme.border);
         if(Build.VERSION.SDK_INT>=29){
             activity.getWindow().setStatusBarContrastEnforced(false);
             activity.getWindow().setNavigationBarContrastEnforced(false);
@@ -88,12 +92,18 @@ public final class TornFcaBrand {
     }
 
     private static void polishButton(Context context,Button button,FactionTheme theme){
+        String label=button.getText()==null?"":button.getText().toString();
+        if("Open TornStats API Key FAQ".equals(label)&&context instanceof Activity){
+            button.setText("Create / Recover TornStats Account");
+            button.setOnClickListener(v->{try{context.startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(TornStatsClient.REGISTER_URL)));}catch(Exception ignored){}});
+        }
         button.setAllCaps(false);
         button.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
         if(Build.VERSION.SDK_INT>=21){
             button.setLetterSpacing(.008f);
             if(button.getElevation()<dp(context,2f))button.setElevation(dp(context,2f));
         }
+        if(Build.VERSION.SDK_INT>=23&&button.getForeground()==null)button.setForeground(ripple(context,theme,12f));
         if(Build.VERSION.SDK_INT>=28){
             button.setOutlineAmbientShadowColor(theme.accentDark);
             button.setOutlineSpotShadowColor(Color.BLACK);
@@ -118,10 +128,17 @@ public final class TornFcaBrand {
             float desired=group.isClickable()?dp(context,3.5f):dp(context,1.5f);
             if(group.getElevation()<desired)group.setElevation(desired);
         }
+        if(Build.VERSION.SDK_INT>=23&&group.isClickable()&&group.getForeground()==null)group.setForeground(ripple(context,theme,18f));
         if(Build.VERSION.SDK_INT>=28){
             group.setOutlineAmbientShadowColor(theme.accentDark);
             group.setOutlineSpotShadowColor(Color.BLACK);
         }
+    }
+
+    private static RippleDrawable ripple(Context context,FactionTheme theme,float radiusDp){
+        int rippleColor=Color.argb(44,Color.red(theme.accent),Color.green(theme.accent),Color.blue(theme.accent));
+        GradientDrawable mask=new GradientDrawable();mask.setColor(Color.WHITE);mask.setCornerRadius(dp(context,radiusDp));
+        return new RippleDrawable(ColorStateList.valueOf(rippleColor),null,mask);
     }
 
     private static void animateOnce(Context context,View root){
