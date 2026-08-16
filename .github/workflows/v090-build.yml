@@ -42,11 +42,15 @@ jobs:
           grep -q 'BankingCompanionActivity' app/src/main/AndroidManifest.xml
           grep -q 'MemberDossierActivity' app/src/main/AndroidManifest.xml
           grep -q 'PremiumAdminActivity' app/src/main/AndroidManifest.xml
+          test "$(grep -c 'android:exported="true"' app/src/main/AndroidManifest.xml)" -eq 1
+          grep -q 'AccessGateActivity" android:exported="true"' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "VERSION=\"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
           grep -q 'class V095CompanionActivity' app/src/main/java/com/matthayesego/duckforcetoolkit/V095CompanionActivity.java
           grep -q 'BuildConfig.DEVELOPER_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          grep -q 'DEVELOPER_PLAYER_ID' app/build.gradle.kts
+          grep -q 'BuildConfig.DEVELOPER_PLAYER_ID' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
           grep -q 'BuildConfig.FACTION_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           grep -q 'BuildConfig.PREMIUM_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
 
@@ -63,6 +67,29 @@ jobs:
           grep -q 'PermanentApiException' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
           grep -q 'TornApiClient.validateKey' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           grep -q '10000L' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
+
+          # API-key retention / logout must remain explicit and device-local.
+          grep -q 'AES/GCM/NoPadding' app/src/main/java/com/matthayesego/duckforcetoolkit/SecureApiKeyStore.java
+          grep -q 'EXPIRES_AT' app/src/main/java/com/matthayesego/duckforcetoolkit/SecureApiKeyStore.java
+          grep -q 'prepareNextSave' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
+          grep -q 'Log Out / Change API Key' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
+          grep -q 'TornApiClient.clearMemoryCache' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
+
+          # Member features remain self/public-faction scoped.
+          grep -q 'factionbalance' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q 'Faction Perks' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q 'My Faction Standing' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q '/members' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q '/user/organizedcrime' app/src/main/java/com/matthayesego/duckforcetoolkit/OcTrackerActivity.java
+
+          # Leadership and war-wall gates must remain layered.
+          grep -q 'AccessPolicy.isLeaderPosition(position)' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPayoutActivity.java
+          grep -q 'DeveloperPreviewStore.isMemberPreview' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'loadFaction(key)' app/src/main/java/com/matthayesego/duckforcetoolkit/OcTrackerActivity.java
+          grep -q 'simulateWar' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
+          grep -q 'War wall simulation' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaScreens.java
+          grep -q 'isUpcoming' app/src/main/java/com/matthayesego/duckforcetoolkit/WarCenterActivity.java
+          grep -q 'isLive' app/src/main/java/com/matthayesego/duckforcetoolkit/WarCenterActivity.java
 
           # Embedded tools must share the native throttle and never receive the actual key in JS.
           grep -q 'TornApiClient.getJsonAbsolute' app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java
