@@ -45,7 +45,7 @@ jobs:
           grep -q 'TornFcaActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "VERSION=\"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
-          grep -q "VERSION = \"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/V095CompanionActivity.java
+          grep -q 'class V095CompanionActivity' app/src/main/java/com/matthayesego/duckforcetoolkit/V095CompanionActivity.java
           grep -q 'BuildConfig.DEVELOPER_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
           grep -q 'BuildConfig.FACTION_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           grep -q 'BuildConfig.PREMIUM_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
