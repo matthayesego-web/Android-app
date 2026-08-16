@@ -7,6 +7,7 @@
         <activity android:name=".DeveloperGateActivity" android:exported="false"/>
         <activity android:name=".DeveloperPanelActivity" android:exported="false"/>
         <activity android:name=".LeadershipAttentionActivity" android:exported="false"/>
+        <activity android:name=".FactionStrengthActivity" android:exported="false"/>
         <activity android:name=".PolishedCompanionActivity" android:exported="false"/>
         <activity android:name=".MemberFactionActivity" android:exported="false"/>
         <activity android:name=".FeatureRouterActivity" android:exported="false"/>
