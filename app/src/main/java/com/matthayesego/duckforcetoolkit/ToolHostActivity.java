@@ -74,8 +74,9 @@ public class ToolHostActivity extends Activity {
             }
             JSONObject json=TornApiClient.getJsonAbsolute(safe.build().toString(),key);
             return jsonResponse(200,"OK",json.toString());
-        }catch(Exception e){return jsonResponse(429,"Torn API unavailable",new JSONObject().put("error",new JSONObject().put("error",e.getMessage()==null?"Torn API request failed.":e.getMessage())).toString());}
+        }catch(Exception e){return jsonResponse(429,"Torn API unavailable",errorEnvelope(e.getMessage()==null?"Torn API request failed.":e.getMessage()));}
     }
+    private String errorEnvelope(String message){try{return new JSONObject().put("error",new JSONObject().put("error",message)).toString();}catch(Exception ignored){return "{\"error\":{\"error\":\"Torn API request failed.\"}}";}}
     private WebResourceResponse jsonResponse(int status,String reason,String body){Map<String,String> headers=new HashMap<>();headers.put("Access-Control-Allow-Origin","*");headers.put("Access-Control-Allow-Methods","GET, OPTIONS");headers.put("Cache-Control","no-store");return new WebResourceResponse("application/json","UTF-8",status,reason,headers,new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));}
     private WebResourceResponse blockedResponse(int status,String reason,String message){try{return jsonResponse(status,reason,new JSONObject().put("error",message).toString());}catch(Exception e){return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(message.getBytes(StandardCharsets.UTF_8)));}}
     @Override public void onBackPressed(){if(webView!=null&&webView.canGoBack())webView.goBack();else super.onBackPressed();}
