@@ -9,8 +9,10 @@
         <activity android:name=".TornFcaScreens$FeatureRouter" android:exported="false"/>
         <activity android:name=".TornFcaScreens$WarCenter" android:exported="false"/>
         <activity android:name=".TornFcaScreens$WarPayout" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$BankingCompanion" android:exported="false"/>
         <activity android:name=".TornFcaScreens$DeveloperGate" android:exported="false"/>
         <activity android:name=".TornFcaScreens$DeveloperPanel" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$PremiumAdmin" android:exported="false"/>
         <activity android:name=".TornFcaScreens$LeadershipAttention" android:exported="false"/>
         <activity android:name=".TornFcaScreens$FactionStrength" android:exported="false"/>
         <activity android:name=".TornFcaScreens$MemberFaction" android:exported="false"/>
@@ -26,10 +28,12 @@
         <activity android:name=".V095CompanionActivity" android:exported="false"/>
         <activity android:name=".WarCenterActivity" android:exported="false"/>
         <activity android:name=".WarPayoutActivity" android:exported="false"/>
+        <activity android:name=".BankingCompanionActivity" android:exported="false"/>
         <activity android:name=".MoreActivity" android:exported="false"/>
         <activity android:name=".AboutActivity" android:exported="false"/>
         <activity android:name=".DeveloperGateActivity" android:exported="false"/>
         <activity android:name=".DeveloperPanelActivity" android:exported="false"/>
+        <activity android:name=".PremiumAdminActivity" android:exported="false"/>
         <activity android:name=".LeadershipAttentionActivity" android:exported="false"/>
         <activity android:name=".FactionStrengthActivity" android:exported="false"/>
         <activity android:name=".MemberFactionActivity" android:exported="false"/>
