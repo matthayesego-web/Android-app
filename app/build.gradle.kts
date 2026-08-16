@@ -10,8 +10,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 22
-        versionName = "0.9.7"
+        versionCode = 23
+        versionName = "0.9.8"
         manifestPlaceholders["appLabel"] = "Duck Force Companion"
     }
 
