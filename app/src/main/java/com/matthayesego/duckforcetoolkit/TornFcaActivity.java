@@ -1,16 +1,31 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 /** Public TornFCA shell. Existing v0.9 functionality remains underneath this brand/theme layer. */
 public class TornFcaActivity extends V098CompanionActivity {
+    private static final long AVATAR_REFRESH_MS=6L*60L*60L*1000L;
+    private volatile boolean avatarRefreshInFlight=false;
+
     @Override public void setContentView(View view){
         super.setContentView(view);
         ViewGroup root=findViewById(android.R.id.content);
@@ -18,6 +33,7 @@ public class TornFcaActivity extends V098CompanionActivity {
             TornFcaBrand.apply(this,root);
             addApiRequirementNotice(root);
             retargetBankingCards(root);
+            restoreProfileAvatar(root);
         }
         primeProviderConsent();
     }
@@ -29,6 +45,7 @@ public class TornFcaActivity extends V098CompanionActivity {
             TornFcaBrand.apply(this,root);
             addApiRequirementNotice(root);
             retargetBankingCards(root);
+            restoreProfileAvatar(root);
         }
         primeProviderConsent();
         refreshPremiumEntitlement();
@@ -79,13 +96,59 @@ public class TornFcaActivity extends V098CompanionActivity {
 
     private View findClickableAncestor(View start){View v=start;while(v!=null){if(v.isClickable())return v;if(!(v.getParent() instanceof View))break;v=(View)v.getParent();}return null;}
 
+    /** Restores the authenticated player's Torn profile image without blocking the shell. */
+    private void restoreProfileAvatar(ViewGroup root){
+        ImageView avatar=findHeaderAvatar(root);if(avatar==null)return;
+        String key=new SecureApiKeyStore(this).load();if(key==null||key.isBlank())return;
+        int playerId=0;AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)playerId=hot.playerId;
+        if(playerId<=0){FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);if(scope!=null)playerId=scope.playerId;}
+        if(playerId<=0)return;
+        File cached=avatarFile(playerId);
+        if(cached.exists()){
+            Bitmap local=BitmapFactory.decodeFile(cached.getAbsolutePath());
+            if(local!=null)avatar.setImageBitmap(local);
+            if(System.currentTimeMillis()-cached.lastModified()<AVATAR_REFRESH_MS)return;
+        }
+        if(avatarRefreshInFlight)return;avatarRefreshInFlight=true;final int id=playerId;
+        new Thread(()->{
+            try{
+                JSONObject rootJson=TornApiClient.getJson("/user/profile",key);JSONObject profile=rootJson.optJSONObject("profile");
+                String image=profile==null?"":profile.optString("image","").trim();
+                if(image.isEmpty()||"null".equalsIgnoreCase(image)){cached.delete();return;}
+                BitmapDownload result=downloadBitmap(image);if(result==null||result.bitmap==null)return;
+                try(FileOutputStream out=new FileOutputStream(avatarFile(id))){out.write(result.bytes);}
+                runOnUiThread(()->{ViewGroup current=findViewById(android.R.id.content);ImageView currentAvatar=current==null?null:findHeaderAvatar(current);if(currentAvatar!=null)currentAvatar.setImageBitmap(result.bitmap);});
+            }catch(Exception ignored){}finally{avatarRefreshInFlight=false;}
+        },"TornFCA-ProfileAvatar").start();
+    }
+
+    private File avatarFile(int playerId){return new File(getCacheDir(),"torn-profile-"+playerId+".img");}
+
+    private BitmapDownload downloadBitmap(String value)throws Exception{
+        URL url=new URL(value);if(!"https".equalsIgnoreCase(url.getProtocol()))return null;
+        HttpURLConnection c=(HttpURLConnection)url.openConnection();
+        try{
+            c.setConnectTimeout(8000);c.setReadTimeout(12000);c.setUseCaches(true);c.setInstanceFollowRedirects(true);c.setRequestProperty("User-Agent","TornFCA/0.9.14 Android");
+            if(c.getResponseCode()<200||c.getResponseCode()>=300)return null;
+            try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                byte[] buffer=new byte[8192];int n,total=0;while((n=in.read(buffer))!=-1){total+=n;if(total>4*1024*1024)return null;out.write(buffer,0,n);}byte[] bytes=out.toByteArray();Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length);return bitmap==null?null:new BitmapDownload(bitmap,bytes);
+            }
+        }finally{c.disconnect();}
+    }
+
+    private ImageView findHeaderAvatar(View view){
+        if(view instanceof ImageView){ViewGroup.LayoutParams p=view.getLayoutParams();if(p!=null&&p.width==dp(78)&&p.height==dp(78))return(ImageView)view;}
+        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){ImageView found=findHeaderAvatar(g.getChildAt(i));if(found!=null)return found;}}
+        return null;
+    }
+
     /** Loads only local consent state so provider clients can enforce opt-in at their network boundary. */
     private void primeProviderConsent(){String key=new SecureApiKeyStore(this).load();if(key!=null&&!key.isBlank())FFScouterClient.hasConsent(this,key);}
 
     private void refreshPremiumEntitlement(){
         String key=new SecureApiKeyStore(this).load();if(key==null||key.isBlank()||!PremiumBackendClient.isConfigured())return;
-        FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);if(scope==null||scope.playerId<=0)return;
-        PremiumBackendClient.refreshAsync(this,scope.playerId);
+        int playerId=0;FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);if(scope!=null)playerId=scope.playerId;AuthSession hot=TornApiClient.cachedSession(key);if(playerId<=0&&hot!=null)playerId=hot.playerId;if(playerId<=0)return;
+        PremiumBackendClient.refreshAsync(this,playerId);
     }
 
     private TextView findText(View view,String needle){
@@ -93,4 +156,6 @@ public class TornFcaActivity extends V098CompanionActivity {
         if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView found=findText(g.getChildAt(i),needle);if(found!=null)return found;}}
         return null;
     }
+
+    private static final class BitmapDownload{final Bitmap bitmap;final byte[] bytes;BitmapDownload(Bitmap bitmap,byte[] bytes){this.bitmap=bitmap;this.bytes=bytes;}}
 }
