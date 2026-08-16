@@ -17,7 +17,7 @@ import java.util.List;
 /** Provider boundary around FFScouter. Every request uses the current player's own registered Torn API key. */
 public final class FFScouterClient {
     private static final String BASE="https://ffscouter.com/api/v1";
-    private static final String USER_AGENT="DuckForceCompanion Android";
+    private static final String USER_AGENT="TornFCA Android";
     private FFScouterClient(){}
 
     public static JSONObject checkKey(String key)throws IOException{
@@ -32,7 +32,7 @@ public final class FFScouterClient {
         try{
             payload.put("key",key);
             payload.put("agree_to_data_policy",true);
-            payload.put("signup_source","DuckForceCompanion");
+            payload.put("signup_source","TornFCA");
         }catch(JSONException e){throw new IOException("Unable to prepare FFScouter registration.",e);}
         return objectResponse(post(BASE+"/register",payload.toString()));
     }
