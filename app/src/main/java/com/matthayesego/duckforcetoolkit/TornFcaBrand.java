@@ -4,21 +4,32 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
-/** Applies the public TornFCA brand without rewriting the working legacy feature implementations. */
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
+
+/** Applies the public TornFCA brand and premium presentation without rewriting proven feature logic. */
 public final class TornFcaBrand {
     public static final String NAME="TornFCA";
     public static final String LONG_NAME="Torn Faction Companion App";
-    public static final String VERSION="0.9.17";
+    public static final String VERSION="0.9.18";
 
     private static final int[] LEGACY_BRAND_COLORS=new int[]{
             Color.rgb(241,190,86),Color.rgb(241,194,106),Color.rgb(243,184,52),Color.rgb(215,160,68),Color.rgb(242,197,107)
     };
+    private static final Map<View,Boolean> ANIMATED=Collections.synchronizedMap(new WeakHashMap<>());
 
     private TornFcaBrand(){}
 
@@ -27,7 +38,12 @@ public final class TornFcaBrand {
         FactionTheme theme=FactionTheme.forContext(activity);
         activity.getWindow().setStatusBarColor(theme.accentDark);
         activity.getWindow().setNavigationBarColor(theme.background);
+        if(Build.VERSION.SDK_INT>=29){
+            activity.getWindow().setStatusBarContrastEnforced(false);
+            activity.getWindow().setNavigationBarContrastEnforced(false);
+        }
         applyView(activity,root,theme);
+        animateOnce(activity,root);
     }
 
     private static void applyView(Context context,View view,FactionTheme theme){
@@ -38,8 +54,10 @@ public final class TornFcaBrand {
             if(isLegacyBrandColor(t.getCurrentTextColor()))t.setTextColor(theme.accent);
             CharSequence hint=t.getHint();
             if(hint!=null){String value=rebrand(hint.toString());if(!value.equals(hint.toString()))t.setHint(value);}
+            polishText(context,t);
         }
-        if(view instanceof ImageView)replaceLegacyArtwork(context,(ImageView)view);
+        if(view instanceof Button)polishButton(context,(Button)view,theme);
+        if(view instanceof ImageView){replaceLegacyArtwork(context,(ImageView)view);polishImage(context,(ImageView)view,theme);}
         CharSequence description=view.getContentDescription();
         if(description!=null&&"Duck Force".contentEquals(description))view.setContentDescription(NAME);
         if(view instanceof ViewGroup){
@@ -49,9 +67,71 @@ public final class TornFcaBrand {
             if(tag instanceof String&&((String)tag).startsWith("nav:")&&view.getBackground()!=null&&selectedNav(group,theme.accent)){
                 Drawable bg=view.getBackground().mutate();bg.setTint(theme.accentDark);view.setBackground(bg);
             }
+            polishContainer(context,group,theme);
         }
     }
 
+    private static void polishText(Context context,TextView text){
+        float sp=text.getTextSize()/context.getResources().getDisplayMetrics().scaledDensity;
+        CharSequence raw=text.getText();String value=raw==null?"":raw.toString().trim();
+        if(text instanceof Button)return;
+        if(sp>=24f){
+            text.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
+            if(Build.VERSION.SDK_INT>=21)text.setLetterSpacing(-0.012f);
+            text.setLineSpacing(0f,1.02f);
+        }else if(sp>=16f&&text.getTypeface()!=null&&text.getTypeface().isBold()){
+            text.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+        }else if(sp<=11.5f&&looksLikeEyebrow(value)){
+            text.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+            if(Build.VERSION.SDK_INT>=21)text.setLetterSpacing(.12f);
+        }
+    }
+
+    private static void polishButton(Context context,Button button,FactionTheme theme){
+        button.setAllCaps(false);
+        button.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
+        if(Build.VERSION.SDK_INT>=21){
+            button.setLetterSpacing(.008f);
+            if(button.getElevation()<dp(context,2f))button.setElevation(dp(context,2f));
+        }
+        if(Build.VERSION.SDK_INT>=28){
+            button.setOutlineAmbientShadowColor(theme.accentDark);
+            button.setOutlineSpotShadowColor(Color.BLACK);
+        }
+        if(button.getMinHeight()<dp(context,42f))button.setMinHeight(Math.round(dp(context,42f)));
+    }
+
+    private static void polishImage(Context context,ImageView image,FactionTheme theme){
+        if(!"tornfca-profile-avatar".equals(image.getTag()))return;
+        if(Build.VERSION.SDK_INT>=21&&image.getElevation()<dp(context,5f))image.setElevation(dp(context,5f));
+        if(Build.VERSION.SDK_INT>=28){
+            image.setOutlineAmbientShadowColor(theme.accentDark);
+            image.setOutlineSpotShadowColor(Color.BLACK);
+        }
+    }
+
+    private static void polishContainer(Context context,ViewGroup group,FactionTheme theme){
+        if(group instanceof ScrollView||group.getBackground()==null)return;
+        boolean cardLike=group.getBackground() instanceof GradientDrawable;
+        if(!cardLike)return;
+        if(Build.VERSION.SDK_INT>=21){
+            float desired=group.isClickable()?dp(context,3.5f):dp(context,1.5f);
+            if(group.getElevation()<desired)group.setElevation(desired);
+        }
+        if(Build.VERSION.SDK_INT>=28){
+            group.setOutlineAmbientShadowColor(theme.accentDark);
+            group.setOutlineSpotShadowColor(Color.BLACK);
+        }
+    }
+
+    private static void animateOnce(Context context,View root){
+        if(ANIMATED.put(root,Boolean.TRUE)!=null)return;
+        root.setAlpha(.94f);root.setTranslationY(dp(context,5f));
+        root.animate().alpha(1f).translationY(0f).setDuration(180L).setInterpolator(new DecelerateInterpolator()).start();
+    }
+
+    private static float dp(Context context,float value){return value*context.getResources().getDisplayMetrics().density;}
+    private static boolean looksLikeEyebrow(String value){if(value==null||value.length()<2||value.length()>55)return false;boolean letter=false;for(int i=0;i<value.length();i++){char c=value.charAt(i);if(Character.isLetter(c)){letter=true;if(Character.isLowerCase(c))return false;}}return letter;}
     private static boolean selectedNav(ViewGroup group,int accent){for(int i=0;i<group.getChildCount();i++)if(group.getChildAt(i)instanceof TextView&&((TextView)group.getChildAt(i)).getCurrentTextColor()==accent)return true;return false;}
 
     private static void replaceLegacyArtwork(Context context,ImageView image){
@@ -84,17 +164,19 @@ public final class TornFcaBrand {
                 .replace("Duck Force payout","faction payout")
                 .replace("Duck Force can remain the first tenant","the current faction can remain the first tenant")
                 .replace("DUCK FORCE •","TORNFCA •")
-                .replace("v0.9.6","v0.9.17")
-                .replace("v0.9.7","v0.9.17")
-                .replace("v0.9.8","v0.9.17")
-                .replace("v0.9.9","v0.9.17")
-                .replace("v0.9.10","v0.9.17")
-                .replace("v0.9.11","v0.9.17")
-                .replace("v0.9.12","v0.9.17")
-                .replace("v0.9.13","v0.9.17")
-                .replace("v0.9.14","v0.9.17")
-                .replace("v0.9.15","v0.9.17")
-                .replace("v0.9.16","v0.9.17");
+                .replace("Leadership-focused member lookup with current Torn status and opted-in battle intelligence.","Search members with Torn status, FFScouter estimates and TornStats spy intelligence.")
+                .replace("v0.9.6","v0.9.18")
+                .replace("v0.9.7","v0.9.18")
+                .replace("v0.9.8","v0.9.18")
+                .replace("v0.9.9","v0.9.18")
+                .replace("v0.9.10","v0.9.18")
+                .replace("v0.9.11","v0.9.18")
+                .replace("v0.9.12","v0.9.18")
+                .replace("v0.9.13","v0.9.18")
+                .replace("v0.9.14","v0.9.18")
+                .replace("v0.9.15","v0.9.18")
+                .replace("v0.9.16","v0.9.18")
+                .replace("v0.9.17","v0.9.18");
         if(branded.contains("Encrypted on this device"))branded=branded.replaceAll("v0\\.9\\.\\d+","v"+VERSION);
         return branded;
     }
