@@ -27,7 +27,12 @@ android {
         versionName = "0.9.13"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
-        val devHash = localOrEnv("TORNFCA_DEV_PASSWORD_SHA256")
+        // The approved fallback is a one-way SHA-256 hash only. CI/local secrets may override it,
+        // but a missing secret must never silently disable the hidden developer gate.
+        val devHash = localOrEnv(
+            "TORNFCA_DEV_PASSWORD_SHA256",
+            "AD039B0643FE2CD75558E56B90955252ED3F56CE6B2B7AA90CD1ED3BC22AC6AB"
+        )
         val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL")
         val premiumBackend = localOrEnv("TORNFCA_PREMIUM_BACKEND_URL")
         buildConfigField("String", "DEVELOPER_ACCESS_SHA256", quotedBuildValue(devHash))
