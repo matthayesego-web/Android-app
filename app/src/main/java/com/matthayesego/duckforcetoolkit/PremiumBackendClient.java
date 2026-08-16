@@ -29,8 +29,7 @@ public final class PremiumBackendClient {
         if(now-last<REFRESH_MS)return;
         p.edit().putLong("last_"+playerId,now).apply();
         new Thread(()->{try{
-            JSONObject request=new JSONObject();request.put("action","status");request.put("player_id",playerId);
-            JSONObject response=post(request);if(!response.optBoolean("ok",false))return;
+            JSONObject response=status(playerId);if(!response.optBoolean("ok",false))return;
             JSONObject entitlement=response.optJSONObject("entitlement");if(entitlement==null)return;
             String tier=entitlement.optString("tier",PremiumEntitlementStore.TIER_FREE);
             long verifiedAt=entitlement.optLong("verified_at",System.currentTimeMillis()/1000L);
@@ -41,7 +40,20 @@ public final class PremiumBackendClient {
         }).start();
     }
 
+    public static JSONObject status(int playerId)throws Exception{JSONObject request=new JSONObject();request.put("action","status");request.put("player_id",playerId);return post(request);}
+
+    public static JSONObject updateConfig(String developerPassword,int daysPerXanax,String requiredMessage)throws Exception{
+        JSONObject request=new JSONObject();request.put("action","admin_config");request.put("admin_password",developerPassword==null?"":developerPassword);request.put("days_per_xanax",daysPerXanax);request.put("required_message",requiredMessage==null?"":requiredMessage);return checked(post(request));
+    }
+
+    public static JSONObject grant(String developerPassword,int playerId,int days)throws Exception{
+        JSONObject request=new JSONObject();request.put("action","admin_grant");request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);return checked(post(request));
+    }
+
+    private static JSONObject checked(JSONObject response)throws Exception{if(!response.optBoolean("ok",false))throw new Exception(response.optString("error","Premium backend request failed."));return response;}
+
     private static JSONObject post(JSONObject body)throws Exception{
+        if(!isConfigured())throw new Exception("Premium backend is not configured in this build.");
         HttpURLConnection c=(HttpURLConnection)new URL(URL_VALUE).openConnection();
         try{
             c.setRequestMethod("POST");c.setConnectTimeout(12000);c.setReadTimeout(20000);c.setUseCaches(false);c.setDoOutput(true);
