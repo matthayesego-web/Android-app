@@ -30,9 +30,16 @@ public class CompanionActivity extends Activity {
     private static final String DUCK_FORCE_NAME = "Duck Force";
     private static final int BG=Color.rgb(8,12,18),BG2=Color.rgb(12,18,27),PANEL=Color.rgb(20,27,38),PANEL2=Color.rgb(27,36,49),BORDER=Color.rgb(49,63,81),ACCENT=Color.rgb(243,184,52),ACCENT2=Color.rgb(255,216,118),TEXT=Color.rgb(245,248,252),MUTED=Color.rgb(151,163,179),GOOD=Color.rgb(63,185,80),BAD=Color.rgb(248,81,73),BLUE=Color.rgb(88,166,255);
     private enum Screen{LOGIN,HOME,BANKING,LEADERSHIP,DEVELOPER}
-    private Screen screen=Screen.LOGIN;private AuthSession session;private SecureApiKeyStore keyStore;
+    private Screen screen=Screen.LOGIN;private volatile AuthSession session;private SecureApiKeyStore keyStore;
 
-    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);String saved=keyStore.load();if(saved==null||saved.trim().isEmpty())showLogin(null);else authenticate(saved,true);}
+    @Override protected void onCreate(Bundle savedInstanceState){
+        super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);
+        String saved=keyStore.load();
+        if(saved==null||saved.trim().isEmpty()){showLogin(null);return;}
+        FactionScopeCache.Scope cached=FactionScopeCache.load(this,saved);
+        if(cached!=null){session=sessionFromScope(cached);showHome();refreshSavedSession(saved);}
+        else authenticate(saved,true);
+    }
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private GradientDrawable gradient(int start,int end,int stroke,int radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{start,end});d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
@@ -54,13 +61,53 @@ public class CompanionActivity extends Activity {
     }
 
     private void showLoading(){ScrollView s=shell();LinearLayout c=column(s);c.addView(card("🦆 Duck Force Companion","Verifying your saved Torn account and exact faction permissions…",ACCENT));setContentView(s);s.requestApplyInsets();}
-    private void authenticate(String key,boolean saved){if(saved)showLoading();new Thread(()->{try{AuthSession result=TornApiClient.authenticate(key);if(result.factionName==null||!DUCK_FORCE_NAME.equalsIgnoreCase(result.factionName.trim()))throw new IOException("This build is restricted to Duck Force members.");result=CompanionBackendClient.resolvePermissions(result,key);keyStore.save(key);session=result;runOnUiThread(this::showHome);}catch(Exception e){if(saved)keyStore.clear();String message=e.getMessage()==null?"Unable to verify Torn account.":e.getMessage();runOnUiThread(()->showLogin(message));}}).start();}
+
+    private AuthSession sessionFromScope(FactionScopeCache.Scope cached){
+        boolean resolved=AccessPolicy.isLeaderPosition(cached.position);
+        return new AuthSession(cached.playerId,cached.playerName,cached.factionId,cached.factionName,cached.position,cached.factionApiAccess,AccessTier.GREEN,new JSONArray(),new JSONArray(),resolved);
+    }
+
+    private void refreshSavedSession(String key){
+        new Thread(()->{
+            try{
+                AuthSession fresh=TornApiClient.authenticate(key);
+                if(fresh.factionName==null||!DUCK_FORCE_NAME.equalsIgnoreCase(fresh.factionName.trim()))return;
+                keyStore.save(key);FactionScopeCache.save(this,key,fresh);session=fresh;
+                runOnUiThread(()->{if(screen==Screen.HOME)showHome();});
+                resolveBackendPermissionsAsync(key,fresh);
+            }catch(Exception ignored){}
+        },"TornFCA-SessionRefresh").start();
+    }
+
+    private void authenticate(String key,boolean saved){
+        if(saved)showLoading();
+        new Thread(()->{
+            try{
+                AuthSession result=TornApiClient.authenticate(key);
+                if(result.factionName==null||!DUCK_FORCE_NAME.equalsIgnoreCase(result.factionName.trim()))throw new IOException("This build is restricted to Duck Force members.");
+                keyStore.save(key);FactionScopeCache.save(this,key,result);session=result;
+                runOnUiThread(this::showHome);
+                resolveBackendPermissionsAsync(key,result);
+            }catch(Exception e){
+                if(saved)keyStore.clear();String message=e.getMessage()==null?"Unable to verify Torn account.":e.getMessage();runOnUiThread(()->showLogin(message));
+            }
+        },"TornFCA-Authenticate").start();
+    }
+
+    private void resolveBackendPermissionsAsync(String key,AuthSession base){
+        if(base==null||!CompanionBackendClient.isConfigured())return;
+        new Thread(()->{
+            AuthSession resolved=CompanionBackendClient.resolvePermissions(base,key);
+            if(resolved==null)return;session=resolved;
+            runOnUiThread(()->{if(screen==Screen.HOME)showHome();});
+        },"TornFCA-BackendPermissions").start();
+    }
 
     private void showHome(){
         if(session==null){showLogin("Connect your Torn account to continue.");return;}screen=Screen.HOME;ScrollView scroll=shell();LinearLayout c=column(scroll);
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(18),dp(18),dp(18),dp(18));hero.setBackground(gradient(Color.rgb(34,49,69),Color.rgb(18,27,40),BORDER,20));hero.addView(text("Welcome back, "+session.playerName,22,TEXT,true));TextView meta=text(session.factionName+" • "+session.position+" • "+session.accessLabel(),13,MUTED,false);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);mp.topMargin=dp(5);hero.addView(meta,mp);
         if(AppRoles.isOwner(session)){TextView owner=text("OWNER / DEVELOPER",11,ACCENT2,true);owner.setPadding(dp(9),dp(5),dp(9),dp(5));owner.setBackground(rounded(BG2,ACCENT,11));LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);op.topMargin=dp(10);hero.addView(owner,op);}
-        LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);Button refresh=secondary("↻ Refresh");refresh.setOnClickListener(v->{String key=keyStore.load();if(key!=null)authenticate(key,true);});actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(44),1f));Button logout=secondary("Forget key");logout.setOnClickListener(v->{keyStore.clear();session=null;showLogin(null);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1f);lp.leftMargin=dp(8);actions.addView(logout,lp);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));ap.topMargin=dp(14);hero.addView(actions,ap);c.addView(hero);
+        LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);Button refresh=secondary("↻ Refresh");refresh.setOnClickListener(v->{String key=keyStore.load();if(key!=null)authenticate(key,true);});actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(44),1f));Button logout=secondary("Forget key");logout.setOnClickListener(v->{keyStore.clear();FactionScopeCache.clear(this);TornApiClient.clearMemoryCache();session=null;showLogin(null);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1f);lp.leftMargin=dp(8);actions.addView(logout,lp);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));ap.topMargin=dp(14);hero.addView(actions,ap);c.addView(hero);
         spacer(c,12);addWarBanner(c);spacer(c,6);c.addView(section("Faction companion"));spacer(c,8);
         LinearLayout banking=card("💰 Banking","Request faction payouts, review history and manage the shared queue when permitted.",BLUE);banking.setClickable(true);banking.setOnClickListener(v->showBanking());addCard(c,banking);
         if(session.hasPermission("Faction API Access"))addExactToolCard(c,"📦 Armory Auditor","Audit any faction armory item, member totals, deposits/restocks and detailed activity.","ARMORY","Faction API Access",BLUE);
