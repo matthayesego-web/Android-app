@@ -40,7 +40,9 @@ jobs:
           grep -q 'TornFcaActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "VERSION=\"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'BuildConfig.DEVELOPER_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
           grep -q 'tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          if grep -q 'PREVIEW_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java; then echo "Legacy beta access-code gate must be removed"; exit 1; fi
           if grep -q 'android:name=".V090CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy V090 shell must not be restorable"; exit 1; fi
           if grep -q 'android:name=".PolishedCompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy v0.8 shell must not be restorable"; exit 1; fi
           if grep -q 'android:name=".CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy base shell must not be restorable"; exit 1; fi
@@ -48,6 +50,8 @@ jobs:
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
       - name: Build unsigned beta and release
+        env:
+          TORNFCA_DEV_PASSWORD_SHA256: ${{ secrets.TORNFCA_DEV_PASSWORD_SHA256 }}
         run: gradle --no-daemon :app:assembleBeta :app:assembleRelease
 
       - name: Align APKs and package signing tools
