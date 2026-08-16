@@ -28,9 +28,9 @@ public final class TornApiClient {
     private static final Pattern QUERY_KEY = Pattern.compile("([?&])key=[^&]*", Pattern.CASE_INSENSITIVE);
 
     // Torn documents 100 requests/minute per user across all of that user's keys. TornFCA caps its
-    // own Android Torn traffic at 20/minute (one request every 3 seconds), leaving >=80% of the
-    // documented ceiling available for TornStats, FFScouter, Torn PDA and other tools.
-    private static final long MIN_REQUEST_SPACING_MS = 3000L;
+    // Android-side Torn traffic at 12/minute (one request every 5 seconds), reserving most of the
+    // user's quota for TornFCA backend verification, TornStats, FFScouter, TornPDA and other tools.
+    private static final long MIN_REQUEST_SPACING_MS = 5000L;
     private static long nextRequestAtMs = 0L;
 
     private static final ConcurrentHashMap<String, CacheEntry> CACHE = new ConcurrentHashMap<>();
@@ -222,14 +222,8 @@ public final class TornApiClient {
         return absoluteUrl + (absoluteUrl.contains("?") ? "&" : "?") + "key=" + encoded;
     }
 
-    private static boolean isTransientTornError(int code) {
-        return code == 5 || code == 17;
-    }
-
-    private static long backoffMs(int tornCode, int attempt) {
-        if (tornCode == 5) return (attempt + 1L) * 10000L;
-        return (attempt + 1L) * 6000L;
-    }
+    private static boolean isTransientTornError(int code) { return code == 5 || code == 17; }
+    private static long backoffMs(int tornCode, int attempt) { if (tornCode == 5) return (attempt + 1L) * 10000L;return (attempt + 1L) * 6000L; }
 
     private static void waitForRequestSlot() {
         long now = System.currentTimeMillis();
@@ -263,53 +257,21 @@ public final class TornApiClient {
 
     private static long queryLong(String url, String name) {
         try {
-            int q = url.indexOf('?');
-            if (q < 0) return 0L;
+            int q = url.indexOf('?');if (q < 0) return 0L;
             String[] parts = url.substring(q + 1).split("&");
             for (String part : parts) {
-                int eq = part.indexOf('=');
-                String k = eq < 0 ? part : part.substring(0, eq);
+                int eq = part.indexOf('=');String k = eq < 0 ? part : part.substring(0, eq);
                 if (!name.equals(URLDecoder.decode(k, StandardCharsets.UTF_8.name()))) continue;
-                String v = eq < 0 ? "" : part.substring(eq + 1);
-                return Long.parseLong(URLDecoder.decode(v, StandardCharsets.UTF_8.name()));
+                String v = eq < 0 ? "" : part.substring(eq + 1);return Long.parseLong(URLDecoder.decode(v, StandardCharsets.UTF_8.name()));
             }
         } catch (Exception ignored) {}
         return 0L;
     }
 
-    private static String cacheKey(String url, String key) {
-        String sanitized = url.replaceAll("([?&])key=[^&]*", "$1key=*");
-        return Integer.toHexString(key == null ? 0 : key.hashCode()) + "|" + sanitized;
-    }
-
-    private static void trimCache() {
-        if (CACHE.size() <= 160) return;
-        long now = System.currentTimeMillis();
-        CACHE.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);
-        if (CACHE.size() > 200) CACHE.clear();
-    }
-
-    private static void sleepQuietly(long ms) {
-        try { Thread.sleep(Math.max(0L, ms)); }
-        catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-    }
-
-    private static String readAll(InputStream input) throws IOException {
-        try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[4096];
-            int n;
-            while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);
-            return out.toString(StandardCharsets.UTF_8.name());
-        }
-    }
-
-    private static final class CacheEntry {
-        final String body;
-        final long expiresAtMs;
-        CacheEntry(String body,long expiresAtMs){this.body=body;this.expiresAtMs=expiresAtMs;}
-    }
-
-    private static final class PermanentApiException extends IOException {
-        PermanentApiException(String message){super(message);}
-    }
+    private static String cacheKey(String url, String key) {String sanitized = url.replaceAll("([?&])key=[^&]*", "$1key=*");return Integer.toHexString(key == null ? 0 : key.hashCode()) + "|" + sanitized;}
+    private static void trimCache() {if (CACHE.size() <= 160) return;long now = System.currentTimeMillis();CACHE.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);if (CACHE.size() > 200) CACHE.clear();}
+    private static void sleepQuietly(long ms) {try { Thread.sleep(Math.max(0L, ms)); }catch (InterruptedException e) { Thread.currentThread().interrupt(); }}
+    private static String readAll(InputStream input) throws IOException {try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {byte[] buffer = new byte[4096];int n;while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);return out.toString(StandardCharsets.UTF_8.name());}}
+    private static final class CacheEntry {final String body;final long expiresAtMs;CacheEntry(String body,long expiresAtMs){this.body=body;this.expiresAtMs=expiresAtMs;}}
+    private static final class PermanentApiException extends IOException {PermanentApiException(String message){super(message);}}
 }
