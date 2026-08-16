@@ -23,7 +23,7 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 32
+        versionCode = 33
         versionName = "0.9.17"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
