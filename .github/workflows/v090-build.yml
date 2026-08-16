@@ -35,11 +35,18 @@ jobs:
           test -n "$VERSION_CODE"
           case "$VERSION_NAME" in 0.9.*) ;; *) echo "v0.9 branch must stay in 0.9.x"; exit 1;; esac
           grep -q 'AccessGateActivity' app/src/main/AndroidManifest.xml
+          grep -q 'V095CompanionActivity' app/src/main/AndroidManifest.xml
           grep -q 'DeveloperGateActivity' app/src/main/AndroidManifest.xml
+          grep -q 'V095CompanionActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/V095CompanionActivity.java
+          if grep -q 'android:name=".V090CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy V090 shell must not be restorable"; exit 1; fi
+          if grep -q 'android:name=".PolishedCompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy v0.8 shell must not be restorable"; exit 1; fi
+          if grep -q 'android:name=".CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy base shell must not be restorable"; exit 1; fi
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
-      - name: Build unsigned internal beta and release
+      - name: Build unsigned beta and release
         run: gradle --no-daemon :app:assembleBeta :app:assembleRelease
 
       - name: Align APKs and package signing tools
