@@ -12,14 +12,16 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 public final class CompanionBackendClient {
-    private static final String BACKEND_URL = "###DUCKFORCE-BACKEND-URL###";
-    private static final String USER_AGENT = "DuckForceCompanion/0.5.0 Android";
+    private static final String BACKEND_URL = BuildConfig.FACTION_BACKEND_URL == null ? "" : BuildConfig.FACTION_BACKEND_URL.trim();
+    private static final String USER_AGENT = "TornFCA/0.9.12 Android";
 
     private CompanionBackendClient() {}
 
     public static boolean isConfigured() {
         return BACKEND_URL.startsWith("https://") && !BACKEND_URL.contains("###");
     }
+
+    public static String configuredUrl(){ return BACKEND_URL; }
 
     public static AuthSession resolvePermissions(AuthSession session, String apiKey) {
         if (session == null || !isConfigured()) return session;
@@ -107,6 +109,7 @@ public final class CompanionBackendClient {
     }
 
     private static JSONObject post(JSONObject body) throws IOException {
+        if(!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
         HttpURLConnection connection = (HttpURLConnection) new URL(BACKEND_URL).openConnection();
         try {
             connection.setRequestMethod("POST");
