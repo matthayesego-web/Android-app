@@ -29,6 +29,13 @@ android {
             versionNameSuffix = "-internal"
             manifestPlaceholders["appLabel"] = "Duck Force Companion INTERNAL"
         }
+        create("beta") {
+            applicationIdSuffix = ".internal"
+            versionNameSuffix = "-internal"
+            manifestPlaceholders["appLabel"] = "Duck Force Companion INTERNAL"
+            isDebuggable = true
+            isMinifyEnabled = false
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
