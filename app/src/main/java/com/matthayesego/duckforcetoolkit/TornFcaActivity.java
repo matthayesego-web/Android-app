@@ -150,7 +150,10 @@ public class TornFcaActivity extends V098CompanionActivity {
     }
 
     private ImageView findHeaderAvatar(View view){
-        if(view instanceof ImageView){ViewGroup.LayoutParams p=view.getLayoutParams();if(p!=null&&Math.abs(p.width-dp(78))<=dp(2)&&Math.abs(p.height-dp(78))<=dp(2))return(ImageView)view;}
+        if(view instanceof ImageView){
+            if("tornfca-profile-avatar".equals(view.getTag()))return(ImageView)view;
+            ViewGroup.LayoutParams p=view.getLayoutParams();if(p!=null&&Math.abs(p.width-dp(78))<=dp(2)&&Math.abs(p.height-dp(78))<=dp(2))return(ImageView)view;
+        }
         if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){ImageView found=findHeaderAvatar(g.getChildAt(i));if(found!=null)return found;}}
         return null;
     }
