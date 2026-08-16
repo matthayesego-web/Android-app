@@ -27,6 +27,10 @@
         <!-- Working feature implementations. Base/legacy shells are intentionally not launchable activities. -->
         <activity android:name=".WarCenterActivity" android:exported="false"/>
         <activity android:name=".WarPayoutActivity" android:exported="false"/>
+        <activity android:name=".WarPayoutReceiptActivity" android:exported="false"/>
+        <activity android:name=".WarHistoryDetailActivity" android:exported="false"/>
+        <activity android:name=".MemberDailyActivity" android:exported="false"/>
+        <activity android:name=".MemberWarActivity" android:exported="false"/>
         <activity android:name=".BankingCompanionActivity" android:exported="false"/>
         <activity android:name=".MemberDossierActivity" android:exported="false"/>
         <activity android:name=".MoreActivity" android:exported="false"/>
