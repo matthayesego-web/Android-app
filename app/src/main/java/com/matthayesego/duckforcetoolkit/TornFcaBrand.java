@@ -62,7 +62,8 @@ public final class TornFcaBrand {
             Drawable current=image.getDrawable();Drawable legacy=context.getDrawable(R.drawable.duckforce_noir_art);
             if(current!=null&&legacy!=null&&current.getConstantState()!=null&&legacy.getConstantState()!=null&&current.getConstantState().equals(legacy.getConstantState())){
                 image.setImageResource(R.drawable.tornfca_mark);
-                image.setPadding(8,8,8,8);
+                int pad=Math.round(8*context.getResources().getDisplayMetrics().density);
+                image.setPadding(pad,pad,pad,pad);
             }
         }catch(Exception ignored){}
     }
@@ -80,6 +81,8 @@ public final class TornFcaBrand {
                 .replace("Duck Force membership","faction membership")
                 .replace("Duck Force estimates","faction estimates")
                 .replace("Loading Duck Force estimates","Loading faction estimates")
+                .replace("Duck Force War Center","Faction War Center")
+                .replace("Duck Force payout","faction payout")
                 .replace("DUCK FORCE •","TORNFCA •")
                 .replace("v0.9.8","v0.9.9");
     }
@@ -88,24 +91,22 @@ public final class TornFcaBrand {
     public static Intent retarget(Context context,Intent source){
         if(source==null||source.getComponent()==null)return source;
         String c=source.getComponent().getClassName();Class<?> target=null;
-        if(c.equals(MoreActivity.class.getName()))target=TornFcaMoreActivity.class;
-        else if(c.equals(AboutActivity.class.getName()))target=TornFcaAboutActivity.class;
-        else if(c.equals(FeatureRouterActivity.class.getName()))target=TornFcaFeatureRouterActivity.class;
-        else if(c.equals(WarCenterActivity.class.getName()))target=TornFcaWarCenterActivity.class;
-        else if(c.equals(WarPayoutActivity.class.getName()))target=TornFcaWarPayoutActivity.class;
-        else if(c.equals(DeveloperGateActivity.class.getName()))target=TornFcaDeveloperGateActivity.class;
-        else if(c.equals(DeveloperPanelActivity.class.getName()))target=TornFcaDeveloperPanelActivity.class;
-        else if(c.equals(LeadershipAttentionActivity.class.getName()))target=TornFcaLeadershipAttentionActivity.class;
-        else if(c.equals(FactionStrengthActivity.class.getName()))target=TornFcaFactionStrengthActivity.class;
-        else if(c.equals(MemberFactionActivity.class.getName()))target=TornFcaMemberFactionActivity.class;
-        else if(c.equals(WarNoticeActivity.class.getName()))target=TornFcaWarNoticeActivity.class;
-        else if(c.equals(FactionOpsActivity.class.getName()))target=TornFcaFactionOpsActivity.class;
-        else if(c.equals(OcTrackerActivity.class.getName()))target=TornFcaOcTrackerActivity.class;
-        else if(c.equals(QuickIntelActivity.class.getName()))target=TornFcaQuickIntelActivity.class;
-        else if(c.equals(PremiumPreviewActivity.class.getName()))target=TornFcaPremiumPreviewActivity.class;
-        else if(c.equals(DeveloperConsoleActivity.class.getName()))target=TornFcaDeveloperConsoleActivity.class;
-        else if(c.equals(ToolHostActivity.class.getName()))target=TornFcaToolHostActivity.class;
-        else if(c.equals(ToolkitActivity.class.getName()))target=TornFcaToolkitActivity.class;
+        if(c.equals(MoreActivity.class.getName()))target=TornFcaScreens.More.class;
+        else if(c.equals(AboutActivity.class.getName()))target=TornFcaScreens.About.class;
+        else if(c.equals(FeatureRouterActivity.class.getName()))target=TornFcaScreens.FeatureRouter.class;
+        else if(c.equals(WarCenterActivity.class.getName()))target=TornFcaScreens.WarCenter.class;
+        else if(c.equals(WarPayoutActivity.class.getName()))target=TornFcaScreens.WarPayout.class;
+        else if(c.equals(DeveloperGateActivity.class.getName()))target=TornFcaScreens.DeveloperGate.class;
+        else if(c.equals(DeveloperPanelActivity.class.getName()))target=TornFcaScreens.DeveloperPanel.class;
+        else if(c.equals(LeadershipAttentionActivity.class.getName()))target=TornFcaScreens.LeadershipAttention.class;
+        else if(c.equals(FactionStrengthActivity.class.getName()))target=TornFcaScreens.FactionStrength.class;
+        else if(c.equals(MemberFactionActivity.class.getName()))target=TornFcaScreens.MemberFaction.class;
+        else if(c.equals(WarNoticeActivity.class.getName()))target=TornFcaScreens.WarNotice.class;
+        else if(c.equals(FactionOpsActivity.class.getName()))target=TornFcaScreens.FactionOps.class;
+        else if(c.equals(OcTrackerActivity.class.getName()))target=TornFcaScreens.OcTracker.class;
+        else if(c.equals(QuickIntelActivity.class.getName()))target=TornFcaScreens.QuickIntel.class;
+        else if(c.equals(PremiumPreviewActivity.class.getName()))target=TornFcaScreens.PremiumPreview.class;
+        else if(c.equals(DeveloperConsoleActivity.class.getName()))target=TornFcaScreens.DeveloperConsole.class;
         else if(c.equals(V098CompanionActivity.class.getName())||c.equals(V095CompanionActivity.class.getName()))target=TornFcaActivity.class;
         if(target!=null)source.setClass(context,target);
         return source;
