@@ -50,9 +50,12 @@ jobs:
           grep -q 'BuildConfig.FACTION_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           grep -q 'BuildConfig.PREMIUM_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
 
-          # One-key / Torn rate-safety gates.
+          # One-key / Torn rate-safety and latency gates.
           grep -q 'Limited Access Torn API key' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
-          grep -q 'MIN_REQUEST_SPACING_MS = 5000L' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          grep -q 'MIN_REQUEST_SPACING_MS = 2000L' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          grep -q 'selections=profile,faction' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          grep -q 'cachedSession' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'AVATAR_REFRESH_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
           grep -q 'PermanentApiException' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
           grep -q 'TornApiClient.validateKey' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           grep -q '10000L' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
