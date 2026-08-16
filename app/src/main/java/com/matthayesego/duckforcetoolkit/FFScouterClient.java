@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-/** Provider boundary around FFScouter. Every request uses the current player's own registered Torn API key. */
+/** Provider boundary around FFScouter. Every request uses the current player's own opted-in Torn API key. */
 public final class FFScouterClient {
     private static final String BASE="https://ffscouter.com/api/v1";
     public static final String HOMEPAGE="https://ffscouter.com/";
@@ -32,26 +32,29 @@ public final class FFScouterClient {
     // FFScouter currently documents 20/min for get-stats, 10/min for check-key and 3/min for
     // registration. TornFCA stays slightly below each published ceiling and caches read requests.
     private static long nextStatsAtMs=0L,nextCheckAtMs=0L,nextRegisterAtMs=0L;
+    private static volatile String approvedFingerprint="";
     private static final ConcurrentHashMap<String,CacheEntry> CACHE=new ConcurrentHashMap<>();
 
     private FFScouterClient(){}
 
+    /** Reads local consent only; it never contacts FFScouter. Also primes the process-level safety gate. */
     public static boolean hasConsent(Context context,String key){
         if(context==null||key==null)return false;
         SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
-        return p.getBoolean("enabled",false)&&fingerprint(key).equals(p.getString("key_fingerprint",""));
+        String fp=fingerprint(key);boolean enabled=p.getBoolean("enabled",false)&&fp.equals(p.getString("key_fingerprint",""));
+        approvedFingerprint=enabled?fp:"";return enabled;
     }
     public static void setConsent(Context context,String key,boolean enabled){
         if(context==null)return;
         SharedPreferences.Editor e=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit();
-        if(enabled&&key!=null){e.putBoolean("enabled",true).putString("key_fingerprint",fingerprint(key));}
-        else{e.clear();}
+        if(enabled&&key!=null){String fp=fingerprint(key);e.putBoolean("enabled",true).putString("key_fingerprint",fp);approvedFingerprint=fp;}
+        else{e.clear();approvedFingerprint="";}
         e.apply();
         if(!enabled)CACHE.clear();
     }
 
     public static JSONObject checkKey(String key)throws IOException{
-        requireKey(key);
+        requireAuthorizedKey(key);
         String cacheKey="check|"+fingerprint(key);JSONObject cached=cacheObject(cacheKey);if(cached!=null)return cached;
         waitForCheckSlot();
         String url=BASE+"/check-key?key="+URLEncoder.encode(key,StandardCharsets.UTF_8.name());
@@ -59,7 +62,7 @@ public final class FFScouterClient {
     }
 
     public static JSONObject registerKey(String key)throws IOException{
-        requireKey(key);waitForRegisterSlot();
+        requireAuthorizedKey(key);waitForRegisterSlot();
         JSONObject payload=new JSONObject();
         try{
             payload.put("key",key);
@@ -70,7 +73,7 @@ public final class FFScouterClient {
     }
 
     public static JSONArray getStats(String key,List<Integer> playerIds)throws IOException{
-        requireKey(key);
+        requireAuthorizedKey(key);
         if(playerIds==null||playerIds.isEmpty())return new JSONArray();
         StringBuilder targets=new StringBuilder();
         for(int i=0;i<playerIds.size()&&i<205;i++){if(i>0)targets.append(',');targets.append(playerIds.get(i));}
@@ -85,6 +88,10 @@ public final class FFScouterClient {
         }catch(JSONException e){throw new IOException("FFScouter returned an unreadable response.",e);}
     }
 
+    private static void requireAuthorizedKey(String key)throws IOException{
+        requireKey(key);String fp=fingerprint(key);
+        if(!fp.equals(approvedFingerprint))throw new IOException("FFScouter is disabled in TornFCA. Enable it from Faction Strength Intel after reviewing FFScouter's Data Policy and Terms.");
+    }
     private static void requireKey(String key)throws IOException{if(key==null||!API_KEY.matcher(key.trim()).matches())throw new IOException("FFScouter requires the same 16-character alphanumeric Torn API key.");}
     private static JSONObject objectResponse(String body)throws IOException{try{return new JSONObject(body.trim());}catch(JSONException e){throw new IOException("FFScouter returned an unreadable response.",e);}}
 
