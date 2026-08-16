@@ -23,16 +23,13 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 28
-        versionName = "0.9.13"
+        versionCode = 29
+        versionName = "0.9.14"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
-        // The approved fallback is a one-way SHA-256 hash only. CI/local secrets may override it,
-        // but a missing secret must never silently disable the hidden developer gate.
-        val devHash = localOrEnv(
-            "TORNFCA_DEV_PASSWORD_SHA256",
-            "AD039B0643FE2CD75558E56B90955252ED3F56CE6B2B7AA90CD1ED3BC22AC6AB"
-        )
+        // Closed-beta temporary developer gate. Only the one-way SHA-256 hash is shipped; the
+        // plaintext password is never embedded in source or the APK. Replace before public release.
+        val devHash = "BFB3F43E00B5530E0A2E42343287C792193DB09A9D87515B19A29992E18BAF7D"
         val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL")
         val premiumBackend = localOrEnv("TORNFCA_PREMIUM_BACKEND_URL")
         buildConfigField("String", "DEVELOPER_ACCESS_SHA256", quotedBuildValue(devHash))
