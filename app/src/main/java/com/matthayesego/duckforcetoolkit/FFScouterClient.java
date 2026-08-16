@@ -17,7 +17,7 @@ import java.util.List;
 /** Provider boundary around FFScouter. Every request uses the current player's own registered Torn API key. */
 public final class FFScouterClient {
     private static final String BASE="https://ffscouter.com/api/v1";
-    private static final String USER_AGENT="DuckForceCompanion/0.9.5 Android";
+    private static final String USER_AGENT="DuckForceCompanion Android";
     private FFScouterClient(){}
 
     public static JSONObject checkKey(String key)throws IOException{
