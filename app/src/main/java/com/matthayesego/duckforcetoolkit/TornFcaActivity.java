@@ -17,6 +17,7 @@ public class TornFcaActivity extends V098CompanionActivity {
         if(root!=null){
             TornFcaBrand.apply(this,root);
             addApiRequirementNotice(root);
+            retargetBankingCards(root);
         }
     }
 
@@ -26,7 +27,9 @@ public class TornFcaActivity extends V098CompanionActivity {
         if(root!=null){
             TornFcaBrand.apply(this,root);
             addApiRequirementNotice(root);
+            retargetBankingCards(root);
         }
+        refreshPremiumEntitlement();
     }
 
     @Override public void startActivity(Intent intent){
@@ -59,6 +62,25 @@ public class TornFcaActivity extends V098CompanionActivity {
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
         p.topMargin=dp(12);p.bottomMargin=dp(3);
         card.addView(notice,Math.min(2,card.getChildCount()),p);
+    }
+
+    private void retargetBankingCards(View root){
+        if(root instanceof TextView){
+            TextView t=(TextView)root;
+            if("Banking".equals(t.getText()==null?"":t.getText().toString())){
+                View card=findClickableAncestor(t);
+                if(card!=null){card.setOnClickListener(v->{Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,FeatureRouterActivity.TARGET_BANKING);startActivity(i);});}
+            }
+        }
+        if(root instanceof ViewGroup){ViewGroup g=(ViewGroup)root;for(int i=0;i<g.getChildCount();i++)retargetBankingCards(g.getChildAt(i));}
+    }
+
+    private View findClickableAncestor(View start){View v=start;while(v!=null){if(v.isClickable())return v;if(!(v.getParent() instanceof View))break;v=(View)v.getParent();}return null;}
+
+    private void refreshPremiumEntitlement(){
+        String key=new SecureApiKeyStore(this).load();if(key==null||key.isBlank()||!PremiumBackendClient.isConfigured())return;
+        FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);if(scope==null||scope.playerId<=0)return;
+        PremiumBackendClient.refreshAsync(this,scope.playerId);
     }
 
     private TextView findText(View view,String needle){
