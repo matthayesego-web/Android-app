@@ -3,6 +3,25 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
         <activity android:name=".AccessGateActivity" android:exported="true" android:launchMode="singleTask" android:clearTaskOnLaunch="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+        <activity android:name=".TornFcaActivity" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$More" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$About" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$FeatureRouter" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$WarCenter" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$WarPayout" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$DeveloperGate" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$DeveloperPanel" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$LeadershipAttention" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$FactionStrength" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$MemberFaction" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$WarNotice" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$FactionOps" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$OcTracker" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$QuickIntel" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$PremiumPreview" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$DeveloperConsole" android:exported="false"/>
+
+        <!-- Legacy implementation classes remain packaged as the proven feature layer underneath TornFCA. -->
         <activity android:name=".V098CompanionActivity" android:exported="false"/>
         <activity android:name=".V095CompanionActivity" android:exported="false"/>
         <activity android:name=".WarCenterActivity" android:exported="false"/>
