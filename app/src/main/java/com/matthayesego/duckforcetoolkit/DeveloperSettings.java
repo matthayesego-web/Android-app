@@ -53,7 +53,9 @@ public final class DeveloperSettings {
     }
 
     public static boolean simulatePremium(Context context) {
-        return prefs(context).getBoolean(KEY_PREMIUM_SIM, false);
+        // Closed-beta default: every tester receives the elevated Premium state unless the
+        // password-protected developer console explicitly switches this device back to Free/real.
+        return prefs(context).getBoolean(KEY_PREMIUM_SIM, true);
     }
 
     public static void setSimulatePremium(Context context, boolean enabled) {
