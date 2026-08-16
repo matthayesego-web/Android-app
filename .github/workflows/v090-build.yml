@@ -1,4 +1,4 @@
-name: v0.9 Faction Automation Build
+name: TornFCA v0.9 Build
 
 on:
   push:
@@ -27,21 +27,20 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Read and verify beta metadata
+      - name: Read and verify TornFCA beta metadata
         run: |
           VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
           VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
           test -n "$VERSION_NAME"
           test -n "$VERSION_CODE"
-          case "$VERSION_NAME" in 0.9.*) ;; *) echo "v0.9 branch must stay in 0.9.x"; exit 1;; esac
-          grep -q 'AccessGateActivity' app/src/main/AndroidManifest.xml
-          grep -q 'V098CompanionActivity' app/src/main/AndroidManifest.xml
-          grep -q 'WarCenterActivity' app/src/main/AndroidManifest.xml
-          grep -q 'WarPayoutActivity' app/src/main/AndroidManifest.xml
-          grep -q 'DeveloperGateActivity' app/src/main/AndroidManifest.xml
-          grep -q 'V098CompanionActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          case "$VERSION_NAME" in 0.9.*) ;; *) echo "TornFCA beta branch must stay in 0.9.x"; exit 1;; esac
+          grep -q 'manifestPlaceholders\["appLabel"\] = "TornFCA"' app/build.gradle.kts
+          grep -q 'TornFcaActivity' app/src/main/AndroidManifest.xml
+          grep -q 'TornFcaScreens' app/src/main/AndroidManifest.xml
+          grep -q 'TornFcaActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
-          grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/V098CompanionActivity.java
+          grep -q "VERSION=\"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           if grep -q 'android:name=".V090CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy V090 shell must not be restorable"; exit 1; fi
           if grep -q 'android:name=".PolishedCompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy v0.8 shell must not be restorable"; exit 1; fi
           if grep -q 'android:name=".CompanionActivity"' app/src/main/AndroidManifest.xml; then echo "Legacy base shell must not be restorable"; exit 1; fi
@@ -59,10 +58,10 @@ jobs:
           test -x "$APKSIGNER"
           test -x "$ZIPALIGN"
 
-          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/beta/app-beta-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-internal-beta-aligned-unsigned.apk"
-          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/release/app-release-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-aligned-unsigned-release.apk"
-          "$ZIPALIGN" -c -P 16 -v 4 "DuckForce-Companion-v${VERSION_NAME}-internal-beta-aligned-unsigned.apk"
-          "$ZIPALIGN" -c -P 16 -v 4 "DuckForce-Companion-v${VERSION_NAME}-aligned-unsigned-release.apk"
+          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/beta/app-beta-unsigned.apk "TornFCA-v${VERSION_NAME}-internal-beta-aligned-unsigned.apk"
+          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/release/app-release-unsigned.apk "TornFCA-v${VERSION_NAME}-aligned-unsigned-release.apk"
+          "$ZIPALIGN" -c -P 16 -v 4 "TornFCA-v${VERSION_NAME}-internal-beta-aligned-unsigned.apk"
+          "$ZIPALIGN" -c -P 16 -v 4 "TornFCA-v${VERSION_NAME}-aligned-unsigned-release.apk"
 
           mkdir -p android-signing-tool/lib
           cp "$APKSIGNER" android-signing-tool/apksigner
@@ -70,13 +69,13 @@ jobs:
           cp "$ZIPALIGN" android-signing-tool/zipalign
           chmod +x android-signing-tool/apksigner android-signing-tool/zipalign
 
-      - name: Upload v0.9 APKs
+      - name: Upload TornFCA v0.9 APKs
         uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Companion-v${{ env.VERSION_NAME }}-branch-builds
+          name: TornFCA-v${{ env.VERSION_NAME }}-branch-builds
           path: |
-            DuckForce-Companion-v${{ env.VERSION_NAME }}-internal-beta-aligned-unsigned.apk
-            DuckForce-Companion-v${{ env.VERSION_NAME }}-aligned-unsigned-release.apk
+            TornFCA-v${{ env.VERSION_NAME }}-internal-beta-aligned-unsigned.apk
+            TornFCA-v${{ env.VERSION_NAME }}-aligned-unsigned-release.apk
             android-signing-tool/apksigner
             android-signing-tool/lib/apksigner.jar
             android-signing-tool/zipalign
