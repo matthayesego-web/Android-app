@@ -19,6 +19,7 @@ public class TornFcaActivity extends V098CompanionActivity {
             addApiRequirementNotice(root);
             retargetBankingCards(root);
         }
+        primeProviderConsent();
     }
 
     @Override protected void onResume(){
@@ -29,6 +30,7 @@ public class TornFcaActivity extends V098CompanionActivity {
             addApiRequirementNotice(root);
             retargetBankingCards(root);
         }
+        primeProviderConsent();
         refreshPremiumEntitlement();
     }
 
@@ -38,7 +40,7 @@ public class TornFcaActivity extends V098CompanionActivity {
 
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
 
-    /** Adds Torn's required key-use disclosure directly beside the API-key input. */
+    /** Adds Torn's key-use disclosure directly beside the API-key input. */
     private void addApiRequirementNotice(View root){
         TextView title=findText(root,"Connect your Torn account");
         if(title==null||!(title.getParent() instanceof LinearLayout))return;
@@ -48,7 +50,7 @@ public class TornFcaActivity extends V098CompanionActivity {
         FactionTheme theme=FactionTheme.forContext(this);
         TextView notice=new TextView(this);
         notice.setTag("tornfca-api-requirement");
-        notice.setText("API KEY REQUIREMENT\nLimited Access or higher is required for normal TornFCA access. Full Access is NOT required. Leadership-only faction data also depends on your in-game Faction API Access permission.\n\nYour key is encrypted and stored locally on this device. TornFCA only requests data needed for the feature you open. Optional third-party providers require separate opt-in before any key is shared.");
+        notice.setText("API KEY REQUIREMENT\nUse one 16-character Limited Access Torn API key for TornFCA. Full Access is NOT required. Leadership-only faction data additionally depends on your in-game Faction API Access permission.\n\nStorage: the key is AES-GCM encrypted on this device using Android Keystore. TornFCA sends it to Torn's official API for requested features. Shared notices/banking may temporarily send it over HTTPS to the TornFCA faction backend to verify identity/permissions; that backend does not store the key. FFScouter and TornStats receive the key only after separate explicit opt-in, under their own terms/data policies.");
         notice.setTextSize(12f);
         notice.setTextColor(Color.rgb(224,232,241));
         notice.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));
@@ -76,6 +78,9 @@ public class TornFcaActivity extends V098CompanionActivity {
     }
 
     private View findClickableAncestor(View start){View v=start;while(v!=null){if(v.isClickable())return v;if(!(v.getParent() instanceof View))break;v=(View)v.getParent();}return null;}
+
+    /** Loads only local consent state so provider clients can enforce opt-in at their network boundary. */
+    private void primeProviderConsent(){String key=new SecureApiKeyStore(this).load();if(key!=null&&!key.isBlank())FFScouterClient.hasConsent(this,key);}
 
     private void refreshPremiumEntitlement(){
         String key=new SecureApiKeyStore(this).load();if(key==null||key.isBlank()||!PremiumBackendClient.isConfigured())return;
