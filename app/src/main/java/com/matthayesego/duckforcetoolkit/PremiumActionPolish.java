@@ -105,7 +105,10 @@ public final class PremiumActionPolish {
         button.setGravity(Gravity.CENTER);
         button.setMinHeight(dp(activity, 46));
         button.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
-        if (Build.VERSION.SDK_INT >= 21 && button.getElevation() < dp(activity, 2)) button.setElevation(dp(activity, 2));
+        if (Build.VERSION.SDK_INT >= 21) {
+            button.setLetterSpacing(.01f);
+            if (button.getElevation() < dp(activity, 2)) button.setElevation(dp(activity, 2));
+        }
     }
 
     private static boolean polishNavItem(Activity activity, LinearLayout item) {
@@ -131,6 +134,7 @@ public final class PremiumActionPolish {
         text.setText("Open War Center  →");
         text.setTextColor(GOLD);
         text.setBackground(actionBackground(activity, GOLD, 13));
+        if (Build.VERSION.SDK_INT >= 21) text.setLetterSpacing(.01f);
         if (!first) return;
         text.setTextSize(13f);
         text.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -207,6 +211,7 @@ public final class PremiumActionPolish {
         action.setTag(ACTION_TAG);
         action.setText(actionLabel(value(eyebrow), value(title)));
         action.setTextColor(accent);
+        action.setVisibility(View.VISIBLE);
         if (first) {
             action.setTextSize(11.5f);
             action.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -229,6 +234,7 @@ public final class PremiumActionPolish {
         }
 
         tuneCompactRow(activity, card, compact, body != null);
+        tuneFullCard(activity, card, compact, action);
         card.setContentDescription(value(title) + ". " + value(action).replace("→", ""));
     }
 
@@ -241,6 +247,20 @@ public final class PremiumActionPolish {
         if (raw.height != desired) {
             raw.height = desired;
             row.setLayoutParams(raw);
+        }
+    }
+
+    private static void tuneFullCard(Activity activity, LinearLayout card, boolean compact, TextView action) {
+        if (compact) return;
+        card.setMinimumHeight(dp(activity, 118));
+        action.setMinHeight(dp(activity, 18));
+        ViewGroup.LayoutParams raw = card.getLayoutParams();
+        if (raw instanceof LinearLayout.LayoutParams) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) raw;
+            if (lp.height > 0) {
+                lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                card.setLayoutParams(lp);
+            }
         }
     }
 
