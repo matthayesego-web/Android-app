@@ -16,12 +16,15 @@ The app does **not** directly declare Firebase Analytics, Crashlytics, Performan
 
 ## Firebase configuration
 
-Current production manifest intent:
+Current production manifest/application intent:
 
 - Firebase Cloud Messaging remains available for push notifications.
 - `firebase_analytics_collection_enabled=false` is explicitly declared.
+- `firebase_messaging_auto_init_enabled=false` is explicitly declared.
+- `TornFcaApplication` initializes Messaging only when the current legal version has already been acknowledged.
+- The first-run legal acceptance flow explicitly initializes Messaging only after acceptance, so the user does not need to restart the app to enable configured push.
 - TornFCA does not call `FirebaseAnalytics`, `setAnalyticsCollectionEnabled`, or `setDeliveryMetricsExportToBigQuery`.
-- The Community Security Audit fails if an Analytics SDK/API or FCM BigQuery delivery-metrics export is introduced without an explicit privacy review.
+- The Community Security Audit fails if these privacy boundaries disappear or an Analytics/BigQuery delivery-metrics integration is introduced without an explicit privacy review.
 
 ## What FCM still means for Data safety
 
@@ -36,7 +39,7 @@ FCM also transitively includes Firebase Installations. Google's disclosure docum
 
 The Firebase user agent can include device metadata such as OS version, device name/model/brand/form factor, install source, and the Firebase SDKs/versions present in the app. Google states that this user-agent bundle is used to provide/maintain/improve Firebase and is not linked to a user or device identifier.
 
-Therefore the Play Data safety form must evaluate FCM/Firebase Installations even though Firebase Analytics is not used.
+TornFCA delays its FCM Messaging initialization until current legal acknowledgement, but once Messaging is enabled the Play Data safety form must still evaluate FCM/Firebase Installations data processing.
 
 ## TornFCA-specific push data
 
@@ -52,7 +55,7 @@ The Torn API key is used for verification where required but is not intended to 
 
 ## FCM analytics distinction
 
-Google documents optional notification interaction analytics when the Firebase Analytics SDK is included. TornFCA does not directly include that SDK and now explicitly disables Firebase Analytics collection in the manifest.
+Google documents optional notification interaction analytics when the Firebase Analytics SDK is included. TornFCA does not directly include that SDK and explicitly disables Firebase Analytics collection in the manifest.
 
 This does **not** remove FCM's normal operational data described above.
 
@@ -79,6 +82,8 @@ Before each production submission:
 - [ ] Run `./gradlew :app:dependencies` (or equivalent targeted release dependency report) for the exact candidate.
 - [ ] Confirm `firebase-analytics`, Crashlytics and Performance are not present unless intentionally added.
 - [ ] Confirm `firebase_analytics_collection_enabled=false` remains in the merged production manifest.
+- [ ] Confirm `firebase_messaging_auto_init_enabled=false` remains in the merged production manifest.
+- [ ] Confirm first-run Messaging initialization is still gated by `LegalAcceptanceStore.hasAcceptedCurrent` and enabled immediately after legal acceptance.
 - [ ] Confirm `setDeliveryMetricsExportToBigQuery` is absent unless intentionally enabled and disclosed.
 - [ ] Confirm only the intended Firebase client configuration is compiled into Android; service-account/private sender credentials remain server-side.
 - [ ] Review Google's current Firebase Android Data safety disclosure page for the exact SDK versions in use.
