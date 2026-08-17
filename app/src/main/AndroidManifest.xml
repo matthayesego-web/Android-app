@@ -25,6 +25,8 @@
         <activity android:name=".TornFcaScreens$PremiumPreview" android:exported="false"/>
         <activity android:name=".TornFcaScreens$DeveloperConsole" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="false"/>
+        <activity android:name=".LegalActivity" android:exported="false"/>
+        <activity android:name=".LegalDocumentActivity" android:exported="false"/>
         <activity android:name=".NotificationSettingsActivity" android:exported="false"/>
         <activity android:name=".NotificationInboxActivity" android:exported="false"/>
         <activity android:name=".MemberCenterActivity" android:exported="false"/>
