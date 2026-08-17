@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.26 — 2026-08-17
+
+- Completed a readability-only polish pass after the v0.9.25 navigation/legal foundation, without changing feature access or permission boundaries.
+- Simplified Member Center descriptions so ordinary members see player-facing language instead of terms such as member-safe, permission-gated, backend configured, or entitlement state.
+- Simplified About, Settings, and More descriptions while keeping the same legal, privacy, provider-consent, Premium, and leadership behavior.
+- Reduced the API sign-in notice to the essentials: use a Limited Access key, choose session-only or encrypted storage, and note that leadership tools may require in-game Faction API Access.
+- Made the compact sign-in notice open Legal & Privacy directly when tapped.
+- Strengthened the Community Security Audit so optional-provider opt-out is verified by the actual FFScouter and TornStats consent-disable calls rather than by a specific button label.
+- Preserved the compact Home/Faction/War/(Leadership)/More navigation and the task-grouped Member Center rather than adding more bottom-navigation items.
+- Bumped Android versionCode to 43 and versionName to 0.9.26.
+
 ## v0.9.25 — 2026-08-17
 
 - Reorganized the free Member Center around plain-language workflows: **Start Here**, **Daily & Readiness**, **Growth & Training**, **My Faction**, **Community & Alerts**, and **Optional Upgrade**.
