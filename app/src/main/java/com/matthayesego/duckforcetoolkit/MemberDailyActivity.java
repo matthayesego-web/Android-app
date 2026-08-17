@@ -48,11 +48,14 @@ public class MemberDailyActivity extends Activity {
             try{
                 AuthSession session=TornApiClient.cachedSession(key);if(session==null)session=TornApiClient.authenticate(key);
                 final AuthSession verified=session;
-                pool=Executors.newFixedThreadPool(3);
-                Future<JSONObject> selfFuture=pool.submit(()->TornApiClient.getJson("/user?selections=bars,cooldowns,travel,refills,organizedcrime,perks,factionbalance",key));
-                Future<JSONObject> warFuture=pool.submit(()->{try{return TornApiClient.getJson("/faction/wars",key);}catch(Exception ignored){return new JSONObject();}});
-                Future<JSONObject> membersFuture=pool.submit(()->{try{return TornApiClient.getJson("/faction/"+verified.factionId+"/members",key);}catch(Exception ignored){return new JSONObject();}});
+                pool=Executors.newFixedThreadPool(4);
+                Future<JSONObject> selfFuture=pool.submit(()->loadSelfSnapshot(key));
+                Future<JSONObject> perksFuture=pool.submit(()->safeJson("/user/perks",key));
+                Future<JSONObject> warFuture=pool.submit(()->safeJson("/faction/wars",key));
+                Future<JSONObject> membersFuture=pool.submit(()->safeJson("/faction/"+verified.factionId+"/members",key));
                 JSONObject self=selfFuture.get();
+                JSONObject perksRoot=perksFuture.get();
+                JSONObject perks=perksRoot.optJSONObject("perks");if(perks!=null)self.put("perks",perks);
                 WarStatus war=WarStatus.from(warFuture.get(),verified.factionId);
                 JSONObject membersRoot=membersFuture.get();
                 Standing standing=findStanding(membersRoot.optJSONArray("members"),verified.playerId,verified.position);
@@ -62,14 +65,33 @@ public class MemberDailyActivity extends Activity {
                 if(chainStart>0||warStart>0){long from=chainStart>0&&warStart>0?Math.min(chainStart,warStart):Math.max(chainStart,warStart);JSONArray attacks=TornApiClient.getPagedArray("/user/attacks?filters=outgoing&from="+from+"&to="+now+"&sort=DESC&limit=100",key,"attacks",8);for(int i=0;i<attacks.length();i++){JSONObject a=attacks.optJSONObject(i);if(a==null)continue;long started=a.optLong("started",a.optLong("timestamp_started",0));if(warStart>0&&started>=warStart&&a.optBoolean("is_ranked_war",false))warHits++;if(chainStart>0&&started>=chainStart&&a.optInt("chain",0)>0&&a.optDouble("respect_gain",0d)>0&&!a.optBoolean("is_interrupted",false))chainHits++;}}
                 AuthSession finalSession=verified;int finalChainHits=chainHits,finalWarHits=warHits;Standing finalStanding=standing;
                 runOnUiThread(()->render(finalSession,self,war,chain,finalChainHits,finalWarHits,finalStanding));
-            }catch(Exception e){renderError(e.getMessage()==null?"Unable to build your daily snapshot.":e.getMessage());}
+            }catch(Exception e){renderError(cleanError(e));}
             finally{if(pool!=null)pool.shutdownNow();}
         },"TornFCA-MyDay").start();
     }
 
+    /** Keep current v2 selections together for latency, but fall back to individual endpoints if Torn rejects a field bundle. */
+    private JSONObject loadSelfSnapshot(String key)throws Exception{
+        try{return TornApiClient.getJson("/user?selections=bars,cooldowns,travel,refills,organizedcrime,money",key);}
+        catch(Exception combinedFailure){
+            JSONObject out=new JSONObject();int loaded=0;
+            loaded+=copyObject(out,safeJson("/user/bars",key),"bars");
+            loaded+=copyObject(out,safeJson("/user/cooldowns",key),"cooldowns");
+            loaded+=copyObject(out,safeJson("/user/travel",key),"travel");
+            loaded+=copyObject(out,safeJson("/user/refills",key),"refills");
+            loaded+=copyObject(out,safeJson("/user/organizedcrime",key),"organizedCrime");
+            loaded+=copyObject(out,safeJson("/user/money",key),"money");
+            if(loaded==0)throw combinedFailure;
+            return out;
+        }
+    }
+    private JSONObject safeJson(String path,String key){try{return TornApiClient.getJson(path,key);}catch(Exception ignored){return new JSONObject();}}
+    private int copyObject(JSONObject into,JSONObject from,String key){if(from==null)return 0;JSONObject value=from.optJSONObject(key);if(value==null)return 0;try{into.put(key,value);return 1;}catch(Exception ignored){return 0;}}
+    private String cleanError(Throwable error){Throwable t=error;while(t.getCause()!=null&&t.getCause()!=t)t=t.getCause();String message=t.getMessage();if(message==null||message.isBlank())return"Unable to build your daily snapshot.";if(message.contains("Wrong fields"))return"Torn rejected one of the requested My Day fields. TornFCA has switched to compatibility mode; tap Retry once.";return message;}
+
     private void render(AuthSession session,JSONObject self,WarStatus war,JSONObject chain,int chainHits,int warHits,Standing standing){
         ScrollView s=shell();LinearLayout r=root(s);header(r,session.factionName+" • "+session.playerName);
-        JSONObject bars=self.optJSONObject("bars"),cooldowns=self.optJSONObject("cooldowns"),travel=self.optJSONObject("travel"),refills=self.optJSONObject("refills"),perks=self.optJSONObject("perks"),balance=self.optJSONObject("factionBalance");OcSummary oc=readOc(self.optJSONObject("organizedCrime"),session.playerId);long now=System.currentTimeMillis()/1000L;
+        JSONObject bars=self.optJSONObject("bars"),cooldowns=self.optJSONObject("cooldowns"),travel=self.optJSONObject("travel"),refills=self.optJSONObject("refills"),perks=self.optJSONObject("perks"),moneyRoot=self.optJSONObject("money"),balance=moneyRoot==null?null:moneyRoot.optJSONObject("faction");OcSummary oc=readOc(self.optJSONObject("organizedCrime"),session.playerId);long now=System.currentTimeMillis()/1000L;
 
         section(r,"WHAT SHOULD I DO NEXT?");String action;int actionColor=GREEN;if(war.isLive(now)&&warHits==0){action="War is live — you have no verified ranked-war hits yet. Open My War when you're ready to contribute.";actionColor=GOLD;}else if(chain!=null&&chain.optInt("current",0)>0&&chain.optInt("timeout",0)<=120){action="The faction chain is active and its timer is getting low. If you're able to hit, this is the priority.";actionColor=RED;}else if(oc.assigned&&oc.itemRequired&&!oc.itemAvailable){action="Your organized crime needs an item that Torn reports as unavailable. Check your OC before it is ready.";actionColor=GOLD;}else if(barFull(bars,"energy")){action="Your energy is full. This is a good time to train or use it before regeneration is wasted.";actionColor=GREEN;}else if(chain!=null&&chain.optInt("current",0)>0){action="The faction chain is active. Your current-chain contribution is "+chainHits+" verified hit"+(chainHits==1?"":"s")+".";actionColor=BLUE;}else if(cooldowns!=null&&cooldowns.optInt("drug",1)==0){action="Drug cooldown is clear. No urgent faction obligation is showing right now.";actionColor=GREEN;}else action="No urgent faction obligation is showing right now. Keep an eye on your OC, energy and upcoming war status.";LinearLayout next=card(actionColor);next.addView(text(action,17,TEXT,true));add(r,next);
 
