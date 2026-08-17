@@ -13,11 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Find remaining legacy faction restriction
+      - name: Trace legacy Activity references and restriction
         run: |
-          echo 'Searching current source tree for compiled Duck Force-only restriction...'
+          echo 'References to ToolkitActivity/MainActivity outside their own files:'
+          grep -R -n -E 'ToolkitActivity|MainActivity' app/src/main/java \
+            --exclude=ToolkitActivity.java --exclude=MainActivity.java || true
+          echo 'Remaining exact Duck Force-only restriction:'
           if grep -R -n -F 'This build is restricted to Duck Force members.' app/src/main; then
-            echo 'Forbidden legacy restriction is still present.'
             exit 1
           fi
           echo 'No exact legacy restriction found in app/src/main.'
