@@ -13,22 +13,54 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Verify side-by-side beta overhaul
+      - name: Verify side-by-side beta command console
         run: |
           set -euo pipefail
           GRADLE=app/build.gradle.kts
-          HOTFIX=app/src/main/java/com/matthayesego/duckforcetoolkit/CurrentShellVisualHotfix.java
+          GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          BETA=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          UI=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandUi.java
+          MANIFEST=app/src/main/AndroidManifest.xml
+
           test -f app/src/main/res/drawable/tornfca_beta_crest.xml
           test -f app/src/beta/res/mipmap-anydpi-v26/ic_launcher.xml
           test -f app/src/beta/res/mipmap-anydpi/ic_launcher.xml
-          grep -q 'versionName = "0.9.32"' "$GRADLE"
-          grep -q 'versionCode = 49' "$GRADLE"
+          test -f "$BETA"
+          test -f "$UI"
+
+          grep -q 'versionName = "0.9.33"' "$GRADLE"
+          grep -q 'versionCode = 50' "$GRADLE"
           grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
           grep -q 'manifestPlaceholders\["appLabel"\] = "Torn FCA Beta"' "$GRADLE"
-          grep -q 'BuildConfig.APPLICATION_ID.endsWith(".beta")' "$HOTFIX"
-          grep -q 'R.drawable.tornfca_beta_crest' "$HOTFIX"
-          grep -q 'styleHeroHeader' "$HOTFIX"
-          grep -q 'styleCard' "$HOTFIX"
-          grep -q 'polishCurrentNavItem' "$HOTFIX"
-          grep -q 'replace("Duck Force","Faction")' "$HOTFIX"
-          echo 'Torn FCA Beta overhaul audit passed.'
+
+          grep -q 'BetaCommandActivity.class' "$GATE"
+          grep -q 'BuildConfig.APPLICATION_ID.endsWith(".beta")' "$GATE"
+          grep -q 'BetaCommandActivity' "$MANIFEST"
+
+          # This must be a new information architecture, not the v0.9.32 runtime recolor.
+          grep -q 'tornfca-command-shell-v2' "$BETA"
+          grep -q 'TORN FCA BETA' "$BETA"
+          grep -q 'addIdentityHero' "$BETA"
+          grep -q 'addQuickGrid' "$BETA"
+          grep -q 'addFeatured' "$BETA"
+          grep -q 'addMetrics' "$BETA"
+          grep -q 'renderTraining' "$BETA"
+          grep -q 'renderOperations' "$BETA"
+          grep -q 'navItem("Home"' "$BETA"
+          grep -q 'navItem("Members"' "$BETA"
+          grep -q 'navItem("Training"' "$BETA"
+          grep -q 'navItem("Operations"' "$BETA"
+          grep -q 'navItem("More"' "$BETA"
+          grep -q 'tornfca-profile-avatar' "$BETA"
+          grep -q 'trainingBaselineLabel' "$BETA"
+
+          grep -q 'CommandArtView' "$UI"
+          grep -q 'RingView' "$UI"
+          grep -q 'featuredPanel' "$UI"
+          grep -q 'quickTile' "$UI"
+          grep -q 'metricTile' "$UI"
+
+          # The old runtime hotfix must not be installed into the beta command console.
+          grep -q 'if(!BuildConfig.APPLICATION_ID.endsWith(".beta"))CurrentShellVisualHotfix.install' "$GATE"
+
+          echo 'Torn FCA Beta command-console overhaul audit passed.'
