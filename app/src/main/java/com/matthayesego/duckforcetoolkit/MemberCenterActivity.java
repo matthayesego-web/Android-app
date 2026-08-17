@@ -21,8 +21,8 @@ public class MemberCenterActivity extends Activity {
         addLaunch(r,"TODAY","My Day","See your bars, cooldowns, refills, OC, chain, current war and anything that may need your attention.",TornFcaUi.GREEN,MemberDailyActivity.class,null,"Open My Day");
 
         TornFcaUi.addSection(this,r,"Daily & readiness");
-        addLaunch(r,"WAR PREP","My War Prep","Check your personal readiness and work through a checklist for the current or upcoming war.",TornFcaUi.GOLD,WarPrepActivity.class,null,"Open War Prep");
-        addLaunch(r,"WAR","My War","See your current ranked-war participation and your recent completed wars.",TornFcaUi.RED,MemberWarActivity.class,null,"Open My War");
+        addLaunch(r,"WAR PREP","My War Prep","Check your personal readiness and work through a checklist for current faction warfare.",TornFcaUi.GOLD,WarPrepActivity.class,null,"Open War Prep");
+        addLaunch(r,"WAR","War Center","Choose Ranked War or Territories. Follow the mode your faction is using, including personal participation and recent history.",TornFcaUi.RED,null,FeatureRouterActivity.TARGET_WAR,"Open War Center");
         addLaunch(r,"OC","My Organized Crime","See your own OC assignment and readiness. Faction-wide OC details are shown only to leaders who have access.",TornFcaUi.PURPLE,null,FeatureRouterActivity.TARGET_OC,"Open My OC");
         addLaunch(r,"CHAIN","Chain Status","See the current faction chain and your participation.",TornFcaUi.BLUE,null,FeatureRouterActivity.TARGET_CHAIN,"Open Chain Status");
 
