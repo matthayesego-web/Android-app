@@ -1,0 +1,280 @@
+package com.matthayesego.duckforcetoolkit;
+
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Outline;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import java.io.File;
+import java.util.Locale;
+
+/**
+ * Side-by-side beta command console. This is intentionally a new screen architecture rather than
+ * a reskin of the stable TornFCA shell. The proven authentication, routing and feature Activities
+ * remain underneath while the beta experiments with the next visual system.
+ */
+public class BetaCommandActivity extends TornFcaActivity {
+    public static final String EXTRA_SECTION="section";
+    private static final String FRAME_TAG="tornfca-command-shell-v2";
+
+    private LinearLayout pageHost;
+    private LinearLayout bottomNav;
+    private Identity identity;
+    private String currentSection="Home";
+
+    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);}
+
+    @Override public void setContentView(View view){
+        super.setContentView(view);
+        ViewGroup root=findViewById(android.R.id.content);
+        if(root==null)return;
+        forceCurrentVersion(root);
+        if(isLegacyAuthenticatedHome(root))installCommandShell(root);
+    }
+
+    @Override protected void onResume(){
+        super.onResume();
+        ViewGroup root=findViewById(android.R.id.content);
+        if(root==null)return;
+        forceCurrentVersion(root);
+        if(isLegacyAuthenticatedHome(root))installCommandShell(root);
+        else if(isCommandShell(root)){
+            Identity now=resolveIdentity();
+            if(identity==null||!identity.sameAs(now))installCommandShell(root);
+            else applyCachedAvatar(root);
+        }
+    }
+
+    private boolean isCommandShell(ViewGroup root){return root.getChildCount()>0&&FRAME_TAG.equals(root.getChildAt(0).getTag());}
+    private boolean isLegacyAuthenticatedHome(View root){
+        if(root==null)return false;
+        if(root instanceof ViewGroup&&isCommandShell((ViewGroup)root))return false;
+        return containsText(root,"Welcome back,")&&containsText(root,"War");
+    }
+
+    private void installCommandShell(ViewGroup host){
+        identity=resolveIdentity();
+        host.removeAllViews();
+        getWindow().setStatusBarColor(TornFcaCommandUi.BG);
+        getWindow().setNavigationBarColor(TornFcaCommandUi.BG);
+
+        LinearLayout frame=TornFcaCommandUi.vertical(this);
+        frame.setTag(FRAME_TAG);
+        frame.setBackgroundColor(TornFcaCommandUi.BG);
+
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroll.setBackgroundColor(TornFcaCommandUi.BG);
+        int l=TornFcaCommandUi.dp(this,13),t=TornFcaCommandUi.dp(this,7),r=TornFcaCommandUi.dp(this,13),b=TornFcaCommandUi.dp(this,22);
+        scroll.setPadding(l,t,r,b);
+        scroll.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(l+i.getSystemWindowInsetLeft(),t+i.getSystemWindowInsetTop(),r+i.getSystemWindowInsetRight(),b);return i;});
+
+        LinearLayout column=TornFcaCommandUi.vertical(this);
+        addBrandBar(column);
+        addIdentityHero(column);
+        pageHost=TornFcaCommandUi.vertical(this);
+        column.addView(pageHost,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        scroll.addView(column,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        frame.addView(scroll,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f));
+
+        bottomNav=buildBottomNav();
+        frame.addView(bottomNav,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        host.addView(frame,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+        scroll.requestApplyInsets();
+        bottomNav.requestApplyInsets();
+
+        String requested=getIntent()==null?null:getIntent().getStringExtra(EXTRA_SECTION);
+        renderRequested(requested);
+        host.post(()->applyCachedAvatar(host));
+    }
+
+    private Identity resolveIdentity(){
+        String key=new SecureApiKeyStore(this).load();
+        String player="Member",faction="Faction",position="Member";
+        int playerId=0,factionId=0;boolean factionApi=false;
+        if(key!=null&&!key.isBlank()){
+            AuthSession hot=TornApiClient.cachedSession(key);
+            if(hot!=null){
+                player=clean(hot.playerName,"Member");faction=clean(hot.factionName,"Faction");position=clean(hot.position,"Member");
+                playerId=hot.playerId;factionId=hot.factionId;factionApi=hot.factionApiAccess;
+            }else{
+                FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);
+                if(scope!=null){player=clean(scope.playerName,"Member");faction=clean(scope.factionName,"Faction");position=clean(scope.position,"Member");playerId=scope.playerId;factionId=scope.factionId;factionApi=scope.factionApiAccess;}
+            }
+        }
+        boolean preview=DeveloperPreviewStore.isMemberPreview(this);
+        if(preview)position="Member Preview";
+        return new Identity(playerId,player,factionId,faction,position,factionApi,!preview&&AccessPolicy.isLeaderPosition(position));
+    }
+
+    private String clean(String value,String fallback){return value==null||value.trim().isEmpty()?fallback:value.trim();}
+
+    private void applyCachedAvatar(View root){
+        if(identity==null||identity.playerId<=0||root==null)return;
+        ImageView avatar=findAvatar(root);if(avatar==null)return;
+        File file=new File(getCacheDir(),"torn-profile-"+identity.playerId+".img");if(!file.exists())return;
+        try{Bitmap bitmap=BitmapFactory.decodeFile(file.getAbsolutePath());if(bitmap!=null)avatar.setImageBitmap(bitmap);}catch(Exception ignored){}
+    }
+    private ImageView findAvatar(View view){
+        if(view instanceof ImageView&&"tornfca-profile-avatar".equals(view.getTag()))return(ImageView)view;
+        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){ImageView f=findAvatar(g.getChildAt(i));if(f!=null)return f;}}
+        return null;
+    }
+
+    private void addBrandBar(LinearLayout root){
+        LinearLayout bar=TornFcaCommandUi.horizontal(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(TornFcaCommandUi.dp(this,7),TornFcaCommandUi.dp(this,7),TornFcaCommandUi.dp(this,7),TornFcaCommandUi.dp(this,9));
+        ImageView mark=new ImageView(this);mark.setImageResource(R.drawable.tornfca_beta_crest);mark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);bar.addView(mark,new LinearLayout.LayoutParams(TornFcaCommandUi.dp(this,38),TornFcaCommandUi.dp(this,38)));
+        TextView label=TornFcaCommandUi.text(this,"TORN FCA BETA",13.5f,TornFcaCommandUi.GOLD_2,true);label.setLetterSpacing(.18f);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f);lp.leftMargin=TornFcaCommandUi.dp(this,10);bar.addView(label,lp);
+        TextView bell=TornFcaCommandUi.text(this,"◉",18,TornFcaCommandUi.GOLD_2,false);bell.setGravity(Gravity.CENTER);bell.setContentDescription("Notifications");bell.setClickable(true);bell.setFocusable(true);bell.setOnClickListener(v->openActivity(NotificationInboxActivity.class));bar.addView(bell,new LinearLayout.LayoutParams(TornFcaCommandUi.dp(this,42),TornFcaCommandUi.dp(this,42)));
+        root.addView(bar,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
+    private void addIdentityHero(LinearLayout root){
+        LinearLayout hero=TornFcaCommandUi.horizontal(this);hero.setGravity(Gravity.CENTER_VERTICAL);hero.setPadding(TornFcaCommandUi.dp(this,14),TornFcaCommandUi.dp(this,13),TornFcaCommandUi.dp(this,14),TornFcaCommandUi.dp(this,13));hero.setBackground(TornFcaCommandUi.gradient(this,new int[]{Color.rgb(15,21,31),Color.rgb(8,12,22),Color.rgb(20,14,43)},24,Color.argb(190,238,185,83),1));hero.setElevation(TornFcaCommandUi.dp(this,5));
+        ImageView avatar=new ImageView(this);avatar.setTag("tornfca-profile-avatar");avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);avatar.setImageResource(R.drawable.tornfca_beta_crest);GradientDrawable bg=new GradientDrawable();bg.setShape(GradientDrawable.OVAL);bg.setColor(TornFcaCommandUi.PANEL_3);bg.setStroke(TornFcaCommandUi.dp(this,2),TornFcaCommandUi.GOLD);avatar.setBackground(bg);avatar.setClipToOutline(true);avatar.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View v,Outline o){o.setOval(0,0,v.getWidth(),v.getHeight());}});hero.addView(avatar,new LinearLayout.LayoutParams(TornFcaCommandUi.dp(this,92),TornFcaCommandUi.dp(this,92)));
+        LinearLayout copy=TornFcaCommandUi.vertical(this);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f);cp.leftMargin=TornFcaCommandUi.dp(this,13);hero.addView(copy,cp);
+        TextView beta=TornFcaCommandUi.text(this,"BETA   •   v"+TornFcaBrand.VERSION,9.5f,TornFcaCommandUi.PURPLE_2,true);beta.setLetterSpacing(.10f);copy.addView(beta);
+        TextView name=TornFcaCommandUi.text(this,identity.playerName,27,TornFcaCommandUi.TEXT,true);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);np.topMargin=TornFcaCommandUi.dp(this,6);copy.addView(name,np);
+        TextView meta=TornFcaCommandUi.text(this,identity.factionName+"  •  "+identity.position,12.5f,TornFcaCommandUi.MUTED,false);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);mp.topMargin=TornFcaCommandUi.dp(this,4);copy.addView(meta,mp);
+        TextView expand=TornFcaCommandUi.text(this,"⌄",22,TornFcaCommandUi.PURPLE_2,false);expand.setGravity(Gravity.CENTER);hero.addView(expand,new LinearLayout.LayoutParams(TornFcaCommandUi.dp(this,38),TornFcaCommandUi.dp(this,44)));
+        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);hp.bottomMargin=TornFcaCommandUi.dp(this,18);root.addView(hero,hp);
+    }
+
+    private LinearLayout buildBottomNav(){
+        LinearLayout nav=TornFcaCommandUi.horizontal(this);nav.setGravity(Gravity.CENTER);nav.setPadding(TornFcaCommandUi.dp(this,6),TornFcaCommandUi.dp(this,7),TornFcaCommandUi.dp(this,6),TornFcaCommandUi.dp(this,7));nav.setBackground(TornFcaCommandUi.gradient(this,new int[]{Color.rgb(12,14,28),Color.rgb(5,9,15)},24,Color.rgb(42,51,70),1));nav.setElevation(TornFcaCommandUi.dp(this,10));
+        nav.addView(navItem("Home",R.drawable.ic_nav_home,this::renderHome),navLp());
+        nav.addView(navItem("Members",R.drawable.ic_nav_faction,this::renderMembers),navLp());
+        nav.addView(navItem("Training",R.drawable.ic_nav_training,this::renderTraining),navLp());
+        nav.addView(navItem("Operations",R.drawable.ic_nav_war,this::renderOperations),navLp());
+        nav.addView(navItem("More",R.drawable.ic_nav_more,this::renderMore),navLp());
+        int base=TornFcaCommandUi.dp(this,7);nav.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(TornFcaCommandUi.dp(this,6),TornFcaCommandUi.dp(this,7),TornFcaCommandUi.dp(this,6),base+i.getSystemWindowInsetBottom());return i;});return nav;
+    }
+    private LinearLayout.LayoutParams navLp(){return new LinearLayout.LayoutParams(0,TornFcaCommandUi.dp(this,70),1f);}
+    private LinearLayout navItem(String label,int icon,Runnable action){
+        LinearLayout item=TornFcaCommandUi.vertical(this);item.setTag("command-nav:"+label);item.setGravity(Gravity.CENTER);item.setClickable(true);item.setFocusable(true);item.setOnClickListener(v->action.run());
+        ImageView iv=new ImageView(this);Drawable d=getDrawable(icon);if(d!=null){d=d.mutate();d.setTint(TornFcaCommandUi.STEEL);iv.setImageDrawable(d);}item.addView(iv,new LinearLayout.LayoutParams(TornFcaCommandUi.dp(this,26),TornFcaCommandUi.dp(this,26)));
+        TextView text=TornFcaCommandUi.text(this,label,9.2f,TornFcaCommandUi.MUTED,false);text.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=TornFcaCommandUi.dp(this,5);item.addView(text,tp);return item;
+    }
+    private void selectNav(String label){
+        if(bottomNav==null)return;
+        for(int i=0;i<bottomNav.getChildCount();i++){
+            View raw=bottomNav.getChildAt(i);if(!(raw instanceof LinearLayout))continue;LinearLayout item=(LinearLayout)raw;boolean selected=("command-nav:"+label).equals(String.valueOf(item.getTag()));
+            item.setBackground(selected?TornFcaCommandUi.gradient(this,new int[]{Color.rgb(62,44,23),Color.rgb(31,24,21)},18,TornFcaCommandUi.GOLD,1):null);item.setElevation(selected?TornFcaCommandUi.dp(this,5):0);
+            for(int j=0;j<item.getChildCount();j++){View child=item.getChildAt(j);if(child instanceof ImageView){Drawable d=((ImageView)child).getDrawable();if(d!=null)d.setTint(selected?TornFcaCommandUi.GOLD_2:TornFcaCommandUi.STEEL);}else if(child instanceof TextView)((TextView)child).setTextColor(selected?TornFcaCommandUi.GOLD_2:TornFcaCommandUi.MUTED);}
+        }
+    }
+
+    private void renderRequested(String section){
+        String s=section==null?"":section.trim().toLowerCase(Locale.US);
+        if(s.equals("faction")||s.equals("members"))renderMembers();
+        else if(s.equals("war")||s.equals("leadership")||s.equals("operations"))renderOperations();
+        else if(s.equals("training"))renderTraining();
+        else if(s.equals("more"))renderMore();
+        else renderHome();
+    }
+    private void beginPage(String section,String title,String subtitle){currentSection=section;pageHost.removeAllViews();selectNav(section);LinearLayout heading=TornFcaCommandUi.sectionHeading(this,title,subtitle,TornFcaCommandUi.GOLD);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);hp.bottomMargin=TornFcaCommandUi.dp(this,16);pageHost.addView(heading,hp);}
+
+    private void renderHome(){
+        beginPage("Home","Command Center","Everything important, organized around what you need to do next.");
+        addQuickGrid(
+                new Tile(R.drawable.ic_nav_home,"My Day","Daily snapshot",TornFcaCommandUi.GREEN,()->openActivity(MemberDailyActivity.class)),
+                new Tile(R.drawable.ic_nav_war,"War Prep","Get ready",TornFcaCommandUi.GOLD,()->openActivity(WarPrepActivity.class)),
+                new Tile(R.drawable.ic_nav_faction,"Members","Faction tools",TornFcaCommandUi.PURPLE,this::renderMembers),
+                new Tile(R.drawable.ic_nav_more,"Alerts","Inbox",TornFcaCommandUi.GOLD,()->openActivity(NotificationInboxActivity.class)));
+        addFeatured("FEATURED","My Day","Bars, cooldowns, organized crime, chain and warfare readiness in one personal command view.","Open My Day",TornFcaCommandUi.PURPLE,()->openActivity(MemberDailyActivity.class));
+        LinearLayout readiness=TornFcaCommandUi.panel(this);addPanelTitle(readiness,"Readiness Snapshot","Your most useful personal jump points");addMetrics(readiness,new Metric("TODAY","OPEN","Daily status","Personal snapshot",TornFcaCommandUi.PURPLE),new Metric("WAR PREP","READY","Checklist","Open when needed",TornFcaCommandUi.GOLD),new Metric("ALERTS","INBOX","Notifications","Device inbox",TornFcaCommandUi.PURPLE));addPanel(readiness);
+        if(identity.leader){LinearLayout lead=TornFcaCommandUi.panel(this);addPanelTitle(lead,"Leadership Radar","Exceptions and member review live here, not on the main dashboard");addAction(lead,R.drawable.ic_nav_leadership,"Needs Attention","Inactivity, war gaps, OC gaps and availability exceptions","Review",TornFcaCommandUi.GOLD,()->openActivity(LeadershipAttentionActivity.class));addAction(lead,R.drawable.ic_nav_faction,"Activity Tracker","Faction-wide activity review","Open",TornFcaCommandUi.PURPLE,()->openFeature(FeatureRouterActivity.TARGET_ACTIVITY));addPanel(lead);}
+        addFooter();
+    }
+
+    private void renderMembers(){
+        beginPage("Members","Members","Faction information, roster tools, resources and community in one place.");
+        addQuickGrid(
+                new Tile(R.drawable.ic_nav_faction,"Overview","Faction status",TornFcaCommandUi.GOLD,()->openActivity(MemberFactionActivity.class)),
+                new Tile(R.drawable.ic_nav_faction,"Directory","Find members",TornFcaCommandUi.PURPLE,()->openActivity(MemberDirectoryActivity.class)),
+                new Tile(R.drawable.ic_nav_more,"Resources","Rules & guides",TornFcaCommandUi.GOLD,()->openActivity(FactionResourcesActivity.class)),
+                new Tile(R.drawable.ic_nav_more,"Community","OC & chain",TornFcaCommandUi.PURPLE,()->openFeature(FeatureRouterActivity.TARGET_OC)));
+        addFeatured("FACTION HUB","Faction Overview","Open current faction information, then move directly into roster, resources or community tools.","Open Faction Overview",TornFcaCommandUi.GOLD,()->openActivity(MemberFactionActivity.class));
+        LinearLayout p=TornFcaCommandUi.panel(this);addPanelTitle(p,"Member & Community Tools","Compact tools replace the old wall of matching cards");addAction(p,R.drawable.ic_nav_faction,"Faction Directory","Search roster and open member information","Directory",TornFcaCommandUi.PURPLE,()->openActivity(MemberDirectoryActivity.class));addAction(p,R.drawable.ic_nav_more,"Faction Resources","Onboarding, rules, guides and shortcuts","Resources",TornFcaCommandUi.GOLD,()->openActivity(FactionResourcesActivity.class));addAction(p,R.drawable.ic_nav_faction,"My Organized Crime","Personal OC status and team timing","OC",TornFcaCommandUi.GREEN,()->openFeature(FeatureRouterActivity.TARGET_OC));addAction(p,R.drawable.ic_nav_war,"Chain","Current chain tools and participation","Chain",TornFcaCommandUi.GOLD,()->openFeature(FeatureRouterActivity.TARGET_CHAIN));addAction(p,R.drawable.ic_nav_faction,"Faction Strength","Strength comparison tools","Strength",TornFcaCommandUi.PURPLE,()->openFeature(FeatureRouterActivity.TARGET_STRENGTH));addAction(p,R.drawable.ic_nav_more,"Faction Chat","Community chat companion","Chat",TornFcaCommandUi.BLUE,()->openActivity(FactionChatActivity.class));addPanel(p);addFooter();
+    }
+
+    private void renderTraining(){
+        beginPage("Training","Training","Training tools, guidance and tracking in one place.");
+        addQuickGrid(
+                new Tile(R.drawable.ic_nav_more,"Guides","Learn & improve",TornFcaCommandUi.PURPLE,()->openActivity(TrainingCenterActivity.class)),
+                new Tile(R.drawable.ic_nav_training,"Progress","Track performance",TornFcaCommandUi.GOLD,()->openActivity(TrainingProgressActivity.class)),
+                new Tile(R.drawable.ic_nav_faction,"Management",identity.leader?"Publish & set":"View guidance",TornFcaCommandUi.PURPLE,()->openActivity(identity.leader?TrainingAdminActivity.class:TrainingCenterActivity.class)),
+                new Tile(R.drawable.ic_nav_war,"Plans","War readiness",TornFcaCommandUi.GOLD,()->openActivity(WarPrepActivity.class)));
+        addFeatured("FEATURED","Training Center","Starter guidance, best practices and faction-published training resources.","Explore Training Center",TornFcaCommandUi.PURPLE,()->openActivity(TrainingCenterActivity.class));
+        LinearLayout overview=TornFcaCommandUi.panel(this);addPanelTitle(overview,"Your Progress Overview","Live entry points backed by your existing training tools");String tracked=trainingBaselineLabel();addMetrics(overview,new Metric("TRAINING","OPEN","My Progress",tracked,TornFcaCommandUi.PURPLE),new Metric("BATTLE STATS","SET","Baseline","Device-local",TornFcaCommandUi.GOLD),new Metric("ROUTINE","PREP","War readiness","Open checklist",TornFcaCommandUi.PURPLE));addPanel(overview);
+        LinearLayout management=TornFcaCommandUi.panel(this);addPanelTitle(management,identity.leader?"Leadership & Management":"Training Library",identity.leader?"Publish faction-scoped guidance and expectations":"Guidance and progress stay available to every member");addAction(management,R.drawable.ic_nav_training,"Training Center","Published resources and guidance","Explore",TornFcaCommandUi.PURPLE,()->openActivity(TrainingCenterActivity.class));addAction(management,R.drawable.ic_nav_training,"My Training Progress","Battle-stat and Xanax baseline tracking","Progress",TornFcaCommandUi.GOLD,()->openActivity(TrainingProgressActivity.class));if(identity.leader)addAction(management,R.drawable.ic_nav_leadership,"Guide & Training Management","Publish guides and faction expectations","Manage",TornFcaCommandUi.PURPLE,()->openActivity(TrainingAdminActivity.class));addPanel(management);addFooter();
+    }
+
+    private String trainingBaselineLabel(){if(identity==null||identity.playerId<=0||identity.factionId<=0)return"Open tracker";SharedPreferences p=getSharedPreferences("tornfca_training_progress_v1",MODE_PRIVATE);long at=p.getLong("p"+identity.playerId+"_f"+identity.factionId+"_at",0L);if(at<=0)return"New baseline";long days=Math.max(1,(System.currentTimeMillis()-at+86399999L)/86400000L);return days+" day"+(days==1?"":"s")+" tracked";}
+
+    private void renderOperations(){
+        beginPage("Operations","Operations","Warfare and permission-aware leadership tools in one command workspace.");
+        Runnable fourth=identity.leader?(Runnable)()->openActivity(LeadershipAttentionActivity.class):()->openScopedActivity(WarCenterActivity.class);
+        addQuickGrid(
+                new Tile(R.drawable.ic_nav_war,"Ranked War","Matchup & score",TornFcaCommandUi.RED,()->openScopedActivity(WarCenterActivity.class)),
+                new Tile(R.drawable.ic_nav_war,"Territories","Walls & assaults",TornFcaCommandUi.GOLD,()->openScopedActivity(TerritoryWarActivity.class)),
+                new Tile(R.drawable.ic_nav_training,"War Prep","Personal readiness",TornFcaCommandUi.GREEN,()->openActivity(WarPrepActivity.class)),
+                new Tile(R.drawable.ic_nav_leadership,identity.leader?"Leadership":"War Center",identity.leader?"Command tools":"Warfare tools",TornFcaCommandUi.PURPLE,fourth));
+        addFeatured("WARFARE","Ranked War Command","Matchup, score, timing and dedicated warfare tools without crowding the home dashboard.","Open Ranked War",TornFcaCommandUi.RED,()->openScopedActivity(WarCenterActivity.class));
+        LinearLayout war=TornFcaCommandUi.panel(this);addPanelTitle(war,"Warfare Console","Focused combat operations");addAction(war,R.drawable.ic_nav_war,"Ranked War","Current or upcoming Ranked War center","Open",TornFcaCommandUi.RED,()->openScopedActivity(WarCenterActivity.class));addAction(war,R.drawable.ic_nav_war,"Territory Warfare","Walls, assaults and territory activity","Open",TornFcaCommandUi.GOLD,()->openScopedActivity(TerritoryWarActivity.class));addAction(war,R.drawable.ic_nav_training,"My War Prep","Personal readiness checklist","Prep",TornFcaCommandUi.GREEN,()->openActivity(WarPrepActivity.class));addPanel(war);
+        if(identity.leader){LinearLayout leadership=TornFcaCommandUi.panel(this);addPanelTitle(leadership,"Leadership Command","Administrative tools stay grouped and permission-aware");addAction(leadership,R.drawable.ic_nav_faction,"Activity Tracker","Faction-wide activity history","Activity",TornFcaCommandUi.PURPLE,()->openFeature(FeatureRouterActivity.TARGET_ACTIVITY));addAction(leadership,R.drawable.ic_nav_faction,"Faction Pulse","Quick leadership status snapshot","Pulse",TornFcaCommandUi.GOLD,()->openFeature(FeatureRouterActivity.TARGET_PULSE));addAction(leadership,R.drawable.ic_nav_faction,"Member Dossier","Member lookup and research","Lookup",TornFcaCommandUi.PURPLE,()->openFeature(FeatureRouterActivity.TARGET_LOOKUP));addAction(leadership,R.drawable.ic_nav_war,"War Payouts","Ranked War payout calculator","Payout",TornFcaCommandUi.RED,()->openFeature(FeatureRouterActivity.TARGET_WAR_PAYOUT));addAction(leadership,R.drawable.ic_nav_more,"Banking","Faction payout requests and queue","Banking",TornFcaCommandUi.BLUE,()->openFeature(FeatureRouterActivity.TARGET_BANKING));addAction(leadership,R.drawable.ic_nav_more,"Armory Auditor","Armory audit workspace","Audit",TornFcaCommandUi.GREEN,this::openArmory);addAction(leadership,R.drawable.ic_nav_training,"Training Management","Publish guides and expectations","Manage",TornFcaCommandUi.PURPLE,()->openActivity(TrainingAdminActivity.class));addPanel(leadership);}
+        addFooter();
+    }
+
+    private void renderMore(){
+        beginPage("More","More","Settings, privacy, app information and optional services.");
+        addQuickGrid(
+                new Tile(R.drawable.ic_nav_more,"Settings","Preferences",TornFcaCommandUi.GOLD,()->openActivity(SettingsActivity.class)),
+                new Tile(R.drawable.ic_nav_more,"Legal","Privacy & terms",TornFcaCommandUi.PURPLE,()->openActivity(LegalActivity.class)),
+                new Tile(R.drawable.ic_nav_more,"About","App info",TornFcaCommandUi.BLUE,()->openActivity(AboutActivity.class)),
+                new Tile(R.drawable.ic_nav_more,"Premium","Optional extras",TornFcaCommandUi.GOLD,()->openActivity(PremiumPreviewActivity.class)));
+        addFeatured("APP CONTROL","Torn FCA Beta","This side-by-side install is the visual overhaul test line. The stable app remains separate.","Open Settings",TornFcaCommandUi.GOLD,()->openActivity(SettingsActivity.class));
+        LinearLayout p=TornFcaCommandUi.panel(this);addPanelTitle(p,"App & Account","Everything that does not belong in day-to-day faction operations");addAction(p,R.drawable.ic_nav_more,"Settings","Notifications, API storage, services and account actions","Open",TornFcaCommandUi.GOLD,()->openActivity(SettingsActivity.class));addAction(p,R.drawable.ic_nav_more,"Legal & Privacy","Privacy Policy, Terms, EULA and acknowledgement","Review",TornFcaCommandUi.PURPLE,()->openActivity(LegalActivity.class));addAction(p,R.drawable.ic_nav_more,"About Torn FCA","Version, privacy approach and third-party services","About",TornFcaCommandUi.BLUE,()->openActivity(AboutActivity.class));addAction(p,R.drawable.ic_nav_more,"Torn FCA Premium","Optional history, analytics and convenience","View",TornFcaCommandUi.GOLD,()->openActivity(PremiumPreviewActivity.class));addPanel(p);addFooter();
+    }
+
+    private void addQuickGrid(Tile... specs){
+        LinearLayout row=TornFcaCommandUi.horizontal(this);row.setGravity(Gravity.TOP);
+        for(int i=0;i<specs.length;i++){Tile s=specs[i];LinearLayout tile=TornFcaCommandUi.quickTile(this,s.icon,s.title,s.subtitle,s.accent,s.action);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,TornFcaCommandUi.dp(this,118),1f);if(i>0)lp.leftMargin=TornFcaCommandUi.dp(this,7);row.addView(tile,lp);}
+        LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);rp.bottomMargin=TornFcaCommandUi.dp(this,14);pageHost.addView(row,rp);
+    }
+    private void addFeatured(String badge,String title,String body,String cta,int accent,Runnable action){FrameLayout f=TornFcaCommandUi.featuredPanel(this,badge,title,body,cta,accent,action);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaCommandUi.dp(this,210));lp.bottomMargin=TornFcaCommandUi.dp(this,15);pageHost.addView(f,lp);}
+    private void addPanelTitle(LinearLayout panel,String title,String subtitle){LinearLayout line=TornFcaCommandUi.horizontal(this);line.setGravity(Gravity.CENTER_VERTICAL);View accent=new View(this);accent.setBackground(TornFcaCommandUi.solid(this,TornFcaCommandUi.GOLD,2,Color.TRANSPARENT,0));line.addView(accent,new LinearLayout.LayoutParams(TornFcaCommandUi.dp(this,3),TornFcaCommandUi.dp(this,30)));LinearLayout copy=TornFcaCommandUi.vertical(this);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f);cp.leftMargin=TornFcaCommandUi.dp(this,9);line.addView(copy,cp);copy.addView(TornFcaCommandUi.text(this,title,15,TornFcaCommandUi.TEXT,true));TextView sub=TornFcaCommandUi.text(this,subtitle,10.5f,TornFcaCommandUi.MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=TornFcaCommandUi.dp(this,2);copy.addView(sub,sp);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);lp.bottomMargin=TornFcaCommandUi.dp(this,11);panel.addView(line,lp);}
+    private void addMetrics(LinearLayout panel,Metric... specs){LinearLayout row=TornFcaCommandUi.horizontal(this);for(int i=0;i<specs.length;i++){Metric s=specs[i];LinearLayout view=TornFcaCommandUi.metricTile(this,s.eyebrow,s.center,s.title,s.detail,s.accent);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,TornFcaCommandUi.dp(this,104),1f);if(i>0)lp.leftMargin=TornFcaCommandUi.dp(this,7);row.addView(view,lp);}panel.addView(row,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));}
+    private void addAction(LinearLayout panel,int icon,String title,String subtitle,String value,int accent,Runnable action){LinearLayout row=TornFcaCommandUi.actionRow(this,icon,title,subtitle,value,accent,action);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);lp.topMargin=panel.getChildCount()>1?TornFcaCommandUi.dp(this,7):0;panel.addView(row,lp);}
+    private void addPanel(LinearLayout panel){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);lp.bottomMargin=TornFcaCommandUi.dp(this,15);pageHost.addView(panel,lp);}
+    private void addFooter(){TextView footer=TornFcaCommandUi.text(this,"Torn FCA Beta v"+TornFcaBrand.VERSION+"  •  "+(identity==null?"Faction":identity.factionName),10,TornFcaCommandUi.MUTED,false);footer.setGravity(Gravity.CENTER);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);lp.bottomMargin=TornFcaCommandUi.dp(this,10);pageHost.addView(footer,lp);}
+
+    private void openActivity(Class<?> target){startActivity(new Intent(this,target));}
+    private void openScopedActivity(Class<?> target){Intent i=new Intent(this,target);putScope(i);startActivity(i);}
+    private void openFeature(String target){Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,target);startActivity(i);}
+    private void openArmory(){Intent i=new Intent(this,ToolHostActivity.class);i.putExtra(ToolHostActivity.EXTRA_TOOL,"ARMORY");startActivity(i);}
+    private void putScope(Intent i){if(identity==null)identity=resolveIdentity();i.putExtra(FactionOpsActivity.EXTRA_FACTION_ID,identity.factionId);i.putExtra(FactionOpsActivity.EXTRA_FACTION_NAME,identity.factionName);i.putExtra(FactionOpsActivity.EXTRA_FACTION_API,identity.factionApi);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,identity.factionId);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,identity.factionName);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,identity.factionApi);i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,identity.position);}
+
+    private void forceCurrentVersion(View view){if(view instanceof TextView){TextView t=(TextView)view;CharSequence raw=t.getText();if(raw!=null){String s=raw.toString().replaceAll("v0\\.9\\.\\d+","v"+TornFcaBrand.VERSION);if(!s.equals(raw.toString()))t.setText(s);}}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)forceCurrentVersion(g.getChildAt(i));}}
+    private boolean containsText(View view,String needle){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().toLowerCase(Locale.US).contains(needle.toLowerCase(Locale.US)))return true;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)if(containsText(g.getChildAt(i),needle))return true;}return false;}
+
+    private static final class Tile{final int icon,accent;final String title,subtitle;final Runnable action;Tile(int icon,String title,String subtitle,int accent,Runnable action){this.icon=icon;this.title=title;this.subtitle=subtitle;this.accent=accent;this.action=action;}}
+    private static final class Metric{final String eyebrow,center,title,detail;final int accent;Metric(String eyebrow,String center,String title,String detail,int accent){this.eyebrow=eyebrow;this.center=center;this.title=title;this.detail=detail;this.accent=accent;}}
+    private static final class Identity{final int playerId,factionId;final String playerName,factionName,position;final boolean factionApi,leader;Identity(int playerId,String playerName,int factionId,String factionName,String position,boolean factionApi,boolean leader){this.playerId=playerId;this.playerName=playerName;this.factionId=factionId;this.factionName=factionName;this.position=position;this.factionApi=factionApi;this.leader=leader;}boolean sameAs(Identity o){return o!=null&&playerId==o.playerId&&factionId==o.factionId&&factionApi==o.factionApi&&leader==o.leader&&playerName.equals(o.playerName)&&factionName.equals(o.factionName)&&position.equals(o.position);}}
+}
