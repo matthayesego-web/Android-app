@@ -11,7 +11,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** Tenant-scoped TornFCA community transport for faction chat, training library and FCM device registration. */
+/** Tenant-scoped TornFCA community transport for faction chat, moderation, training library and FCM device registration. */
 public final class CommunityBackendClient {
     private static final String BACKEND_URL=BuildConfig.COMMUNITY_BACKEND_URL==null?"":BuildConfig.COMMUNITY_BACKEND_URL.trim();
     private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android Community";
@@ -22,6 +22,7 @@ public final class CommunityBackendClient {
     public static JSONObject config(String key)throws IOException{return postChecked(request("config",key),"Unable to read community configuration.");}
     public static JSONArray getChatMessages(String key,String channel)throws IOException{JSONObject b=request("chat_list",key);put(b,"channel",channel);JSONObject r=postChecked(b,"Unable to load faction chat.");JSONArray a=r.optJSONArray("messages");return a==null?new JSONArray():a;}
     public static JSONObject sendChatMessage(String key,String channel,String message)throws IOException{JSONObject b=request("chat_send",key);put(b,"channel",channel);put(b,"message",message);return postChecked(b,"Unable to send faction chat message.");}
+    public static JSONObject reportChatMessage(String key,String messageId,String reason)throws IOException{JSONObject b=request("chat_report",key);put(b,"messageId",messageId);put(b,"reason",reason);return postChecked(b,"Unable to report this message.");}
     public static JSONObject trainingLibrary(String key)throws IOException{return postChecked(request("training_library",key),"Unable to load faction training library.");}
     public static JSONObject saveTrainingRules(String key,String statGainTarget,String xanaxTarget,String notes)throws IOException{JSONObject b=request("training_rules_save",key);put(b,"statGainTarget",statGainTarget);put(b,"xanaxTarget",xanaxTarget);put(b,"notes",notes);return postChecked(b,"Unable to save faction training rules.");}
     public static JSONObject saveTrainingGuide(String key,String id,String title,String category,String body)throws IOException{JSONObject b=request("training_guide_save",key);put(b,"id",id);put(b,"title",title);put(b,"category",category);put(b,"body",body);return postChecked(b,"Unable to save faction training guide.");}

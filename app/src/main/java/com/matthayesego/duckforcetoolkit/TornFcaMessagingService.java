@@ -5,7 +5,7 @@ import com.google.firebase.messaging.RemoteMessage;
 
 import java.util.Map;
 
-/** Data-only FCM receiver so TornFCA applies its own categories, inbox and tenant checks. */
+/** Data-only FCM receiver so TornFCA applies its own categories, inbox, tenant checks and chat blocks. */
 public class TornFcaMessagingService extends FirebaseMessagingService {
     @Override public void onNewToken(String token){PushNotifications.onNewToken(this,token);}
     @Override public void onMessageReceived(RemoteMessage message){
@@ -14,6 +14,10 @@ public class TornFcaMessagingService extends FirebaseMessagingService {
         // to that exact faction. Player-targeted messages additionally require the exact player ID.
         if(factionId>0&&currentFaction!=factionId)return;
         if(targetPlayerId>0&&currentPlayer!=targetPlayerId)return;
+        if("chat".equalsIgnoreCase(type)){
+            int authorId=parseInt(value(data,"author_id","0"));
+            if(authorId>0&&BlockedUserStore.isBlocked(this,factionId,authorId))return;
+        }
         if((title.isBlank()||body.isBlank())&&message.getNotification()!=null){if(title.isBlank())title=message.getNotification().getTitle();if(body.isBlank())body=message.getNotification().getBody();}
         NotificationCenter.receive(this,type,title==null?"TornFCA":title,body==null?"":body,factionId);
     }
