@@ -46,7 +46,8 @@ jobs:
           grep -q 'AccessGateActivity" android:exported="true"' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q "v${VERSION_NAME}" app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
-          grep -q "VERSION=\"${VERSION_NAME}\"" app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'VERSION=BuildConfig.VERSION_NAME' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'replace("-internal","").replace("-beta","")' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
           grep -q 'class V095CompanionActivity' app/src/main/java/com/matthayesego/duckforcetoolkit/V095CompanionActivity.java
           grep -q 'BuildConfig.DEVELOPER_ACCESS_SHA256' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
           grep -q 'DEVELOPER_PLAYER_ID' app/build.gradle.kts
