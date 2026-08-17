@@ -13,10 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Reject legacy single-faction restriction
+      - name: Reject obsolete single-faction restrictions
         run: |
-          if grep -R -n -F 'This build is restricted to Duck Force members.' app/src/main; then
-            echo 'Legacy single-faction restriction must not be compiled into TornFCA.'
+          bad=0
+          for needle in \
+            'This build is restricted to Duck Force members.' \
+            'production sign-in gate remains Duck Force-only' \
+            'This preview is restricted to Duck Force.'; do
+            if grep -R -n -F "$needle" app/src/main; then
+              bad=1
+            fi
+          done
+          if [ "$bad" -ne 0 ]; then
+            echo 'Obsolete single-faction restriction messaging must not be compiled into TornFCA.'
             exit 1
           fi
-          echo 'No legacy Duck Force-only authentication restriction found.'
+          echo 'No obsolete Duck Force-only authentication/preview restriction found.'
