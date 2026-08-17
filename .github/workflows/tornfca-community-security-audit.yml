@@ -19,13 +19,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Android notification surface: permission is explicit and the FCM service is never exported.
+          # Android notification surface: permission is explicit, Analytics collection is disabled,
+          # and the FCM service is never exported. FCM itself remains enabled for push delivery.
           grep -q 'android.permission.POST_NOTIFICATIONS' app/src/main/AndroidManifest.xml
+          grep -q 'firebase_analytics_collection_enabled" android:value="false"' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaMessagingService" android:exported="false"' app/src/main/AndroidManifest.xml
           grep -q 'com.google.firebase.MESSAGING_EVENT' app/src/main/AndroidManifest.xml
           grep -q 'if(factionId>0&&currentFaction!=factionId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
           grep -q 'target_player_id' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
           grep -q 'if(targetPlayerId>0&&currentPlayer!=targetPlayerId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+
+          # No Analytics SDK or optional FCM BigQuery delivery export should be introduced silently.
+          if grep -R -n -E 'firebase-analytics|FirebaseAnalytics|setAnalyticsCollectionEnabled|setDeliveryMetricsExportToBigQuery' app; then
+            echo 'Unexpected Analytics/BigQuery delivery-metrics integration detected; review privacy/Data safety before shipping.'
+            exit 1
+          fi
 
           # Cloud sender credentials are server-side only. Firebase client identifiers are allowed.
           if grep -R -n -E 'FIREBASE_PRIVATE_KEY|BEGIN PRIVATE KEY|FIREBASE_CLIENT_EMAIL' app/src; then
