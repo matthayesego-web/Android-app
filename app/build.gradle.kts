@@ -23,8 +23,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.9.19"
+        versionCode = 37
+        versionName = "0.9.20"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
         // Closed-beta developer gate. The temporary PIN remains hash-only, and the console also

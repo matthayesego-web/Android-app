@@ -30,7 +30,7 @@ import java.util.WeakHashMap;
 public final class TornFcaBrand {
     public static final String NAME="TornFCA";
     public static final String LONG_NAME="Torn Faction Companion App";
-    public static final String VERSION="0.9.19";
+    public static final String VERSION="0.9.20";
 
     private static final int[] LEGACY_BRAND_COLORS=new int[]{
             Color.rgb(241,190,86),Color.rgb(241,194,106),Color.rgb(243,184,52),Color.rgb(215,160,68),Color.rgb(242,197,107)
@@ -250,19 +250,20 @@ public final class TornFcaBrand {
                 .replace("DUCK FORCE •","TORNFCA •")
                 .replace("Leadership-focused member lookup with current Torn status and opted-in battle intelligence.","Search members with Torn status, FFScouter estimates and TornStats spy intelligence.")
                 .replace("capped at roughly 12 requests/minute","capped at roughly 30 direct requests/minute")
-                .replace("v0.9.6","v0.9.19")
-                .replace("v0.9.7","v0.9.19")
-                .replace("v0.9.8","v0.9.19")
-                .replace("v0.9.9","v0.9.19")
-                .replace("v0.9.10","v0.9.19")
-                .replace("v0.9.11","v0.9.19")
-                .replace("v0.9.12","v0.9.19")
-                .replace("v0.9.13","v0.9.19")
-                .replace("v0.9.14","v0.9.19")
-                .replace("v0.9.15","v0.9.19")
-                .replace("v0.9.16","v0.9.19")
-                .replace("v0.9.17","v0.9.19")
-                .replace("v0.9.18","v0.9.19");
+                .replace("v0.9.6","v0.9.20")
+                .replace("v0.9.7","v0.9.20")
+                .replace("v0.9.8","v0.9.20")
+                .replace("v0.9.9","v0.9.20")
+                .replace("v0.9.10","v0.9.20")
+                .replace("v0.9.11","v0.9.20")
+                .replace("v0.9.12","v0.9.20")
+                .replace("v0.9.13","v0.9.20")
+                .replace("v0.9.14","v0.9.20")
+                .replace("v0.9.15","v0.9.20")
+                .replace("v0.9.16","v0.9.20")
+                .replace("v0.9.17","v0.9.20")
+                .replace("v0.9.18","v0.9.20")
+                .replace("v0.9.19","v0.9.20");
         if(branded.contains("Encrypted on this device"))branded=branded.replaceAll("v0\\.9\\.\\d+","v"+VERSION);
         return branded;
     }
