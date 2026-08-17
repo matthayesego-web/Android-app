@@ -75,8 +75,11 @@ jobs:
           grep -q 'Log Out / Change API Key' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
           grep -q 'TornApiClient.clearMemoryCache' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
 
-          # Member features remain self/public-faction scoped.
-          grep -q 'factionbalance' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          # Member features remain self/public-faction scoped and tolerate Torn field changes.
+          grep -q 'loadSelfSnapshot' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q '/user/money' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q 'optJSONObject("faction")' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q '/user/perks' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
           grep -q 'Faction Perks' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
           grep -q 'My Faction Standing' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
           grep -q '/members' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
@@ -90,6 +93,15 @@ jobs:
           grep -q 'War wall simulation' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaScreens.java
           grep -q 'isUpcoming' app/src/main/java/com/matthayesego/duckforcetoolkit/WarCenterActivity.java
           grep -q 'isLive' app/src/main/java/com/matthayesego/duckforcetoolkit/WarCenterActivity.java
+
+          # Leadership shell must always expose the operational tools independently of legacy cards.
+          grep -q 'Activity Tracker' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'FeatureRouterActivity.TARGET_ACTIVITY' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'Faction Pulse' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'FeatureRouterActivity.TARGET_PULSE' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'Armory Auditor' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q 'ToolHostActivity.EXTRA_TOOL' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          grep -q '"ARMORY"' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
 
           # Embedded tools must share the native throttle and never receive the actual key in JS.
           grep -q 'TornApiClient.getJsonAbsolute' app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java
