@@ -42,7 +42,7 @@ public class MoreActivity extends Activity {
         LinearLayout premium=card("PREMIUM ROADMAP","Free vs Premium","Core faction work stays free. Premium is reserved for automation, deeper analytics, long history, exports and convenience—not basic faction participation or access.",GOLD);premium.setClickable(true);premium.setOnClickListener(v->startActivity(new Intent(this,PremiumPreviewActivity.class)));add(r,premium);
         LinearLayout about=card("APP INFORMATION","About TornFCA","Purpose, version, data sources, privacy/security boundaries, FFScouter attribution and release status.",BLUE);about.setClickable(true);about.setOnClickListener(v->startActivity(new Intent(this,AboutActivity.class)));add(r,about);
         LinearLayout safety=card("SECURITY","Your data","Torn keys are session-only unless you explicitly choose 7, 30 or 90 day encrypted device retention at login. Shared faction systems use faction_id as their tenant boundary and player_id as identity.",GREEN);add(r,safety);
-        TextView footer=text("TornFCA v0.9.16 • pre-release",11,MUTED,false);footer.setGravity(Gravity.CENTER);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fp.topMargin=dp(8);r.addView(footer,fp);setContentView(s);s.requestApplyInsets();
+        TextView footer=text("TornFCA v"+TornFcaBrand.VERSION+" • pre-release",11,MUTED,false);footer.setGravity(Gravity.CENTER);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fp.topMargin=dp(8);r.addView(footer,fp);setContentView(s);s.requestApplyInsets();
     }
 
     private void logout(){
