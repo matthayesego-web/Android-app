@@ -1,0 +1,66 @@
+name: TornFCA Community Security Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Verify community, push and premium boundaries
+        run: |
+          set -euo pipefail
+
+          # Android notification surface: permission is explicit and the FCM service is never exported.
+          grep -q 'android.permission.POST_NOTIFICATIONS' app/src/main/AndroidManifest.xml
+          grep -q 'TornFcaMessagingService" android:exported="false"' app/src/main/AndroidManifest.xml
+          grep -q 'com.google.firebase.MESSAGING_EVENT' app/src/main/AndroidManifest.xml
+          grep -q 'if(factionId>0&&current!=factionId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+
+          # Cloud sender credentials are server-side only. Firebase client identifiers are allowed.
+          if grep -R -n -E 'FIREBASE_PRIVATE_KEY|BEGIN PRIVATE KEY|FIREBASE_CLIENT_EMAIL' app/src; then
+            echo 'Firebase service-account credentials must never be compiled into Android.'
+            exit 1
+          fi
+          if grep -R -n -E 'Authorization:[[:space:]]*key=|server[_-]?key' app/src/main; then
+            echo 'Legacy FCM server credentials must never be compiled into Android.'
+            exit 1
+          fi
+          grep -q 'BuildConfig.COMMUNITY_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          grep -q 'BACKEND_URL.startsWith("https://")' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+
+          # Chat is tenant-scoped. Leadership content is gated and intentionally never fan-out pushed.
+          grep -q "Number(values\[i\]\[1\])!==user.faction_id" backend/TornFcaCommunityBackend.gs
+          grep -q "c==='leadership'&&!tcLeader_(user.position)" backend/TornFcaCommunityBackend.gs
+          grep -q "if(channel!=='leadership')tcPushToFaction_" backend/TornFcaCommunityBackend.gs
+          grep -q 'tcHash_(apiKey)' backend/TornFcaCommunityBackend.gs
+
+          # Faction announcement push honors the same explicit Torn permission concept.
+          grep -q 'tcCanAnnounce_' backend/TornFcaCommunityBackend.gs
+          grep -q "announcement changes" backend/TornFcaCommunityBackend.gs
+          grep -q "urn:ietf:params:oauth:grant-type:jwt-bearer" backend/TornFcaCommunityBackend.gs
+
+          # Settings remain the player-facing account/privacy control surface.
+          grep -q 'prepareNextSave' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
+          grep -q 'PushNotifications.unregisterAsync' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
+          grep -q 'External Intelligence Providers' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
+
+          # Premium is server/player-ID based; basic faction membership and leadership are not paywalled.
+          grep -q 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAccess.java
+          grep -q 'Permissions, not a paywall' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          grep -q '/user/attacks?filters=outgoing' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+          grep -q 'PremiumAccess.PERSONAL_INSIGHTS' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+
+          # Apps Script must at least parse as JavaScript before deployment.
+          cp backend/TornFcaCommunityBackend.gs /tmp/TornFcaCommunityBackend.js
+          node --check /tmp/TornFcaCommunityBackend.js
+
+          echo 'TornFCA community/push/premium security audit passed.'
