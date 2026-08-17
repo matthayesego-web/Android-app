@@ -25,12 +25,12 @@ import java.util.regex.Pattern;
  */
 public final class TornApiClient {
     private static final String BASE = "https://api.torn.com/v2";
-    private static final String USER_AGENT = "TornFCA/0.9.15 Android";
+    private static final String USER_AGENT = "TornFCA/" + TornFcaBrand.VERSION + " Android";
     private static final Pattern API_KEY = Pattern.compile("^[A-Za-z0-9]{16}$");
     private static final Pattern QUERY_KEY = Pattern.compile("([?&])key=[^&]*", Pattern.CASE_INSENSITIVE);
 
     // Three requests may start promptly for an interactive login. Tokens then refill at one every
-    // two seconds, preserving the same ~30/minute sustained TornFCA ceiling used in v0.9.14.
+    // two seconds, preserving the same ~30/minute sustained TornFCA ceiling.
     private static final long TOKEN_REFILL_MS = 2000L;
     private static final double TOKEN_CAPACITY = 3.0;
     private static double requestTokens = TOKEN_CAPACITY;
@@ -113,7 +113,8 @@ public final class TornApiClient {
                     }
                 }
             } catch (IOException ignored) {
-                // key/info remains the source of truth for the Faction API Access boolean.
+                // key/info remains a useful hint. Individual restricted endpoints are authoritative
+                // when a Leadership tool actually requests their data.
             }
         }
 
@@ -253,7 +254,10 @@ public final class TornApiClient {
     }
 
     private static String canonicalizeTornUrl(String absoluteUrl, String key) throws IOException {
-        if (absoluteUrl == null || !absoluteUrl.startsWith(BASE)) throw new IOException("Refusing non-Torn API URL.");
+        if (absoluteUrl == null) throw new IOException("Refusing non-Torn API URL.");
+        URL parsed;
+        try{parsed=new URL(absoluteUrl);}catch(Exception e){throw new IOException("Refusing invalid Torn API URL.");}
+        if(!"https".equalsIgnoreCase(parsed.getProtocol())||!"api.torn.com".equalsIgnoreCase(parsed.getHost())||!parsed.getPath().startsWith("/v2"))throw new IOException("Refusing non-Torn API URL.");
         String encoded = java.net.URLEncoder.encode(key.trim(), StandardCharsets.UTF_8.name());
         Matcher matcher = QUERY_KEY.matcher(absoluteUrl);
         if (matcher.find()) return matcher.replaceAll("$1key=" + encoded);
@@ -320,11 +324,16 @@ public final class TornApiClient {
         return 0L;
     }
 
-    private static String sessionKey(String key){return Integer.toHexString(key==null?0:key.trim().hashCode());}
-    private static String cacheKey(String url, String key) {String sanitized = url.replaceAll("([?&])key=[^&]*", "$1key=*");return Integer.toHexString(key == null ? 0 : key.hashCode()) + "|" + sanitized;}
+    private static String keyFingerprint(String key){
+        if(key==null)return"";
+        try{java.security.MessageDigest d=java.security.MessageDigest.getInstance("SHA-256");byte[] bytes=d.digest(key.trim().getBytes(StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();for(byte v:bytes)b.append(String.format(java.util.Locale.US,"%02x",v&0xff));return b.toString();}
+        catch(Exception e){return Integer.toHexString(key.trim().hashCode());}
+    }
+    private static String sessionKey(String key){return keyFingerprint(key);}
+    private static String cacheKey(String url, String key) {String sanitized = url.replaceAll("([?&])key=[^&]*", "$1key=*");return keyFingerprint(key) + "|" + sanitized;}
     private static void trimCache() {if (CACHE.size() <= 160) return;long now = System.currentTimeMillis();CACHE.entrySet().removeIf(e -> e.getValue().expiresAtMs <= now);if (CACHE.size() > 200) CACHE.clear();}
     private static void sleepQuietly(long ms) {try { Thread.sleep(Math.max(0L, ms)); }catch (InterruptedException e) { Thread.currentThread().interrupt(); }}
-    private static String readAll(InputStream input) throws IOException {try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {byte[] buffer=new byte[4096];int n;while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);return out.toString(StandardCharsets.UTF_8.name());}}
+    private static String readAll(InputStream input) throws IOException {try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {byte[] buffer=new byte[4096];int n;while ((n = input.read(buffer)) >= 0) out.write(buffer, 0, n);return out.toString(StandardCharsets.UTF_8.name());}}
     private static final class CacheEntry {final String body;final long expiresAtMs;CacheEntry(String body,long expiresAtMs){this.body=body;this.expiresAtMs=expiresAtMs;}}
     private static final class SessionEntry {final AuthSession session;final long expiresAtMs;SessionEntry(AuthSession session,long expiresAtMs){this.session=session;this.expiresAtMs=expiresAtMs;}}
     private static final class PermanentApiException extends IOException {PermanentApiException(String message){super(message);}}
