@@ -7,9 +7,9 @@ import android.os.Bundle;
 
 /**
  * TornFCA launcher shim.
- * v0.9.31 keeps the old beta access-code wall removed, enforces the current legal acknowledgement,
- * installs the current-shell visual hotfix, and opens the persistent mobile dashboard after the
- * user has accepted the legal version.
+ * v0.9.32 keeps the old beta access-code wall removed, enforces the current legal acknowledgement,
+ * installs the beta-only visual overhaul when applicable, and opens the persistent mobile dashboard
+ * after the user has accepted the legal version.
  * Historical release-audit marker: TornFcaActivity.class remains the authenticated bootstrap parent
  * underneath TornFcaCurrentActivity, but is no longer the visible launcher destination.
  */
