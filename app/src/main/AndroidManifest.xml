@@ -6,6 +6,7 @@
         <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
         <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
         <activity android:name=".AccessGateActivity" android:exported="true" android:launchMode="singleTask" android:clearTaskOnLaunch="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+        <activity android:name=".TornFcaCurrentActivity" android:exported="false"/>
         <activity android:name=".TornFcaActivity" android:exported="false"/>
         <activity android:name=".TornFcaScreens$More" android:exported="false"/>
         <activity android:name=".TornFcaScreens$About" android:exported="false"/>
