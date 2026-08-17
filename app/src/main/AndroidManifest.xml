@@ -38,6 +38,9 @@
         <activity android:name=".TrainingAdminActivity" android:exported="false"/>
         <activity android:name=".TrainingProgressActivity" android:exported="false"/>
         <activity android:name=".WarPrepActivity" android:exported="false"/>
+        <activity android:name=".WarHubActivity" android:exported="false"/>
+        <activity android:name=".TerritoryWarActivity" android:exported="false"/>
+        <activity android:name=".TerritoryWarDetailActivity" android:exported="false"/>
         <activity android:name=".PremiumInsightsActivity" android:exported="false"/>
         <activity android:name=".FactionChatActivity" android:exported="false"/>
         <activity android:name=".CommunityModerationActivity" android:exported="false"/>
