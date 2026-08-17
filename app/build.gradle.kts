@@ -23,12 +23,10 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 50
-        versionName = "0.9.33"
+        versionCode = 51
+        versionName = "0.9.34"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
-        // Closed-beta developer gate. The temporary PIN remains hash-only, and the console also
-        // requires the verified Torn identity of the app owner before any developer controls open.
         val devHash = "BFB3F43E00B5530E0A2E42343287C792193DB09A9D87515B19A29992E18BAF7D"
         val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL")
         val premiumBackend = localOrEnv("TORNFCA_PREMIUM_BACKEND_URL")
@@ -48,9 +46,7 @@ android {
         buildConfigField("String", "FIREBASE_SENDER_ID", quotedBuildValue(firebaseSenderId))
     }
 
-    buildFeatures {
-        buildConfig = true
-    }
+    buildFeatures { buildConfig = true }
 
     buildTypes {
         debug {
@@ -72,10 +68,7 @@ android {
         }
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 
 dependencies {

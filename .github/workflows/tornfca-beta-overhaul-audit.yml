@@ -13,54 +13,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Verify side-by-side beta command console
+      - name: Verify repaired beta command surface
         run: |
           set -euo pipefail
           GRADLE=app/build.gradle.kts
           GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          BASE=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
           BETA=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
           UI=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandUi.java
-          MANIFEST=app/src/main/AndroidManifest.xml
+          SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
+          WRAPPERS=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaScreens.java
 
-          test -f app/src/main/res/drawable/tornfca_beta_crest.xml
-          test -f app/src/beta/res/mipmap-anydpi-v26/ic_launcher.xml
-          test -f app/src/beta/res/mipmap-anydpi/ic_launcher.xml
           test -f "$BETA"
           test -f "$UI"
-
-          grep -q 'versionName = "0.9.33"' "$GRADLE"
-          grep -q 'versionCode = 50' "$GRADLE"
+          test -f "$SURFACE"
+          grep -q 'versionName = "0.9.34"' "$GRADLE"
+          grep -q 'versionCode = 51' "$GRADLE"
           grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
-          grep -q 'manifestPlaceholders\["appLabel"\] = "Torn FCA Beta"' "$GRADLE"
+          grep -q 'BetaSurfacePolish.install' "$GATE"
+          grep -q 'isBetaCommandActivity' "$BASE"
+          grep -q 'BetaSurfacePolish.apply' "$WRAPPERS"
 
-          grep -q 'BetaCommandActivity.class' "$GATE"
-          grep -q 'BuildConfig.APPLICATION_ID.endsWith(".beta")' "$GATE"
-          grep -q 'BetaCommandActivity' "$MANIFEST"
+          # Main pages must no longer share one identical composition.
+          grep -q 'addStatusHero' "$BETA"
+          grep -q 'addDuoGrid' "$BETA"
+          grep -q 'Member Network' "$BETA"
+          grep -q 'Training Lab' "$BETA"
+          grep -q 'Operations Command' "$BETA"
+          grep -q 'App Control' "$BETA"
 
-          # This must be a new information architecture, not the v0.9.32 runtime recolor.
-          grep -q 'tornfca-command-shell-v2' "$BETA"
-          grep -q 'TORN FCA BETA' "$BETA"
-          grep -q 'addIdentityHero' "$BETA"
-          grep -q 'addQuickGrid' "$BETA"
-          grep -q 'addFeatured' "$BETA"
-          grep -q 'addMetrics' "$BETA"
-          grep -q 'renderTraining' "$BETA"
-          grep -q 'renderOperations' "$BETA"
-          grep -q 'navItem("Home"' "$BETA"
-          grep -q 'navItem("Members"' "$BETA"
-          grep -q 'navItem("Training"' "$BETA"
-          grep -q 'navItem("Operations"' "$BETA"
-          grep -q 'navItem("More"' "$BETA"
-          grep -q 'tornfca-profile-avatar' "$BETA"
-          grep -q 'trainingBaselineLabel' "$BETA"
+          # Gauge modules are readable and interactive.
+          grep -q 'final Runnable action' "$BETA"
+          grep -q 's.action' "$BETA"
+          grep -q 'metricTile(Activity a,String eyebrow,String center,String title,String detail,int accent,Runnable action)' "$UI"
+          grep -q 'tile.setOnClickListener' "$UI"
+          grep -q 'setSingleLine(true)' "$UI"
 
-          grep -q 'CommandArtView' "$UI"
-          grep -q 'RingView' "$UI"
-          grep -q 'featuredPanel' "$UI"
-          grep -q 'quickTile' "$UI"
-          grep -q 'metricTile' "$UI"
+          # Secondary activities must receive the beta command surface and return rail.
+          grep -q 'tornfca-beta-context-rail' "$SURFACE"
+          grep -q 'Console  ›' "$SURFACE"
+          grep -q 'Intent.FLAG_ACTIVITY_CLEAR_TOP' "$SURFACE"
+          grep -q 'decorateContextRail' "$SURFACE"
 
-          # The old runtime hotfix must not be installed into the beta command console.
-          grep -q 'if(!BuildConfig.APPLICATION_ID.endsWith(".beta"))CurrentShellVisualHotfix.install' "$GATE"
-
-          echo 'Torn FCA Beta command-console overhaul audit passed.'
+          echo 'Torn FCA Beta v0.9.34 repaired command-surface audit passed.'
