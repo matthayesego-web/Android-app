@@ -27,7 +27,6 @@ public class MemberFactionActivity extends Activity {
 
     private static final int BG=Color.rgb(6,9,13), PANEL=Color.rgb(15,20,28), PANEL2=Color.rgb(10,15,22), BORDER=Color.rgb(45,55,69);
     private static final int TEXT=Color.rgb(244,246,249), MUTED=Color.rgb(154,164,178), GOLD=Color.rgb(241,194,106), BLUE=Color.rgb(88,166,255), GOOD=Color.rgb(63,185,80), BAD=Color.rgb(248,81,73);
-    private static final String DUCK_FORCE_NAME = "Duck Force";
 
     private SecureApiKeyStore keyStore;
     private String mode;
@@ -73,13 +72,13 @@ public class MemberFactionActivity extends Activity {
         Button back=button("← Companion");back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(132),dp(44)));
 
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setGravity(Gravity.CENTER_HORIZONTAL);hero.setPadding(dp(18),dp(20),dp(18),dp(20));hero.setBackground(gradient(Color.rgb(29,43,61),Color.rgb(13,19,27),BORDER,22));
-        TextView brand=text("DUCK FORCE • MEMBER VIEW",10,GOLD,true);brand.setLetterSpacing(.13f);brand.setGravity(Gravity.CENTER);hero.addView(brand);
+        TextView brand=text("TORNFCA • MEMBER VIEW",10,GOLD,true);brand.setLetterSpacing(.13f);brand.setGravity(Gravity.CENTER);hero.addView(brand);
         TextView h=text(title(),30,TEXT,true);h.setGravity(Gravity.CENTER);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);hp.topMargin=dp(6);hero.addView(h,hp);
         TextView sub=text(subtitle,13,MUTED,false);sub.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(6);hero.addView(sub,sp);
         LinearLayout.LayoutParams heroParams=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);heroParams.topMargin=dp(14);heroParams.bottomMargin=dp(16);r.addView(hero,heroParams);
     }
 
-    private void addFooter(LinearLayout r){TextView f=text("Duck Force Companion v0.9.1 • member-safe data scope",11,MUTED,false);f.setGravity(Gravity.CENTER);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(8);p.bottomMargin=dp(4);r.addView(f,p);}
+    private void addFooter(LinearLayout r){TextView f=text("TornFCA v"+TornFcaBrand.VERSION+" • member-safe data scope",11,MUTED,false);f.setGravity(Gravity.CENTER);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(8);p.bottomMargin=dp(4);r.addView(f,p);}
 
     private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading only your signed-in faction data…");section(r,"SECURE MEMBER SCOPE");addCard(r,card("Loading your status","Faction-wide leadership records are not exposed on this screen.",BLUE));addFooter(r);setContentView(s);s.requestApplyInsets();}
 
@@ -88,8 +87,7 @@ public class MemberFactionActivity extends Activity {
         if(key==null||key.trim().isEmpty()){renderError("Reconnect your Torn API key to continue.");return;}
         new Thread(()->{
             try{
-                AuthSession session=TornApiClient.authenticate(key);
-                if(session.factionName==null||!DUCK_FORCE_NAME.equalsIgnoreCase(session.factionName.trim()))throw new Exception("This build is restricted to Duck Force members.");
+                AuthSession session=TornApiClient.cachedSession(key);if(session==null)session=TornApiClient.authenticate(key);
                 if(MODE_OC.equals(mode))loadOc(key,session);
                 else if(MODE_PARTICIPATION.equals(mode))loadParticipation(key,session);
                 else loadOverview(key,session);
@@ -136,7 +134,7 @@ public class MemberFactionActivity extends Activity {
             ScrollView s=shell();LinearLayout r=root(s);addHeader(r,session.factionName+" • your attacks only");
             section(r,"WAR STATUS");addCard(r,card(war.isLive(System.currentTimeMillis()/1000L)?"Current ranked war":"Recent ranked-war activity",p.summary,p.known?(p.hits>0?GOOD:GOLD):BORDER));
             if(war.present)addCard(r,card("Current war",war.headline(System.currentTimeMillis()/1000L)+"\n"+war.detail(System.currentTimeMillis()/1000L),BLUE));
-            section(r,"REQUIREMENT PROGRESS");addCard(r,card("Verified participation","v0.9.1 reports your verified hit count. Configurable faction requirements will come from the obligation engine so the app never invents a target.",BORDER));
+            section(r,"REQUIREMENT PROGRESS");addCard(r,card("Verified participation","TornFCA reports your verified hit count. Configurable faction requirements will come from the obligation engine so the app never invents a target.",BORDER));
             addFooter(r);setContentView(s);s.requestApplyInsets();
         });
     }
