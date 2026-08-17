@@ -23,7 +23,9 @@ jobs:
           grep -q 'android.permission.POST_NOTIFICATIONS' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaMessagingService" android:exported="false"' app/src/main/AndroidManifest.xml
           grep -q 'com.google.firebase.MESSAGING_EVENT' app/src/main/AndroidManifest.xml
-          grep -q 'if(factionId>0&&current!=factionId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+          grep -q 'if(factionId>0&&currentFaction!=factionId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+          grep -q 'target_player_id' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+          grep -q 'if(targetPlayerId>0&&currentPlayer!=targetPlayerId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
 
           # Cloud sender credentials are server-side only. Firebase client identifiers are allowed.
           if grep -R -n -E 'FIREBASE_PRIVATE_KEY|BEGIN PRIVATE KEY|FIREBASE_CLIENT_EMAIL' app/src; then
@@ -42,6 +44,9 @@ jobs:
           grep -q "c==='leadership'&&!tcLeader_(user.position)" backend/TornFcaCommunityBackend.gs
           grep -q "if(channel!=='leadership')tcPushToFaction_" backend/TornFcaCommunityBackend.gs
           grep -q 'tcHash_(apiKey)' backend/TornFcaCommunityBackend.gs
+
+          # Personal pushes are scoped to the exact verified player as well as faction.
+          grep -q 'target_player_id:String(playerId)' backend/TornFcaCommunityBackend.gs
 
           # Faction announcement push honors the same explicit Torn permission concept.
           grep -q 'tcCanAnnounce_' backend/TornFcaCommunityBackend.gs
