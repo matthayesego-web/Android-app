@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.27 — 2026-08-17
+
+- Completed the release-preparation legal/privacy pass for the expanded member experience while keeping `main` untouched.
+- Advanced the in-app legal acknowledgement to `2026-08-17-v3`, with a concise pre-sign-in data-use disclosure and separate acknowledgement of Privacy/data use from agreement to Terms & Conditions and the EULA.
+- Prevented Firebase Cloud Messaging auto-initialization before the current legal version is acknowledged, with an independent guard inside `PushNotifications` so future callers cannot bypass the gate accidentally.
+- Reorganized More, Settings and About so everyday faction tools remain centered in Member Center and legal/privacy information stays easy to find without duplicating primary navigation.
+- Kept Member Center organized around **Start Here**, **Daily & Readiness**, **Growth & Training**, **My Faction**, **Community & Alerts**, and **Optional Upgrade**, with core member tools before Premium.
+- Added a synchronized Google Play release/Data Safety checklist and a clearly marked public privacy-policy publication draft; final public contact/HTTPS hosting remains a production-release task.
+- Added faction-chat **Report** and **Block User** controls, device-local faction-scoped blocking, and suppression of chat push notifications from blocked authors.
+- Added verified faction-scoped `ChatReports` intake with message snapshots, reporter/author identity, reason, timestamp and status.
+- Added a hidden central Community Moderation queue restricted server-side to the verified TornFCA owner player ID; moderation actions bypass cached identity and re-check Torn before access.
+- Added moderator actions to dismiss reports or remove reported messages; removals redact the message, close other open reports for that message, and record moderator identity, timestamp and resolution.
+- Updated TornFCA Community Backend to v1.3.0 and expanded CI to protect the new legal v3 and community-safety boundaries.
+- Removed a stale hard-coded developer-panel version label in favor of `TornFcaBrand.VERSION`.
+- Bumped Android versionCode to 44 and versionName to 0.9.27.
+
 ## v0.9.26 — 2026-08-17
 
 - Completed a readability-only polish pass after the v0.9.25 navigation/legal foundation, without changing feature access or permission boundaries.
