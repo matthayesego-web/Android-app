@@ -40,6 +40,7 @@
         <activity android:name=".WarPrepActivity" android:exported="false"/>
         <activity android:name=".PremiumInsightsActivity" android:exported="false"/>
         <activity android:name=".FactionChatActivity" android:exported="false"/>
+        <activity android:name=".CommunityModerationActivity" android:exported="false"/>
         <service android:name=".TornFcaMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>
 
         <activity android:name=".WarCenterActivity" android:exported="false"/>

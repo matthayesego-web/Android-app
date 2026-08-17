@@ -44,21 +44,26 @@ Faction Chat is user-generated content and must keep safety controls operational
 - [x] Terms accepted before community posting.
 - [x] Terms define prohibited conduct/content and moderation rights.
 - [x] In-app Report action on another member's chat message.
-- [x] Reports are verified against the reporter's current faction and stored in a faction-scoped `ChatReports` moderation sheet with message snapshot, author, reporter, reason, time and status fields.
+- [x] Reports are verified against the reporter's current faction and stored in faction-scoped `ChatReports` records with message snapshot, author, reporter, reason, time and status.
 - [x] In-app Block User action.
 - [x] Blocked users' chat messages are hidden locally for that faction.
 - [x] Chat push notifications from blocked authors are ignored on that device.
 - [x] Users can clear their faction block list from Faction Chat.
-- [ ] Define the production moderator/reviewer workflow for open `ChatReports` rows and how status/resolution fields are updated.
+- [x] Hidden central moderation queue is restricted server-side to verified TornFCA owner player ID `3987363` and sensitive moderation calls bypass cached identity.
+- [x] Moderator can dismiss a report or remove a reported message.
+- [x] Message removal redacts the chat row and resolves other open reports for the same message.
+- [x] Every moderation resolution records verified moderator ID/name, timestamp and resolution.
 - [ ] Decide moderation-report retention period.
-- [ ] Test reports, duplicate reports, blocking, unblocking, faction changes and push suppression against the deployed backend.
+- [ ] Deploy Community Backend v1.3.0 and rerun `setupTornFcaCommunityBackend()` against the production community sheet.
+- [ ] Device-test report → review → dismiss/remove, duplicate reports, blocking/unblocking, faction changes and push suppression against the deployed backend.
 - [ ] Complete Play UGC/content-rating declarations accurately.
-- [ ] Do not call public community chat production-ready until moderation operations are tested.
+- [ ] Do not call public community chat production-ready until deployed moderation operations pass testing.
 
 ## 6. Retention and deletion
 - [ ] Publish privacy/deletion contact mechanism.
 - [ ] Document TornFCA-hosted deletion handling.
 - [ ] Establish stale FCM-token cleanup.
+- [ ] Establish moderation-report retention/cleanup rule after operational/legal need ends.
 - [ ] Clarify that TornFCA deletion cannot delete independent Torn/Google/FFScouter/TornStats data.
 
 ## 7. Store/review readiness
@@ -76,7 +81,8 @@ Faction Chat is user-generated content and must keep safety controls operational
 - [x] More no longer duplicates Chat/Inbox as competing destinations.
 - [x] Settings is grouped by notifications/community, account/security, optional services/plan, legal/privacy and account action.
 - [x] Core/free tools appear before Premium and leadership tools do not crowd normal-member navigation.
+- [x] Hidden Developer Panel now uses the current `TornFcaBrand.VERSION` instead of a stale hard-coded version label.
 - [ ] Complete device readability/back-path review across all new member screens.
 
 ## 9. v0.9.27 completion rule
-Do not promote the v0.9.27 candidate until member features are coherent, chat moderation operations are tested if chat is enabled, public privacy/Data Safety work is ready, the exact candidate passes build/device audits, and the user explicitly approves promotion. 
+Do not promote the v0.9.27 candidate until member features are coherent, deployed chat moderation operations pass if chat is enabled, public privacy/Data Safety work is ready, the exact candidate passes build/device audits, and the user explicitly approves promotion.

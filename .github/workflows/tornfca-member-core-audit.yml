@@ -22,7 +22,6 @@ jobs:
           MEMBER=app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
           MANIFEST=app/src/main/AndroidManifest.xml
 
-          # The Member Center must keep the expanded free core discoverable and organized by task.
           grep -q '"My Day"' "$MEMBER"
           grep -q '"Faction Directory"' "$MEMBER"
           grep -q '"Faction Resources"' "$MEMBER"
@@ -38,7 +37,6 @@ jobs:
           grep -q 'Core faction-member tools stay free' "$MEMBER"
           grep -q 'The core member tools above remain free' "$MEMBER"
 
-          # New member activities and legal screens must remain internal to the app.
           grep -q 'MemberDirectoryActivity" android:exported="false"' "$MANIFEST"
           grep -q 'FactionResourcesActivity" android:exported="false"' "$MANIFEST"
           grep -q 'TrainingCenterActivity" android:exported="false"' "$MANIFEST"
@@ -46,8 +44,8 @@ jobs:
           grep -q 'WarPrepActivity" android:exported="false"' "$MANIFEST"
           grep -q 'LegalActivity" android:exported="false"' "$MANIFEST"
           grep -q 'LegalDocumentActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'CommunityModerationActivity" android:exported="false"' "$MANIFEST"
 
-          # Legal v3 must gate first launch and keep privacy acknowledgement separate from contract agreement.
           grep -q 'LegalAcceptanceStore.hasAcceptedCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q 'EXTRA_REQUIRE_ACCEPTANCE,true' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q 'LEGAL_VERSION="2026-08-17-v3"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
@@ -59,33 +57,36 @@ jobs:
           grep -q 'Review Legal Documents' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           grep -q 'Legal & Privacy' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
 
-          # Chat UGC must retain report + block safety controls and faction-scoped backend report verification.
           grep -q 'reportChatMessage' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          grep -q 'moderationReports' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          grep -q 'resolveModerationReport' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
           grep -q '"Report"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
           grep -q '"Block User"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
           grep -q 'BlockedUserStore.isBlocked' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
           grep -q "action==='chat_report'" backend/TornFcaCommunityBackend.gs
-          grep -q 'Message does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
-          grep -q "TC_REPORTS='ChatReports'" backend/TornFcaCommunityBackend.gs
+          grep -q "action==='moderation_list'" backend/TornFcaCommunityBackend.gs
+          grep -q "action==='moderation_resolve'" backend/TornFcaCommunityBackend.gs
+          grep -q 'TC_MODERATOR_PLAYER_ID=3987363' backend/TornFcaCommunityBackend.gs
+          grep -q "action.indexOf('moderation_')===0" backend/TornFcaCommunityBackend.gs
+          grep -q 'TornFCA moderation is restricted to the verified app owner.' backend/TornFcaCommunityBackend.gs
+          grep -q '\[Removed by TornFCA moderation\]' backend/TornFcaCommunityBackend.gs
+          grep -q 'CommunityModerationActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
+          grep -q 'TornFcaBrand.VERSION' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
 
-          # Personal training progress is own-player data and its baseline is player+faction scoped.
           grep -q '/user/battlestats' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
           grep -q '/user/personalstats?cat=drugs' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
           grep -q '"p"+session.playerId+"_f"+session.factionId+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
           grep -q 'Your baseline stays on this device' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
 
-          # Onboarding/resources are player+faction local and shared guides use the verified faction backend.
           grep -q '"p"+session.playerId+"_f"+session.factionId+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
           grep -q 'CommunityBackendClient.trainingLibrary' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
           grep -q 'Resources belong to the faction' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
 
-          # War prep is own-player data and checklist state must be isolated by player+faction+war cycle.
           grep -q 'selections=bars,cooldowns,travel,refills,organizedcrime' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
           grep -q '"p"+session.playerId+"_f"+session.factionId+"_"+cycle()+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
           grep -q 'No universal war requirements invented' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
           grep -q 'Faction Resources' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
 
-          # Shared training writes remain server-side faction/leadership gated.
           grep -q "action.indexOf('training_')===0" backend/TornFcaCommunityBackend.gs
           grep -q 'tcVerifyUser_(key,freshIdentity)' backend/TornFcaCommunityBackend.gs
           grep -q 'Guide does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
