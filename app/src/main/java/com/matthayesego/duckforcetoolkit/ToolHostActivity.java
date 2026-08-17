@@ -29,7 +29,7 @@ import java.util.Map;
 
 public class ToolHostActivity extends Activity {
     public static final String EXTRA_TOOL="tool";
-    private static final String APP_VERSION="0.9.15";
+    private static final String APP_VERSION=TornFcaBrand.VERSION;
     private static final String MANAGED_KEY_SENTINEL="TORNFCA_MANAGED_KEY";
     private static final int BG=Color.rgb(8,12,18),PANEL=Color.rgb(20,27,38),TEXT=Color.rgb(245,248,252);
     private WebView webView;private SecureApiKeyStore keyStore;
@@ -63,7 +63,7 @@ public class ToolHostActivity extends Activity {
         page.addView(webView,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f));setContentView(page);page.requestApplyInsets();webView.loadUrl("https://"+tool.domain+"/assets/tools/"+tool.asset);
     }
     /** The real Torn key never enters JavaScript/DOM; JS only receives a non-secret sentinel. */
-    private void injectManagedKey(WebView view){String key=keyStore.load();if(key==null||key.isEmpty())return;String js="(function(){var e=document.getElementById('key');if(e){e.value='"+MANAGED_KEY_SENTINEL+"';e.readOnly=true;e.placeholder='Using Companion API key';e.title='Key managed securely by TornFCA';}})();";view.evaluateJavascript(js,null);}
+    private void injectManagedKey(WebView view){String key=keyStore.load();if(key==null||key.isEmpty())return;String js="(function(){var e=document.getElementById('key');if(e){e.value='"+MANAGED_KEY_SENTINEL+"';e.readOnly=true;e.placeholder='Using TornFCA API key';e.title='Key managed securely by TornFCA';}})();";view.evaluateJavascript(js,null);}
     private WebResourceResponse proxyTornApi(Uri uri){
         try{
             String key=keyStore.load();if(key==null||key.isBlank())return blockedResponse(401,"No API key","Reconnect your Torn API key.");
