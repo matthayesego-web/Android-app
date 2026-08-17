@@ -13,8 +13,11 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Small visual-only pass that makes TornFCA's tappable surfaces read like one coherent action
@@ -26,11 +29,13 @@ public final class PremiumActionPolish {
     private static final int SURFACE_2 = Color.rgb(8,13,20);
     private static final int TEXT = Color.rgb(246,248,251);
     private static final int MUTED = Color.rgb(145,155,169);
+    private static final Map<View,Boolean> APPLIED=Collections.synchronizedMap(new WeakHashMap<>());
 
     private PremiumActionPolish() {}
 
     public static void apply(Activity activity, View root) {
         if (activity == null || root == null) return;
+        if (APPLIED.put(root, Boolean.TRUE) != null) return;
         polishTree(activity, root);
         polishNamedHeading(root, "Command center", 27f);
         polishNamedHeading(root, "Your faction hub", 27f);
