@@ -2,11 +2,11 @@ package com.matthayesego.duckforcetoolkit;
 
 import android.app.Application;
 
-/** Initializes notification channels and optional cloud messaging before any Activity/Service. */
+/** Creates local notification channels immediately and enables optional cloud push after legal acknowledgement. */
 public class TornFcaApplication extends Application {
     @Override public void onCreate(){
         super.onCreate();
         NotificationCenter.ensureChannels(this);
-        PushNotifications.initialize(this);
+        if(LegalAcceptanceStore.hasAcceptedCurrent(this))PushNotifications.initialize(this);
     }
 }
