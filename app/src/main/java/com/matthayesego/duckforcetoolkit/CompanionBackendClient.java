@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class CompanionBackendClient {
     private static final String BACKEND_URL = BuildConfig.FACTION_BACKEND_URL == null ? "" : BuildConfig.FACTION_BACKEND_URL.trim();
-    private static final String USER_AGENT = "TornFCA/0.9.13 Android";
+    private static final String USER_AGENT = "TornFCA/" + TornFcaBrand.VERSION + " Android";
     // The shared backend re-verifies identity against Torn. Limit app-originated backend calls to
     // 6/min/device so backend verification cannot become a hidden high-frequency Torn poller.
     private static long nextBackendRequestAtMs=0L;
