@@ -47,15 +47,26 @@ jobs:
           grep -q 'LegalActivity" android:exported="false"' "$MANIFEST"
           grep -q 'LegalDocumentActivity" android:exported="false"' "$MANIFEST"
 
-          # The current legal version must gate first launch before Torn sign-in and remain reviewable later.
+          # Legal v3 must gate first launch and keep privacy acknowledgement separate from contract agreement.
           grep -q 'LegalAcceptanceStore.hasAcceptedCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q 'EXTRA_REQUIRE_ACCEPTANCE,true' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
-          grep -q 'LEGAL_VERSION="2026-08-17-v2"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
-          grep -q 'I have reviewed the Privacy Policy, agree to the Terms & Conditions, and agree to the EULA.' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          grep -q 'LEGAL_VERSION="2026-08-17-v3"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
+          grep -q 'I have reviewed the Privacy Policy and understand the data-use notice above.' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          grep -q 'I agree to the Terms & Conditions and the End User License Agreement.' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          grep -q '!LegalAcceptanceStore.hasAcceptedCurrent(context)' app/src/main/java/com/matthayesego/duckforcetoolkit/PushNotifications.java
           grep -q 'Notifications & Firebase' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalDocumentActivity.java
           grep -q 'Privacy, Terms & EULA' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
           grep -q 'Review Legal Documents' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           grep -q 'Legal & Privacy' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
+
+          # Chat UGC must retain report + block safety controls and faction-scoped backend report verification.
+          grep -q 'reportChatMessage' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          grep -q '"Report"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
+          grep -q '"Block User"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
+          grep -q 'BlockedUserStore.isBlocked' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+          grep -q "action==='chat_report'" backend/TornFcaCommunityBackend.gs
+          grep -q 'Message does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
+          grep -q "TC_REPORTS='ChatReports'" backend/TornFcaCommunityBackend.gs
 
           # Personal training progress is own-player data and its baseline is player+faction scoped.
           grep -q '/user/battlestats' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
@@ -80,4 +91,4 @@ jobs:
           grep -q 'Guide does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
           grep -q 'Faction Leader or Co-leader access is required to change training rules.' backend/TornFcaCommunityBackend.gs
 
-          echo 'TornFCA free member-core/navigation/legal audit passed.'
+          echo 'TornFCA free member-core/navigation/legal/community-safety audit passed.'
