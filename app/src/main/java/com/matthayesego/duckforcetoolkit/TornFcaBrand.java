@@ -11,11 +11,14 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Build;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -27,12 +30,13 @@ import java.util.WeakHashMap;
 public final class TornFcaBrand {
     public static final String NAME="TornFCA";
     public static final String LONG_NAME="Torn Faction Companion App";
-    public static final String VERSION="0.9.18";
+    public static final String VERSION="0.9.19";
 
     private static final int[] LEGACY_BRAND_COLORS=new int[]{
             Color.rgb(241,190,86),Color.rgb(241,194,106),Color.rgb(243,184,52),Color.rgb(215,160,68),Color.rgb(242,197,107)
     };
     private static final Map<View,Boolean> ANIMATED=Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<View,Boolean> OBSERVED=Collections.synchronizedMap(new WeakHashMap<>());
 
     private TornFcaBrand(){}
 
@@ -47,6 +51,8 @@ public final class TornFcaBrand {
             activity.getWindow().setNavigationBarContrastEnforced(false);
         }
         applyView(activity,root,theme);
+        enhanceLeadership(activity,root,theme);
+        observeLeadership(activity,root);
         animateOnce(activity,root);
     }
 
@@ -135,6 +141,66 @@ public final class TornFcaBrand {
         }
     }
 
+    /** Keep critical leadership tools first-class even when the legacy shell no longer exposes their old cards. */
+    private static void observeLeadership(Activity activity,View root){
+        if(OBSERVED.put(root,Boolean.TRUE)!=null)return;
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{
+            if(activity.isFinishing())return;
+            try{enhanceLeadership(activity,root,FactionTheme.forContext(activity));}catch(Exception ignored){}
+        });
+    }
+
+    private static void enhanceLeadership(Activity activity,View root,FactionTheme theme){
+        if(DeveloperPreviewStore.isMemberPreview(activity))return;
+        TextView command=findExact(root,"Command center");
+        if(command==null)return;
+        ViewParent headerParent=command.getParent();
+        if(!(headerParent instanceof View))return;
+        ViewParent pageParent=((View)headerParent).getParent();
+        if(!(pageParent instanceof LinearLayout))return;
+        LinearLayout page=(LinearLayout)pageParent;
+
+        if(findExact(page,"Activity Tracker")==null){
+            int warIndex=findDirectIndexContaining(page,"WAR & OC");
+            int insertAt=warIndex>=0?warIndex:Math.max(0,page.getChildCount()-1);
+            TextView section=leadershipEyebrow(activity,"MEMBER OPERATIONS",theme);
+            LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=Math.round(dp(activity,5));sp.bottomMargin=Math.round(dp(activity,8));
+            page.addView(section,insertAt++,sp);
+            LinearLayout row=new LinearLayout(activity);row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout activityCard=leadershipCard(activity,"ACTIVITY","Activity Tracker","Faction-wide participation and activity scan.",theme.accent,()->openFeature(activity,FeatureRouterActivity.TARGET_ACTIVITY));
+            LinearLayout pulseCard=leadershipCard(activity,"READINESS","Faction Pulse","Member health, inactivity and availability at a glance.",Color.rgb(76,190,102),()->openFeature(activity,FeatureRouterActivity.TARGET_PULSE));
+            LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,Math.round(dp(activity,132)),1f);
+            LinearLayout.LayoutParams right=new LinearLayout.LayoutParams(0,Math.round(dp(activity,132)),1f);right.leftMargin=Math.round(dp(activity,10));
+            row.addView(activityCard,left);row.addView(pulseCard,right);
+            LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,Math.round(dp(activity,132)));rp.bottomMargin=Math.round(dp(activity,14));
+            page.addView(row,insertAt,rp);
+        }
+
+        if(findExact(page,"Armory Auditor")==null){
+            LinearLayout armory=leadershipCard(activity,"FACTION OPERATIONS","Armory Auditor","Audit faction armory items, member totals, deposits, restocks and detailed activity.",Color.rgb(76,190,102),()->openArmory(activity));
+            LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,Math.round(dp(activity,118)));ap.bottomMargin=Math.round(dp(activity,12));
+            int index=Math.max(0,page.getChildCount()-1);
+            page.addView(armory,index,ap);
+        }
+    }
+
+    private static LinearLayout leadershipCard(Activity activity,String eye,String title,String body,int accent,Runnable action){
+        FactionTheme theme=FactionTheme.forContext(activity);
+        LinearLayout card=new LinearLayout(activity);card.setOrientation(LinearLayout.VERTICAL);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(Math.round(dp(activity,16)),Math.round(dp(activity,13)),Math.round(dp(activity,16)),Math.round(dp(activity,13)));card.setClickable(true);card.setFocusable(true);
+        GradientDrawable bg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{theme.surface,Color.rgb(8,13,20)});bg.setCornerRadius(dp(activity,20));bg.setStroke(Math.round(dp(activity,1)),accent);card.setBackground(bg);
+        TextView eyebrow=leadershipEyebrow(activity,eye,theme);eyebrow.setTextColor(accent);card.addView(eyebrow);
+        TextView heading=new TextView(activity);heading.setText(title);heading.setTextColor(Color.rgb(246,248,251));heading.setTextSize(17);heading.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);hp.topMargin=Math.round(dp(activity,5));card.addView(heading,hp);
+        TextView copy=new TextView(activity);copy.setText(body);copy.setTextColor(Color.rgb(145,155,169));copy.setTextSize(11.5f);copy.setMaxLines(2);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=Math.round(dp(activity,4));card.addView(copy,bp);
+        card.setOnClickListener(v->action.run());polishContainer(activity,card,theme);return card;
+    }
+
+    private static TextView leadershipEyebrow(Activity activity,String value,FactionTheme theme){TextView t=new TextView(activity);t.setText(value);t.setTextColor(theme.accent);t.setTextSize(9.5f);t.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));if(Build.VERSION.SDK_INT>=21)t.setLetterSpacing(.12f);return t;}
+    private static int findDirectIndexContaining(LinearLayout parent,String needle){for(int i=0;i<parent.getChildCount();i++)if(containsText(parent.getChildAt(i),needle))return i;return-1;}
+    private static boolean containsText(View view,String needle){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&raw.toString().contains(needle))return true;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)if(containsText(g.getChildAt(i),needle))return true;}return false;}
+    private static TextView findExact(View view,String exact){if(view instanceof TextView){CharSequence raw=((TextView)view).getText();if(raw!=null&&exact.equals(raw.toString()))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView found=findExact(g.getChildAt(i),exact);if(found!=null)return found;}}return null;}
+    private static void openFeature(Activity activity,String target){Intent i=new Intent(activity,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,target);activity.startActivity(i);}
+    private static void openArmory(Activity activity){Intent i=new Intent(activity,ToolHostActivity.class);i.putExtra(ToolHostActivity.EXTRA_TOOL,"ARMORY");activity.startActivity(i);}
+
     private static RippleDrawable ripple(Context context,FactionTheme theme,float radiusDp){
         int rippleColor=Color.argb(44,Color.red(theme.accent),Color.green(theme.accent),Color.blue(theme.accent));
         GradientDrawable mask=new GradientDrawable();mask.setColor(Color.WHITE);mask.setCornerRadius(dp(context,radiusDp));
@@ -183,18 +249,19 @@ public final class TornFcaBrand {
                 .replace("DUCK FORCE •","TORNFCA •")
                 .replace("Leadership-focused member lookup with current Torn status and opted-in battle intelligence.","Search members with Torn status, FFScouter estimates and TornStats spy intelligence.")
                 .replace("capped at roughly 12 requests/minute","capped at roughly 30 direct requests/minute")
-                .replace("v0.9.6","v0.9.18")
-                .replace("v0.9.7","v0.9.18")
-                .replace("v0.9.8","v0.9.18")
-                .replace("v0.9.9","v0.9.18")
-                .replace("v0.9.10","v0.9.18")
-                .replace("v0.9.11","v0.9.18")
-                .replace("v0.9.12","v0.9.18")
-                .replace("v0.9.13","v0.9.18")
-                .replace("v0.9.14","v0.9.18")
-                .replace("v0.9.15","v0.9.18")
-                .replace("v0.9.16","v0.9.18")
-                .replace("v0.9.17","v0.9.18");
+                .replace("v0.9.6","v0.9.19")
+                .replace("v0.9.7","v0.9.19")
+                .replace("v0.9.8","v0.9.19")
+                .replace("v0.9.9","v0.9.19")
+                .replace("v0.9.10","v0.9.19")
+                .replace("v0.9.11","v0.9.19")
+                .replace("v0.9.12","v0.9.19")
+                .replace("v0.9.13","v0.9.19")
+                .replace("v0.9.14","v0.9.19")
+                .replace("v0.9.15","v0.9.19")
+                .replace("v0.9.16","v0.9.19")
+                .replace("v0.9.17","v0.9.19")
+                .replace("v0.9.18","v0.9.19");
         if(branded.contains("Encrypted on this device"))branded=branded.replaceAll("v0\\.9\\.\\d+","v"+VERSION);
         return branded;
     }
