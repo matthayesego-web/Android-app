@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Verify repaired beta command surface
+      - name: Verify repaired beta command surface and live gauges
         run: |
           set -euo pipefail
           GRADLE=app/build.gradle.kts
@@ -22,19 +22,22 @@ jobs:
           BETA=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
           UI=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandUi.java
           SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
+          GAUGES=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaGaugeLiveData.java
           WRAPPERS=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaScreens.java
 
           test -f "$BETA"
           test -f "$UI"
           test -f "$SURFACE"
-          grep -q 'versionName = "0.9.34"' "$GRADLE"
-          grep -q 'versionCode = 51' "$GRADLE"
+          test -f "$GAUGES"
+          grep -q 'versionName = "0.9.35"' "$GRADLE"
+          grep -q 'versionCode = 52' "$GRADLE"
           grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
           grep -q 'BetaSurfacePolish.install' "$GATE"
+          grep -q 'BetaGaugeLiveData.install' "$GATE"
           grep -q 'isBetaCommandActivity' "$BASE"
           grep -q 'BetaSurfacePolish.apply' "$WRAPPERS"
 
-          # Main pages must no longer share one identical composition.
+          # Main pages remain structurally distinct.
           grep -q 'addStatusHero' "$BETA"
           grep -q 'addDuoGrid' "$BETA"
           grep -q 'Member Network' "$BETA"
@@ -42,17 +45,24 @@ jobs:
           grep -q 'Operations Command' "$BETA"
           grep -q 'App Control' "$BETA"
 
-          # Gauge modules are readable and interactive.
+          # Gauge modules remain readable/clickable and now consume real data.
           grep -q 'final Runnable action' "$BETA"
           grep -q 's.action' "$BETA"
           grep -q 'metricTile(Activity a,String eyebrow,String center,String title,String detail,int accent,Runnable action)' "$UI"
           grep -q 'tile.setOnClickListener' "$UI"
           grep -q 'setSingleLine(true)' "$UI"
+          grep -q '/user?selections=bars' "$GAUGES"
+          grep -q '/user/battlestats' "$GAUGES"
+          grep -q 'tornfca_war_prep_v1' "$GAUGES"
+          grep -q 'tornfca_training_progress_v1' "$GAUGES"
+          grep -q 'NotificationInboxStore.all' "$GAUGES"
+          grep -q 'LiveGaugeView' "$GAUGES"
+          grep -q '360f\*progress' "$GAUGES"
 
-          # Secondary activities must receive the beta command surface and return rail.
+          # Secondary activities keep the beta command surface and return rail.
           grep -q 'tornfca-beta-context-rail' "$SURFACE"
           grep -q 'Console  ›' "$SURFACE"
           grep -q 'Intent.FLAG_ACTIVITY_CLEAR_TOP' "$SURFACE"
           grep -q 'decorateContextRail' "$SURFACE"
 
-          echo 'Torn FCA Beta v0.9.34 repaired command-surface audit passed.'
+          echo 'Torn FCA Beta v0.9.35 live-gauge command-surface audit passed.'
