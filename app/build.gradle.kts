@@ -23,8 +23,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 48
-        versionName = "0.9.31"
+        versionCode = 49
+        versionName = "0.9.32"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
         // Closed-beta developer gate. The temporary PIN remains hash-only, and the console also
@@ -62,7 +62,7 @@ android {
             initWith(getByName("debug"))
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
-            manifestPlaceholders["appLabel"] = "TornFCA Beta"
+            manifestPlaceholders["appLabel"] = "Torn FCA Beta"
             isDebuggable = false
             signingConfig = null
         }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="app_bg">#05080D</color>
+    <color name="app_panel">#0D131C</color>
+    <color name="app_panel_alt">#141D29</color>
+    <color name="app_border">#273344</color>
+    <color name="app_accent">#E8B75C</color>
+    <color name="app_accent_light">#F6D38F</color>
+    <color name="app_text">#F5F7FA</color>
+    <color name="app_muted">#919DAF</color>
+    <color name="icon_background">#070B11</color>
+    <color name="beta_icon_background">#070B11</color>
+</resources>
