@@ -28,6 +28,9 @@
         <activity android:name=".NotificationSettingsActivity" android:exported="false"/>
         <activity android:name=".NotificationInboxActivity" android:exported="false"/>
         <activity android:name=".MemberCenterActivity" android:exported="false"/>
+        <activity android:name=".MemberDirectoryActivity" android:exported="false"/>
+        <activity android:name=".TrainingCenterActivity" android:exported="false"/>
+        <activity android:name=".TrainingAdminActivity" android:exported="false"/>
         <activity android:name=".PremiumInsightsActivity" android:exported="false"/>
         <activity android:name=".FactionChatActivity" android:exported="false"/>
         <service android:name=".TornFcaMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>
