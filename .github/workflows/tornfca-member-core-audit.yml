@@ -50,8 +50,9 @@ jobs:
           # The current legal version must gate first launch before Torn sign-in and remain reviewable later.
           grep -q 'LegalAcceptanceStore.hasAcceptedCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q 'EXTRA_REQUIRE_ACCEPTANCE,true' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
-          grep -q 'LEGAL_VERSION="2026-08-17-v1"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
+          grep -q 'LEGAL_VERSION="2026-08-17-v2"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
           grep -q 'I have reviewed the Privacy Policy, agree to the Terms & Conditions, and agree to the EULA.' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          grep -q 'Notifications & Firebase' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalDocumentActivity.java
           grep -q 'Privacy, Terms & EULA' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
           grep -q 'Review Legal Documents' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           grep -q 'Legal & Privacy' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
