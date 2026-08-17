@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/** Local outage fallback for banking requests. Every new row is tenant-bound by faction_id. */
 public final class BankingDraftStore {
     private static final String PREFS = "duckforce_banking_v040";
     private static final String KEY = "requests";
@@ -17,6 +18,7 @@ public final class BankingDraftStore {
     private BankingDraftStore() {}
 
     public static void add(Context context, AuthSession session, String amount, String note) {
+        if(context==null||session==null)return;
         try {
             SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             JSONArray rows = new JSONArray(prefs.getString(KEY, "[]"));
@@ -26,6 +28,8 @@ public final class BankingDraftStore {
             row.put("created", created);
             row.put("playerId", session.playerId);
             row.put("playerName", session.playerName);
+            row.put("factionId", session.factionId);
+            row.put("factionName", session.factionName);
             row.put("amount", amount == null || amount.trim().isEmpty() ? "FULL BALANCE" : amount.trim());
             row.put("note", note == null ? "" : note.trim());
             row.put("status", "LOCAL FALLBACK");
@@ -34,10 +38,12 @@ public final class BankingDraftStore {
         } catch (Exception ignored) {}
     }
 
-    public static JSONArray all(Context context) {
+    /** Returns only drafts that belong to the signed-in player + current faction tenant. */
+    public static JSONArray all(Context context, AuthSession session) {
         JSONArray rows = read(context);
-        scheduleSync(context.getApplicationContext(), rows);
-        return rows;
+        JSONArray scoped = scopedRows(rows, session);
+        scheduleSync(context.getApplicationContext(), scoped);
+        return scoped;
     }
 
     private static JSONArray read(Context context) {
@@ -49,16 +55,33 @@ public final class BankingDraftStore {
         }
     }
 
+    private static JSONArray scopedRows(JSONArray rows,AuthSession session){
+        JSONArray out=new JSONArray();if(rows==null||session==null)return out;
+        for(int i=0;i<rows.length();i++){
+            JSONObject row=rows.optJSONObject(i);if(row==null)continue;
+            if(row.optInt("playerId",0)!=session.playerId)continue;
+            int storedFaction=row.optInt("factionId",0);
+            if(storedFaction==session.factionId&&storedFaction>0){out.put(row);continue;}
+            // Rows created before TornFCA became multi-faction had no faction_id and could only
+            // have been created by the historical Duck Force-restricted build. Preserve access to
+            // those drafts only while the same player is in Duck Force, but never auto-sync them.
+            if(storedFaction<=0&&"Duck Force".equalsIgnoreCase(session.factionName))out.put(row);
+        }
+        return out;
+    }
+
     private static void scheduleSync(Context context, JSONArray snapshot) {
         if (!CompanionBackendClient.isConfigured() || snapshot == null || snapshot.length() == 0 || !SYNCING.compareAndSet(false, true)) return;
         new Thread(() -> {
             try {
                 String key = new SecureApiKeyStore(context).load();
                 if (key == null || key.trim().isEmpty()) return;
-                AuthSession current = TornApiClient.authenticate(key);
+                AuthSession current = TornApiClient.cachedSession(key);if(current==null)current=TornApiClient.authenticate(key);
                 for (int i = 0; i < snapshot.length(); i++) {
                     JSONObject row = snapshot.optJSONObject(i);
                     if (row == null || row.optInt("playerId", 0) != current.playerId) continue;
+                    int rowFaction=row.optInt("factionId",0);
+                    if(rowFaction<=0||rowFaction!=current.factionId)continue; // legacy/unscoped rows never auto-sync
                     String amount = row.optString("amount", "FULL BALANCE");
                     if ("FULL BALANCE".equalsIgnoreCase(amount)) amount = "";
                     try {
@@ -72,7 +95,7 @@ public final class BankingDraftStore {
             } finally {
                 SYNCING.set(false);
             }
-        }, "DuckForce-BankingFallbackSync").start();
+        }, "TornFCA-BankingFallbackSync").start();
     }
 
     public static String fingerprint(JSONObject row) {
@@ -97,7 +120,20 @@ public final class BankingDraftStore {
         } catch (Exception ignored) {}
     }
 
-    public static void clear(Context context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY).apply();
+    /** Clears only the current player/current faction tenant's visible drafts. */
+    public static void clear(Context context,AuthSession session) {
+        if(context==null||session==null)return;
+        try{
+            SharedPreferences prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
+            JSONArray rows=new JSONArray(prefs.getString(KEY,"[]"));JSONArray keep=new JSONArray();
+            for(int i=0;i<rows.length();i++){
+                JSONObject row=rows.optJSONObject(i);if(row==null){keep.put(rows.opt(i));continue;}
+                boolean samePlayer=row.optInt("playerId",0)==session.playerId;int storedFaction=row.optInt("factionId",0);
+                boolean sameTenant=samePlayer&&storedFaction==session.factionId&&storedFaction>0;
+                boolean duckLegacy=samePlayer&&storedFaction<=0&&"Duck Force".equalsIgnoreCase(session.factionName);
+                if(!sameTenant&&!duckLegacy)keep.put(row);
+            }
+            prefs.edit().putString(KEY,keep.toString()).apply();
+        }catch(Exception ignored){}
     }
 }
