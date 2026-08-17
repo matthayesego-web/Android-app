@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.22 — 2026-08-17
+
+- Added **My Training Progress** to the free Member Center.
+- Added private personal battle-stat progress using the signed-in player's own Torn battle stats only.
+- Added device-local baselines scoped to both `player_id` and `faction_id`, so progress comparisons do not carry across factions.
+- Added total battle-stat gain, per-stat deltas, Xanax-use delta, time tracked, and average Xanax use per day since baseline.
+- Added side-by-side display of the current faction's published training expectations when the faction Community backend is available.
+- Kept personal battle-stat baselines on the device; they are not written to the faction training library or exposed to ordinary faction members.
+- Kept faction-wide training compliance, violation summaries, long-term trend reporting, and automated follow-up outside the free member screen for future permission-aware Faction Pro tooling.
+- Added a member-controlled **Reset progress baseline** action.
+- Bumped Android versionCode to 39 and versionName to 0.9.22.
+
 ## v0.9.21 — 2026-08-17
 
 - Expanded the free member core with a searchable faction directory and member-safe roster cards.
