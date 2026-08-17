@@ -34,11 +34,19 @@ public class LegalActivity extends Activity {
                 requireAcceptance?"Exit":"More",
                 requireAcceptance?"Before you continue":"Legal & Privacy",
                 requireAcceptance
-                        ?"Review the three documents below. Agree to the Terms & Conditions and EULA, and acknowledge the Privacy Policy, before connecting your Torn account."
+                        ?"A short privacy acknowledgement and agreement to the Terms & Conditions and EULA are required before connecting a Torn account. You can open every document below before deciding."
                         :"Review TornFCA's current legal documents and acknowledgement status."
         );
 
-        if(!requireAcceptance){
+        if(requireAcceptance){
+            TornFcaUi.add(this,r,TornFcaUi.card(
+                    this,
+                    "DATA USE BEFORE SIGN-IN",
+                    "What happens when you connect",
+                    "TornFCA uses the Torn API key you provide to request the Torn data needed for features you choose. A Limited Access key is recommended; Full Access is not required. If cloud/community features are configured, TornFCA may process your verified Torn player/faction identifiers and a Firebase push token for faction-scoped services and notifications. FFScouter and TornStats remain separate optional services and require their own opt-in. Read the Privacy Policy below for storage, retention, deletion and Firebase details.",
+                    TornFcaUi.GREEN
+            ));
+        }else{
             String status;
             if(LegalAcceptanceStore.hasAcceptedCurrent(this)){
                 long at=LegalAcceptanceStore.acceptedAt(this);
@@ -57,22 +65,32 @@ public class LegalActivity extends Activity {
         addDocument(r,"LICENSE","End User License Agreement","The personal app license, ownership, restrictions, updates, third-party components and termination.",LegalDocumentActivity.DOC_EULA,TornFcaUi.BLUE);
 
         if(requireAcceptance){
-            LinearLayout accept=TornFcaUi.card(this,"ACKNOWLEDGEMENT","Accept current legal version","You can review these documents again later from More → Legal & Privacy and About TornFCA.",TornFcaUi.PURPLE);
+            LinearLayout accept=TornFcaUi.card(this,"ACKNOWLEDGEMENT","Accept current legal version","These choices are kept on this device with the legal version and acknowledgement time. Material legal changes can require acknowledgement again.",TornFcaUi.PURPLE);
 
-            CheckBox box=new CheckBox(this);
-            box.setText("I have reviewed the Privacy Policy, agree to the Terms & Conditions, and agree to the EULA.");
-            box.setTextColor(TornFcaUi.TEXT);
-            box.setTextSize(13f);
-            LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
-            bp.topMargin=TornFcaUi.dp(this,10);
-            accept.addView(box,bp);
+            CheckBox privacyBox=new CheckBox(this);
+            privacyBox.setText("I have reviewed the Privacy Policy and understand the data-use notice above.");
+            privacyBox.setTextColor(TornFcaUi.TEXT);
+            privacyBox.setTextSize(13f);
+            LinearLayout.LayoutParams privacyParams=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+            privacyParams.topMargin=TornFcaUi.dp(this,10);
+            accept.addView(privacyBox,privacyParams);
+
+            CheckBox agreementBox=new CheckBox(this);
+            agreementBox.setText("I agree to the Terms & Conditions and the End User License Agreement.");
+            agreementBox.setTextColor(TornFcaUi.TEXT);
+            agreementBox.setTextSize(13f);
+            LinearLayout.LayoutParams agreementParams=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+            agreementParams.topMargin=TornFcaUi.dp(this,6);
+            accept.addView(agreementBox,agreementParams);
 
             Button continueButton=TornFcaUi.button(this,"Accept & Continue",TornFcaUi.GREEN);
             continueButton.setEnabled(false);
-            box.setOnCheckedChangeListener((buttonView,isChecked)->continueButton.setEnabled(isChecked));
+            Runnable updateEnabled=()->continueButton.setEnabled(privacyBox.isChecked()&&agreementBox.isChecked());
+            privacyBox.setOnCheckedChangeListener((buttonView,isChecked)->updateEnabled.run());
+            agreementBox.setOnCheckedChangeListener((buttonView,isChecked)->updateEnabled.run());
             continueButton.setOnClickListener(v->{
-                if(!box.isChecked()){
-                    Toast.makeText(this,"Please review and acknowledge the legal documents first.",Toast.LENGTH_SHORT).show();
+                if(!privacyBox.isChecked()||!agreementBox.isChecked()){
+                    Toast.makeText(this,"Please complete both acknowledgement choices first.",Toast.LENGTH_SHORT).show();
                     return;
                 }
                 LegalAcceptanceStore.acceptCurrent(this);
@@ -88,7 +106,7 @@ public class LegalActivity extends Activity {
             TornFcaUi.add(this,r,accept);
         }
 
-        TextView note=TornFcaUi.footer(this,"TornFCA is an independent community project. Torn and optional integrated services are separate services.");
+        TextView note=TornFcaUi.footer(this,"TornFCA is an independent community project. Torn and optional integrated services are separate services. Legal documents can be reviewed again from More, Settings or About TornFCA.");
         LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
         np.topMargin=TornFcaUi.dp(this,8);
         r.addView(note,np);

@@ -15,7 +15,7 @@ This checklist is a release-preparation aid, not legal advice. Re-check Google P
 
 ## 2. App legal surfaces
 
-Current in-app legal version: `2026-08-17-v2`.
+Current in-app legal version: `2026-08-17-v3`.
 
 - [x] Versioned local legal acknowledgement store.
 - [x] First-run/current-version legal acknowledgement before Torn API sign-in.
@@ -23,10 +23,13 @@ Current in-app legal version: `2026-08-17-v2`.
 - [x] Terms & Conditions available in-app.
 - [x] EULA available in-app.
 - [x] Legal documents reachable again from More, Settings and About.
-- [x] Privacy is acknowledged separately from agreement to Terms/EULA in the acceptance wording.
-- [x] FCM Messaging auto-init is disabled before the current legal version is acknowledged; TornFCA explicitly enables push after acknowledgement.
+- [x] First-run flow includes a concise pre-sign-in data-use disclosure.
+- [x] Privacy/data-use acknowledgement is a separate checkbox from agreement to Terms/EULA.
+- [x] FCM Messaging auto-init is disabled before the current legal version is acknowledged.
+- [x] `PushNotifications` independently checks current legal acknowledgement before initialization/sync so a future caller cannot accidentally bypass the gate.
 - [ ] Final developer/legal review of the production wording.
-- [ ] If material legal wording changes, bump `LegalAcceptanceStore.LEGAL_VERSION` so users are asked again.
+- [ ] Insert the final public privacy/support contact into the production policy before release.
+- [ ] If material legal wording changes again, bump `LegalAcceptanceStore.LEGAL_VERSION` so users are asked again.
 
 ## 3. Public privacy-policy hosting
 
@@ -40,7 +43,7 @@ Google Play requires a public privacy-policy URL as well as in-app access.
 - [ ] Enter the URL in Play Console → Policy/App content → Privacy policy.
 - [ ] Keep public wording synchronized with `LegalDocumentActivity`.
 
-A `docs/privacy-policy.html` publication draft can be hosted after a public HTTPS host is configured. It is intentionally marked `noindex` and as a draft until the public privacy contact and production hosting are ready.
+A `docs/privacy-policy.html` publication draft can be hosted after a public HTTPS host is configured. It remains intentionally marked as a draft until the public privacy contact and production hosting are ready.
 
 ## 4. Data Safety inventory — current Android/community architecture
 
@@ -84,6 +87,7 @@ When those features are enabled/configured, TornFCA services may store/process:
 - Faction chat messages.
 - Faction training rules and custom guides/resources.
 - Other faction-scoped shared notices/content used by enabled TornFCA community features.
+- Community moderation/report records once UGC moderation is enabled.
 
 The shared-services design verifies current faction identity/permissions. Torn API keys may be transmitted over HTTPS for verification but are not intended to be persisted by the TornFCA backend.
 
@@ -98,7 +102,7 @@ The shared-services design verifies current faction identity/permissions. Torn A
 
 ### Likely Data safety categories to review carefully
 
-Do not blindly copy these; answer from the exact production build and Google definitions:
+Do not blindly copy these; answer from the exact production build and Google's current definitions:
 
 - User IDs / identifiers: likely applicable because verified Torn player IDs and faction scope can be processed by TornFCA services.
 - Device or other IDs: review FCM registration tokens and Firebase Installation IDs under Google's current definitions.
@@ -109,7 +113,24 @@ Do not blindly copy these; answer from the exact production build and Google def
 - Crash/diagnostics: confirm production dependencies before declaring.
 - Location, contacts, SMS/call log, microphone and camera: not part of the current TornFCA architecture; confirm permissions remain absent in the production manifest.
 
-## 5. Retention and deletion
+## 5. UGC/community moderation release bar
+
+Faction Chat and faction-authored shared content make TornFCA subject to Google Play's user-generated-content requirements when those features are enabled.
+
+- [x] Users must accept TornFCA Terms before they can reach faction chat/community posting.
+- [x] Terms define prohibited community behavior/content and permit moderation/removal.
+- [ ] Add an obvious in-app **Report** action for chat messages/content and the author.
+- [ ] Add an obvious in-app **Block user** action for user-to-user chat interaction.
+- [ ] Ensure blocked users/content are actually hidden or prevented from interacting as designed.
+- [ ] Add backend report intake scoped to verified reporter, faction, content/message and accused user.
+- [ ] Add a moderation review/action path with auditability and faction isolation.
+- [ ] Prevent ordinary faction leadership from using moderation controls to cross faction boundaries.
+- [ ] Decide and document retention for reports/moderation records.
+- [ ] Test report/block behavior, deleted messages, faction changes and role changes.
+- [ ] Complete Play content-rating/UGC declarations accurately.
+- [ ] Do **not** call community chat production-ready or enable it for the public release until report/block/moderation is complete.
+
+## 6. Retention and deletion
 
 - [ ] Publish a clear privacy/deletion contact mechanism before public release.
 - [ ] Document how TornFCA-hosted player/community data is deleted on request.
@@ -117,9 +138,9 @@ Do not blindly copy these; answer from the exact production build and Google def
 - [ ] Make clear that deleting TornFCA data cannot delete independent data held by Torn, Google/Firebase, FFScouter or TornStats; users may need to use those providers' own controls.
 - [ ] Review backend sheets/storage for stale FCM tokens and establish a reasonable cleanup rule.
 
-## 6. Store/review readiness
+## 7. Store/review readiness
 
-- [ ] Current production target SDK remains compliant with the submission deadline (currently targetSdk 36 in this branch).
+- [x] Current branch targets Android 16 / API 36, meeting the Google Play requirement that begins August 31, 2026 for new apps and updates.
 - [ ] Complete Data safety form and make sure every answer matches the privacy policy and exact production SDK list.
 - [ ] Complete content rating and target-audience declarations.
 - [ ] Declare ads accurately.
@@ -129,13 +150,25 @@ Do not blindly copy these; answer from the exact production build and Google def
 - [ ] Verify release build contains no developer PIN/secrets, test API keys, private backend credentials or debug-only access paths.
 - [ ] Verify merged release manifest still has both `firebase_analytics_collection_enabled=false` and `firebase_messaging_auto_init_enabled=false`.
 
-## 7. Navigation/usability release bar
+## 8. Navigation/usability release bar
 
-- [ ] A normal member can reach My Day in one obvious action.
-- [ ] Member Center is grouped by: Start Here; Daily & Readiness; Growth & Training; My Faction; Community & Alerts; Optional Upgrade.
-- [ ] Labels describe the user's task, not internal implementation names.
-- [ ] Core/free tools appear before Premium.
-- [ ] Leadership tools do not crowd ordinary member navigation.
+- [x] A normal member has one obvious home for everyday faction tools: Member Center.
+- [x] Member Center is grouped by: Start Here; Daily & Readiness; Growth & Training; My Faction; Community & Alerts; Optional Upgrade.
+- [x] More no longer duplicates Chat and Notification Inbox as competing top-level destinations; it points users back to Member Center for everyday tools.
+- [x] Settings is grouped by notifications/community, account/security, optional services/plan, legal/privacy and account action.
+- [x] Labels describe the user's task, not internal implementation names.
+- [x] Core/free tools appear before Premium.
+- [x] Leadership tools do not crowd ordinary member navigation.
 - [ ] Every screen has a clear back path and one obvious primary action.
-- [ ] Long explanatory copy uses short paragraphs/cards rather than walls of text.
-- [ ] Legal documents are discoverable but do not dominate day-to-day navigation after acknowledgement.
+- [ ] Long explanatory copy uses short paragraphs/cards rather than walls of text across every new member screen.
+- [x] Legal documents are discoverable but do not dominate day-to-day navigation after acknowledgement.
+
+## 9. v0.9.27 completion rule
+
+Do not bump/promote the final v0.9.27 candidate merely because the legal/navigation pass is complete. The candidate is ready only when:
+
+1. regular-member features are enjoyable and coherent,
+2. UGC report/block/moderation is complete if faction chat is enabled,
+3. public privacy contact/hosting and Play Data Safety work are ready,
+4. the exact beta candidate passes device/build audits,
+5. the user explicitly approves the candidate before any `main` promotion or production AAB.
