@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.9.25 — 2026-08-17
+
+- Reorganized the free Member Center around plain-language workflows: **Start Here**, **Daily & Readiness**, **Growth & Training**, **My Faction**, **Community & Alerts**, and **Optional Upgrade**.
+- Kept everyday navigation intentionally compact rather than adding more bottom-navigation tabs; Home/Faction/War remain the primary routes and deeper member tools are organized under Member Center.
+- Added versioned first-run legal acknowledgement before Torn API sign-in.
+- Added in-app **Privacy Policy**, **Terms & Conditions**, and **End User License Agreement** screens.
+- Added persistent access to Legal & Privacy from More, Settings, and About TornFCA.
+- Added a device-local legal-version/timestamp record so materially revised legal documents can require renewed acknowledgement later.
+- Added a Google Play release/Data safety checklist grounded in TornFCA's current Torn API, device storage, faction community, FCM, FFScouter, and TornStats architecture.
+- Added a clearly marked web privacy-policy publication draft; it remains non-production until a public privacy contact is chosen and HTTPS hosting is enabled/tested.
+- Expanded the Member Core CI audit to protect member navigation, free-core discoverability, legal routing, local privacy boundaries, and faction isolation.
+- Bumped Android versionCode to 42 and versionName to 0.9.25.
+
+## v0.9.24 — 2026-08-17
+
+- Added free **My War Prep** for ordinary faction members.
+- Added current/upcoming ranked-war timing plus the signed-in member's own bars, cooldowns, travel, refills, and organized-crime context.
+- Added a five-step personal readiness checklist scoped to `player_id + faction_id + war cycle`, preventing checklist state from carrying into another faction or future war.
+- Added shortcuts from War Prep to My War, My Day, Faction Resources, and faction community tools.
+- Kept faction-specific requirements in faction-authored rules/guides rather than inventing universal energy, Xanax, travel, or war-readiness requirements inside TornFCA.
+- Preserved the v0.9.23 faction-resource restore point before introducing War Prep.
+- Bumped Android versionCode to 41 and versionName to 0.9.24.
+
 ## v0.9.23 — 2026-08-17
 
 - Added **Faction Resources** to the free Member Center for ordinary faction members.
