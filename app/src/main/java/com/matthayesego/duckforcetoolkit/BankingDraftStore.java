@@ -46,6 +46,9 @@ public final class BankingDraftStore {
         return scoped;
     }
 
+    /** Compatibility wrapper for the legacy shell; resolves only already-verified local scope. */
+    public static JSONArray all(Context context){return all(context,currentSession(context));}
+
     private static JSONArray read(Context context) {
         try {
             SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -53,6 +56,13 @@ public final class BankingDraftStore {
         } catch (Exception ignored) {
             return new JSONArray();
         }
+    }
+
+    private static AuthSession currentSession(Context context){
+        if(context==null)return null;String key=new SecureApiKeyStore(context).load();if(key==null||key.isBlank())return null;
+        AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return hot;
+        FactionScopeCache.Scope scope=FactionScopeCache.load(context,key);if(scope==null)return null;
+        return new AuthSession(scope.playerId,scope.playerName,scope.factionId,scope.factionName,scope.position,scope.factionApiAccess,AccessTier.GREEN,new JSONArray(),new JSONArray(),AccessPolicy.isLeaderPosition(scope.position));
     }
 
     private static JSONArray scopedRows(JSONArray rows,AuthSession session){
@@ -136,4 +146,6 @@ public final class BankingDraftStore {
             prefs.edit().putString(KEY,keep.toString()).apply();
         }catch(Exception ignored){}
     }
+
+    public static void clear(Context context){clear(context,currentSession(context));}
 }
