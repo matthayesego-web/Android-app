@@ -34,6 +34,7 @@ public class FeatureRouterActivity extends Activity {
 
     private void route(){
         final String target=getIntent().getStringExtra(EXTRA_TARGET);final String key=keyStore.load();
+        if(!isKnownTarget(target)){showStatus("This TornFCA feature route is unavailable.",BAD);return;}
         if(key==null||key.trim().isEmpty()){showStatus("No active Torn API key is available. Return to TornFCA and sign in again.",BAD);return;}
         if(!TARGET_DEVELOPER.equals(target)){
             FactionScopeCache.Scope cached=FactionScopeCache.load(this,key);
@@ -49,6 +50,12 @@ public class FeatureRouterActivity extends Activity {
         // Member Preview must behave like a member across every downstream screen. Never pass the
         // real leader position into preview-routed WarPay/leadership activities.
         String effectivePosition=DeveloperPreviewStore.isMemberPreview(this)?"Member":position;
+        if(requiresLeadership(target)&&!AccessPolicy.isLeaderPosition(effectivePosition)){
+            showStatus("This tool is restricted to faction leadership. Member Preview uses the same access boundary as a normal member.",BAD);
+            return;
+        }
         Intent i;if(TARGET_WAR.equals(target)){i=new Intent(this,WarCenterActivity.class);}else if(TARGET_WAR_PAYOUT.equals(target)){i=new Intent(this,WarPayoutActivity.class);}else if(TARGET_BANKING.equals(target)){i=new Intent(this,BankingCompanionActivity.class);}else if(TARGET_LOOKUP.equals(target)){i=new Intent(this,MemberDossierActivity.class);}else if(TARGET_STRENGTH.equals(target)){i=new Intent(this,FactionStrengthActivity.class);}else if(TARGET_OC.equals(target)){i=new Intent(this,OcTrackerActivity.class);}else if(TARGET_PULSE.equals(target)){i=new Intent(this,QuickIntelActivity.class);i.putExtra(QuickIntelActivity.EXTRA_MODE,QuickIntelActivity.MODE_PULSE);}else{String mode;if(TARGET_CHAIN.equals(target))mode=FactionOpsActivity.MODE_CHAIN;else mode=FactionOpsActivity.MODE_ACTIVITY;i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);}putScope(i,factionId,factionName,effectivePosition,factionApiAccess);startActivity(i);finish();}
+    private boolean requiresLeadership(String target){return TARGET_ACTIVITY.equals(target)||TARGET_PULSE.equals(target)||TARGET_LOOKUP.equals(target)||TARGET_WAR_PAYOUT.equals(target);}
+    private boolean isKnownTarget(String target){return TARGET_ACTIVITY.equals(target)||TARGET_WAR.equals(target)||TARGET_WAR_PAYOUT.equals(target)||TARGET_BANKING.equals(target)||TARGET_CHAIN.equals(target)||TARGET_OC.equals(target)||TARGET_PULSE.equals(target)||TARGET_LOOKUP.equals(target)||TARGET_STRENGTH.equals(target)||TARGET_DEVELOPER.equals(target);}
     private void putScope(Intent i,int factionId,String factionName,String position,boolean factionApiAccess){i.putExtra(FactionOpsActivity.EXTRA_FACTION_ID,factionId);i.putExtra(FactionOpsActivity.EXTRA_FACTION_NAME,factionName);i.putExtra(FactionOpsActivity.EXTRA_FACTION_API,factionApiAccess);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,factionId);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,factionName);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,factionApiAccess);i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,position);}
 }
