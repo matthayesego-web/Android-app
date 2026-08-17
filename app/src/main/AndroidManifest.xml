@@ -29,6 +29,7 @@
         <activity android:name=".NotificationInboxActivity" android:exported="false"/>
         <activity android:name=".MemberCenterActivity" android:exported="false"/>
         <activity android:name=".MemberDirectoryActivity" android:exported="false"/>
+        <activity android:name=".FactionResourcesActivity" android:exported="false"/>
         <activity android:name=".TrainingCenterActivity" android:exported="false"/>
         <activity android:name=".TrainingAdminActivity" android:exported="false"/>
         <activity android:name=".TrainingProgressActivity" android:exported="false"/>
