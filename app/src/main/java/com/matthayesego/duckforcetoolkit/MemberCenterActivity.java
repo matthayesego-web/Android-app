@@ -15,33 +15,33 @@ public class MemberCenterActivity extends Activity {
 
     private void render(){
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
-        TornFcaUi.header(this,r,"More","Member Center","Start with My Day, then use the section that matches what you are doing. Core faction-member tools stay free.");
+        TornFcaUi.header(this,r,"More","Member Center","Start with My Day, then choose the section that matches what you want to do. Core faction-member tools stay free.");
 
         TornFcaUi.addSection(this,r,"Start here");
-        addLaunch(r,"TODAY","My Day","One-screen summary of bars, cooldowns, refills, your OC, chain, current war and what may need attention.",TornFcaUi.GREEN,MemberDailyActivity.class,null,"Open My Day");
+        addLaunch(r,"TODAY","My Day","See your bars, cooldowns, refills, OC, chain, current war and anything that may need your attention.",TornFcaUi.GREEN,MemberDailyActivity.class,null,"Open My Day");
 
         TornFcaUi.addSection(this,r,"Daily & readiness");
-        addLaunch(r,"WAR PREP","My War Prep","Check your personal readiness and a war-specific checklist before fighting starts.",TornFcaUi.GOLD,WarPrepActivity.class,null,"Open War Prep");
-        addLaunch(r,"WAR","My War","See your current ranked-war participation and recent completed-war history.",TornFcaUi.RED,MemberWarActivity.class,null,"Open My War");
-        addLaunch(r,"OC","My Organized Crime","See your own OC assignment and readiness. Leadership-wide OC information remains permission-gated.",TornFcaUi.PURPLE,null,FeatureRouterActivity.TARGET_OC,"Open My OC");
-        addLaunch(r,"CHAIN","Chain Status","See the current faction chain and your participation context.",TornFcaUi.BLUE,null,FeatureRouterActivity.TARGET_CHAIN,"Open Chain Status");
+        addLaunch(r,"WAR PREP","My War Prep","Check your personal readiness and work through a checklist for the current or upcoming war.",TornFcaUi.GOLD,WarPrepActivity.class,null,"Open War Prep");
+        addLaunch(r,"WAR","My War","See your current ranked-war participation and your recent completed wars.",TornFcaUi.RED,MemberWarActivity.class,null,"Open My War");
+        addLaunch(r,"OC","My Organized Crime","See your own OC assignment and readiness. Faction-wide OC details are shown only to leaders who have access.",TornFcaUi.PURPLE,null,FeatureRouterActivity.TARGET_OC,"Open My OC");
+        addLaunch(r,"CHAIN","Chain Status","See the current faction chain and your participation.",TornFcaUi.BLUE,null,FeatureRouterActivity.TARGET_CHAIN,"Open Chain Status");
 
         TornFcaUi.addSection(this,r,"Growth & training");
-        addLaunch(r,"TRAINING","Training Center","Read TornFCA starter guides plus your faction's current training rules and private guide library.",TornFcaUi.PURPLE,TrainingCenterActivity.class,null,"Open Training Center");
-        addLaunch(r,"PROGRESS","My Training Progress","Track your own battle-stat and Xanax progress from a private faction-specific baseline.",TornFcaUi.GREEN,TrainingProgressActivity.class,null,"Open My Progress");
+        addLaunch(r,"TRAINING","Training Center","Read TornFCA starter guides plus training rules and guides published by your current faction.",TornFcaUi.PURPLE,TrainingCenterActivity.class,null,"Open Training Center");
+        addLaunch(r,"PROGRESS","My Training Progress","Track your own battle stats and Xanax use from a baseline saved only on this device for this faction.",TornFcaUi.GREEN,TrainingProgressActivity.class,null,"Open My Progress");
 
         TornFcaUi.addSection(this,r,"My faction");
-        addLaunch(r,"RESOURCES","Faction Resources","Start here when joining a faction: onboarding checklist, local rules, guides and useful shortcuts.",TornFcaUi.GOLD,FactionResourcesActivity.class,null,"Open Faction Resources");
-        addLaunch(r,"OVERVIEW","Faction Overview","Member-safe faction status and current faction information.",TornFcaUi.GOLD,MemberFactionActivity.class,null,"Open Faction Overview");
-        addLaunch(r,"DIRECTORY","Faction Directory","Search the current roster and open member-safe status cards without leadership analytics.",TornFcaUi.BLUE,MemberDirectoryActivity.class,null,"Open Directory");
+        addLaunch(r,"RESOURCES","Faction Resources","New here? Find your faction's onboarding checklist, rules, guides and useful shortcuts.",TornFcaUi.GOLD,FactionResourcesActivity.class,null,"Open Faction Resources");
+        addLaunch(r,"OVERVIEW","Faction Overview","See your faction's current status and information available to members.",TornFcaUi.GOLD,MemberFactionActivity.class,null,"Open Faction Overview");
+        addLaunch(r,"DIRECTORY","Faction Directory","Search your faction roster and open basic member status cards.",TornFcaUi.BLUE,MemberDirectoryActivity.class,null,"Open Directory");
 
         TornFcaUi.addSection(this,r,"Community & alerts");
-        addLaunch(r,"COMMUNITY","Faction Chat",CommunityBackendClient.isConfigured()?"Chat with authenticated members of your current faction inside TornFCA.":"Faction chat is installed; the shared community connection is not configured in this build.",TornFcaUi.BLUE,FactionChatActivity.class,null,"Open Faction Chat");
+        addLaunch(r,"COMMUNITY","Faction Chat",CommunityBackendClient.isConfigured()?"Chat with verified members of your current faction inside TornFCA.":"Faction Chat is not available in this build yet.",TornFcaUi.BLUE,FactionChatActivity.class,null,"Open Faction Chat");
         addLaunch(r,"ALERTS","Notification Inbox","Review important TornFCA alerts after they leave Android's notification shade.",TornFcaUi.GOLD,NotificationInboxActivity.class,null,"Open Notification Inbox");
 
         TornFcaUi.addSection(this,r,"Optional upgrade");
         int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS);
-        addLaunch(r,premium?"PREMIUM ACTIVE":"PREMIUM","Premium Insights",premium?"Your deeper personal history and analytics are active.":"Optional deeper history, analytics, automation and convenience. The core member tools above remain free.",TornFcaUi.GOLD,PremiumInsightsActivity.class,null,premium?"Open Premium Insights":"Preview Premium");
+        addLaunch(r,premium?"PREMIUM ACTIVE":"PREMIUM","Premium Insights",premium?"Your extra history and personal analytics are active.":"Optional extra history, analytics, automation and convenience. The core member tools above remain free.",TornFcaUi.GOLD,PremiumInsightsActivity.class,null,premium?"Open Premium Insights":"Preview Premium");
 
         setContentView(s);s.requestApplyInsets();
     }
