@@ -18,6 +18,8 @@ jobs:
         run: |
           set -euo pipefail
           CURRENT=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
+          HOTFIX=app/src/main/java/com/matthayesego/duckforcetoolkit/CurrentShellVisualHotfix.java
+          GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
 
           # Five tabs for members, Leadership conditionally adds the sixth.
@@ -27,6 +29,16 @@ jobs:
           grep -q 'navItem("Training"' "$CURRENT"
           grep -q 'if(identity!=null&&identity.leader)nav.addView(navItem("Leadership"' "$CURRENT"
           grep -q 'navItem("More"' "$CURRENT"
+
+          # Icon-first navigation hotfix is installed from the launcher.
+          grep -q 'CurrentShellVisualHotfix.install' "$GATE"
+          grep -q 'R.drawable.ic_nav_home' "$HOTFIX"
+          grep -q 'R.drawable.ic_nav_faction' "$HOTFIX"
+          grep -q 'R.drawable.ic_nav_war' "$HOTFIX"
+          grep -q 'R.drawable.ic_nav_training' "$HOTFIX"
+          grep -q 'R.drawable.ic_nav_leadership' "$HOTFIX"
+          grep -q 'R.drawable.ic_nav_more' "$HOTFIX"
+          grep -q 'tornfca-premium-action-label' "$HOTFIX"
 
           # Home remains a summary instead of a full tool catalog.
           grep -q '"Your faction companion"' "$CURRENT"

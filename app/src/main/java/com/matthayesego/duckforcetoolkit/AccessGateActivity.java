@@ -7,8 +7,9 @@ import android.os.Bundle;
 
 /**
  * TornFCA launcher shim.
- * v0.9.30 keeps the old beta access-code wall removed, enforces the current legal acknowledgement,
- * and opens the current persistent mobile dashboard after the user has accepted the legal version.
+ * v0.9.31 keeps the old beta access-code wall removed, enforces the current legal acknowledgement,
+ * installs the current-shell visual hotfix, and opens the persistent mobile dashboard after the
+ * user has accepted the legal version.
  * Historical release-audit marker: TornFcaActivity.class remains the authenticated bootstrap parent
  * underneath TornFcaCurrentActivity, but is no longer the visible launcher destination.
  */
@@ -17,6 +18,7 @@ public class AccessGateActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Color.rgb(6,9,13));
         getWindow().setNavigationBarColor(Color.rgb(6,9,13));
+        CurrentShellVisualHotfix.install(getApplication());
         Intent i;
         if(LegalAcceptanceStore.hasAcceptedCurrent(this))i=new Intent(this,TornFcaCurrentActivity.class);
         else{
