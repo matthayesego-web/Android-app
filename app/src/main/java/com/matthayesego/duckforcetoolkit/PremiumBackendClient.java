@@ -17,6 +17,7 @@ public final class PremiumBackendClient {
     private static final String URL_VALUE=BuildConfig.PREMIUM_BACKEND_URL==null?"":BuildConfig.PREMIUM_BACKEND_URL.trim();
     private static final String PREFS="tornfca_premium_sync";
     private static final long REFRESH_MS=5L*60L*1000L;
+    private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android";
     private PremiumBackendClient(){}
 
     public static boolean isConfigured(){return URL_VALUE.startsWith("https://")&&!URL_VALUE.contains("###");}
@@ -57,7 +58,7 @@ public final class PremiumBackendClient {
         HttpURLConnection c=(HttpURLConnection)new URL(URL_VALUE).openConnection();
         try{
             c.setRequestMethod("POST");c.setConnectTimeout(12000);c.setReadTimeout(20000);c.setUseCaches(false);c.setDoOutput(true);
-            c.setRequestProperty("Content-Type","text/plain;charset=UTF-8");c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","TornFCA/0.9.12 Android");
+            c.setRequestProperty("Content-Type","text/plain;charset=UTF-8");c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent",USER_AGENT);
             byte[] payload=body.toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=c.getOutputStream()){out.write(payload);}int code=c.getResponseCode();InputStream in=code>=400?c.getErrorStream():c.getInputStream();String raw=in==null?"":readAll(in);if(code<200||code>=300)throw new Exception("Premium backend HTTP "+code);return new JSONObject(raw);
         }finally{c.disconnect();}
     }
