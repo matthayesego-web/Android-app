@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.9.28 — 2026-08-17
+
+- Split the member-facing **War Center** into two clear modes: **Ranked War** and **Territories**, while keeping a single simple War destination in bottom navigation.
+- Kept the existing ranked-war workflow intact but relabeled it clearly as Ranked War, including live status, opponent intelligence, participation, completed history and leadership payout tools.
+- Added a member-safe **Territories** screen using Torn API v2's dedicated current warfare, faction territory and territory-war history endpoints.
+- Added faction territory summaries for owned blocks, total daily respect, rackets, sector, size, density, wall slots and acquired date.
+- Added live territory-war cards with assault/defense context, opponent, current scores, target, wall counts and whether the signed-in member is currently on the wall.
+- Added completed territory-war history plus an official report drill-down showing faction totals and the signed-in member's score, joins and clears when Torn returns a contribution row.
+- Added a plain-language Territory explanation so members unfamiliar with the system can understand what the data means without leaving TornFCA.
+- Updated My War Prep so members are prompted to check whether their faction is using Ranked War, Territories or both, and routed its war shortcut through the split War Center.
+- Registered all new War/Territory activities as internal-only Android screens and expanded Member Core CI to protect the split, Torn endpoint choices and personal contribution fields.
+- Verified the implementation against Torn's current OpenAPI 6.10.2 dedicated warfare endpoints rather than the deprecated generic `/faction/warfare` route.
+- Changed `TornFcaBrand.VERSION` to derive from Android `BuildConfig.VERSION_NAME`, preventing stale hard-coded visible-version labels in future releases.
+- Bumped Android versionCode to 45 and versionName to 0.9.28.
+
 ## v0.9.27 — 2026-08-17
 
 - Completed the release-preparation legal/privacy pass for the expanded member experience while keeping `main` untouched.
