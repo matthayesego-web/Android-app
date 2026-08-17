@@ -26,7 +26,7 @@ public final class FFScouterClient {
     public static final String HOMEPAGE="https://ffscouter.com/";
     public static final String API_DOCS="https://ffscouter.com/api-docs";
     private static final String PREFS="tornfca_ffscouter_consent_v2";
-    private static final String USER_AGENT="TornFCA/0.9.13 Android";
+    private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android";
     private static final Pattern API_KEY=Pattern.compile("^[A-Za-z0-9]{16}$");
 
     // FFScouter currently documents 20/min for get-stats, 10/min for check-key and 3/min for
@@ -77,7 +77,7 @@ public final class FFScouterClient {
         if(playerIds==null||playerIds.isEmpty())return new JSONArray();
         StringBuilder targets=new StringBuilder();
         for(int i=0;i<playerIds.size()&&i<205;i++){if(i>0)targets.append(',');targets.append(playerIds.get(i));}
-        String cacheKey="stats|"+fingerprint(key)+"|"+Integer.toHexString(targets.toString().hashCode());String cached=cacheBody(cacheKey);if(cached!=null)try{return new JSONArray(cached);}catch(Exception ignored){CACHE.remove(cacheKey);}
+        String cacheKey="stats|"+fingerprint(key)+"|"+fingerprint(targets.toString());String cached=cacheBody(cacheKey);if(cached!=null)try{return new JSONArray(cached);}catch(Exception ignored){CACHE.remove(cacheKey);}
         waitForStatsSlot();
         String url=BASE+"/get-stats?key="+URLEncoder.encode(key,StandardCharsets.UTF_8.name())+"&targets="+URLEncoder.encode(targets.toString(),StandardCharsets.UTF_8.name());
         String trimmed=get(url).trim();
