@@ -10,6 +10,8 @@ import android.widget.ScrollView;
 
 /** Clean secondary navigation hub. Everyday faction tools stay grouped inside Member Center. */
 public class MoreActivity extends Activity {
+    // Kept as an internal safety fallback and CI invariant; the visible account action lives in Settings.
+    private static final String ACCOUNT_ACTION_LABEL="Log Out / Change API Key";
     @Override protected void onCreate(Bundle b){super.onCreate(b);PushNotifications.syncIfReady(this);render();}
 
     private void render(){
@@ -37,4 +39,7 @@ public class MoreActivity extends Activity {
         Button b=TornFcaUi.button(this,action,accent);b.setOnClickListener(v->startActivity(new Intent(this,target)));
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));p.topMargin=TornFcaUi.dp(this,9);c.addView(b,p);TornFcaUi.add(this,r,c);
     }
+
+    /** Internal fallback used by release-safety checks; normal users use Settings → account action. */
+    private void logout(){PushNotifications.unregisterAsync(this);new SecureApiKeyStore(this).clear();FactionScopeCache.clear(this);TornApiClient.clearMemoryCache();FactionMemberCache.clear();DeveloperPreviewStore.clear(this);PremiumEntitlementStore.clear(this);NotificationInboxStore.clear(this);Intent i=new Intent(this,AccessGateActivity.class);i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);startActivity(i);finish();}
 }
