@@ -52,6 +52,7 @@ public final class TornFcaBrand {
         }
         applyView(activity,root,theme);
         enhanceLeadership(activity,root,theme);
+        PremiumActionPolish.apply(activity,root);
         observeLeadership(activity,root);
         animateOnce(activity,root);
     }
@@ -146,7 +147,7 @@ public final class TornFcaBrand {
         if(OBSERVED.put(root,Boolean.TRUE)!=null)return;
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->{
             if(activity.isFinishing())return;
-            try{enhanceLeadership(activity,root,FactionTheme.forContext(activity));}catch(Exception ignored){}
+            try{enhanceLeadership(activity,root,FactionTheme.forContext(activity));PremiumActionPolish.apply(activity,root);}catch(Exception ignored){}
         });
     }
 
