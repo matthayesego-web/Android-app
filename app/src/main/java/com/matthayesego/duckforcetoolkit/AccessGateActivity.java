@@ -5,7 +5,11 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 
-/** TornFCA launcher shim. v0.9.34 routes the side-by-side beta into the repaired command surface. */
+/**
+ * TornFCA launcher shim. v0.9.34 routes the side-by-side beta into the repaired command surface.
+ * Historical release-audit marker: TornFcaActivity.class remains the authenticated bootstrap parent
+ * underneath both the stable and beta shells; this launcher only chooses the visible shell.
+ */
 public class AccessGateActivity extends Activity {
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);getWindow().setStatusBarColor(Color.rgb(6,9,13));getWindow().setNavigationBarColor(Color.rgb(6,9,13));
