@@ -125,8 +125,9 @@ public class TornFcaActivity extends V098CompanionActivity {
         FactionTheme theme=FactionTheme.forContext(this);
         TextView notice=new TextView(this);
         notice.setTag("tornfca-api-requirement");
-        notice.setText("API KEY REQUIREMENT\nUse one 16-character Limited Access Torn API key for TornFCA. Full Access is NOT required. Leadership-only faction data additionally depends on your in-game Faction API Access permission.\n\nStorage: you choose whether the key stays only for this app session or is AES-GCM encrypted on this device for a limited number of days. TornFCA sends it to Torn's official API for requested features. Shared notices/banking may temporarily send it over HTTPS to the TornFCA faction backend to verify identity/permissions; that backend does not store the key. FFScouter and TornStats receive the key only after separate explicit opt-in, under their own terms/data policies.");
+        notice.setText("LIMITED ACCESS API KEY\nUse one 16-character Limited Access Torn API key. Full Access is not required.\n\nYour key stays only for this app session unless you choose encrypted storage below. Leadership tools may also require your in-game Faction API Access permission.\n\nTap here to review Legal & Privacy.");
         notice.setTextSize(12f);notice.setTextColor(Color.rgb(224,232,241));notice.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));notice.setLineSpacing(0f,1.12f);notice.setPadding(dp(13),dp(12),dp(13),dp(12));
+        notice.setClickable(true);notice.setFocusable(true);notice.setOnClickListener(v->startActivity(new Intent(this,LegalActivity.class)));
         GradientDrawable bg=new GradientDrawable();bg.setColor(Color.rgb(8,18,25));bg.setCornerRadius(dp(13));bg.setStroke(dp(1),theme.accent);notice.setBackground(bg);
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(12);p.bottomMargin=dp(3);card.addView(notice,Math.min(2,card.getChildCount()),p);
     }
