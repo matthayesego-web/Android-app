@@ -21,6 +21,9 @@ jobs:
 
           MEMBER=app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
           MANIFEST=app/src/main/AndroidManifest.xml
+          WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+          TERRITORY=app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarActivity.java
+          TERRITORY_DETAIL=app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarDetailActivity.java
 
           grep -q '"My Day"' "$MEMBER"
           grep -q '"Faction Directory"' "$MEMBER"
@@ -28,6 +31,8 @@ jobs:
           grep -q '"Training Center"' "$MEMBER"
           grep -q '"My Training Progress"' "$MEMBER"
           grep -q '"My War Prep"' "$MEMBER"
+          grep -q '"War Center"' "$MEMBER"
+          grep -q 'FeatureRouterActivity.TARGET_WAR' "$MEMBER"
           grep -q '"Start here"' "$MEMBER"
           grep -q '"Daily & readiness"' "$MEMBER"
           grep -q '"Growth & training"' "$MEMBER"
@@ -42,9 +47,32 @@ jobs:
           grep -q 'TrainingCenterActivity" android:exported="false"' "$MANIFEST"
           grep -q 'TrainingProgressActivity" android:exported="false"' "$MANIFEST"
           grep -q 'WarPrepActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'WarHubActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'TerritoryWarActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'TerritoryWarDetailActivity" android:exported="false"' "$MANIFEST"
           grep -q 'LegalActivity" android:exported="false"' "$MANIFEST"
           grep -q 'LegalDocumentActivity" android:exported="false"' "$MANIFEST"
           grep -q 'CommunityModerationActivity" android:exported="false"' "$MANIFEST"
+
+          # War must remain one simple entry point, then split cleanly into Ranked War and Territories.
+          grep -q 'TARGET_WAR.equals(target)){i=new Intent(this,WarHubActivity.class)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q '"Ranked War"' "$WARHUB"
+          grep -q '"Territories"' "$WARHUB"
+          grep -q 'WarCenterActivity.class' "$WARHUB"
+          grep -q 'TerritoryWarActivity.class' "$WARHUB"
+          grep -q 'WarHubActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          grep -q 'TORNFCA • RANKED WAR' app/src/main/java/com/matthayesego/duckforcetoolkit/WarCenterActivity.java
+
+          # Territory features use Torn's dedicated current warfare, ownership, history and report endpoints.
+          grep -q '/faction/warfareterritory?limit=100&sort=DESC' "$TERRITORY"
+          grep -q '/territorywars?limit=8&sort=DESC' "$TERRITORY"
+          grep -q '/territory",key' "$TERRITORY"
+          grep -q 'players_on_wall' "$TERRITORY"
+          grep -q 'isAggressor' "$TERRITORY"
+          grep -q '/territorywarreport' "$TERRITORY_DETAIL"
+          grep -q 'optInt("joins",0)' "$TERRITORY_DETAIL"
+          grep -q 'optInt("clears",0)' "$TERRITORY_DETAIL"
+          grep -q 'optInt("score",0)' "$TERRITORY_DETAIL"
 
           grep -q 'LegalAcceptanceStore.hasAcceptedCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q 'EXTRA_REQUIRE_ACCEPTANCE,true' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
@@ -92,4 +120,4 @@ jobs:
           grep -q 'Guide does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
           grep -q 'Faction Leader or Co-leader access is required to change training rules.' backend/TornFcaCommunityBackend.gs
 
-          echo 'TornFCA free member-core/navigation/legal/community-safety audit passed.'
+          echo 'TornFCA free member-core/navigation/legal/community-safety/war-mode audit passed.'
