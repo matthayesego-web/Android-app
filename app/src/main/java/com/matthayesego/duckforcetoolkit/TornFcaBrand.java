@@ -30,7 +30,7 @@ import java.util.WeakHashMap;
 public final class TornFcaBrand {
     public static final String NAME="TornFCA";
     public static final String LONG_NAME="Torn Faction Companion App";
-    public static final String VERSION="0.9.22";
+    public static final String VERSION="0.9.23";
 
     private static final int[] LEGACY_BRAND_COLORS=new int[]{
             Color.rgb(241,190,86),Color.rgb(241,194,106),Color.rgb(243,184,52),Color.rgb(215,160,68),Color.rgb(242,197,107)
