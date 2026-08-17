@@ -15,7 +15,7 @@ This checklist is a release-preparation aid, not legal advice. Re-check Google P
 
 ## 2. App legal surfaces
 
-Current in-app legal version: `2026-08-17-v1`.
+Current in-app legal version: `2026-08-17-v2`.
 
 - [x] Versioned local legal acknowledgement store.
 - [x] First-run/current-version legal acknowledgement before Torn API sign-in.
@@ -24,6 +24,7 @@ Current in-app legal version: `2026-08-17-v1`.
 - [x] EULA available in-app.
 - [x] Legal documents reachable again from More, Settings and About.
 - [x] Privacy is acknowledged separately from agreement to Terms/EULA in the acceptance wording.
+- [x] FCM Messaging auto-init is disabled before the current legal version is acknowledged; TornFCA explicitly enables push after acknowledgement.
 - [ ] Final developer/legal review of the production wording.
 - [ ] If material legal wording changes, bump `LegalAcceptanceStore.LEGAL_VERSION` so users are asked again.
 
@@ -39,7 +40,7 @@ Google Play requires a public privacy-policy URL as well as in-app access.
 - [ ] Enter the URL in Play Console → Policy/App content → Privacy policy.
 - [ ] Keep public wording synchronized with `LegalDocumentActivity`.
 
-A `docs/privacy.html` production draft can be hosted with GitHub Pages after Pages is enabled for this repository. GitHub Pages is not currently enabled/configured for the repository as of this checklist date.
+A `docs/privacy-policy.html` publication draft can be hosted after a public HTTPS host is configured. It is intentionally marked `noindex` and as a draft until the public privacy contact and production hosting are ready.
 
 ## 4. Data Safety inventory — current Android/community architecture
 
@@ -72,6 +73,7 @@ The app may keep:
 - Optional intelligence-provider consent state.
 - Premium entitlement/cache state.
 - Legal acknowledgement version/timestamp.
+- FCM registration token after Messaging is enabled.
 
 ### TornFCA-hosted/shared data
 
@@ -88,7 +90,8 @@ The shared-services design verifies current faction identity/permissions. Torn A
 ### Third parties / SDKs
 
 - Torn official API — required for core Torn data.
-- Firebase Cloud Messaging — push delivery; current Android dependencies do not include Firebase Analytics.
+- Firebase Cloud Messaging — push delivery. Messaging auto-init is disabled until current legal acknowledgement. Current Android dependencies do not directly include Firebase Analytics, and Analytics collection is explicitly disabled in the manifest.
+- Firebase Installations — transitively used by FCM; may generate a per-installation Firebase installation ID (FID) and process Firebase user-agent/app/device metadata needed by Firebase services.
 - FFScouter — optional, explicit opt-in before use.
 - TornStats — optional, explicit opt-in before use.
 - Google Play services/billing if and when paid Play-distributed features are enabled.
@@ -98,10 +101,11 @@ The shared-services design verifies current faction identity/permissions. Torn A
 Do not blindly copy these; answer from the exact production build and Google definitions:
 
 - User IDs / identifiers: likely applicable because verified Torn player IDs and faction scope can be processed by TornFCA services.
-- Device or other IDs: review because FCM registration tokens are processed for push delivery.
+- Device or other IDs: review FCM registration tokens and Firebase Installation IDs under Google's current definitions.
+- Device/app information: review FCM/Firebase user-agent and app-version processing under Google's current definitions.
 - Messages / user-generated content: applicable when faction chat is enabled.
 - Other user-generated content: applicable to faction-authored guides/rules/notices where the backend stores them.
-- App activity/analytics: current app does not intentionally use Firebase Analytics; confirm no other production SDK adds analytics.
+- App activity/analytics: Firebase Analytics collection is explicitly disabled; confirm no other production SDK adds analytics and answer from Google's exact Data safety definitions.
 - Crash/diagnostics: confirm production dependencies before declaring.
 - Location, contacts, SMS/call log, microphone and camera: not part of the current TornFCA architecture; confirm permissions remain absent in the production manifest.
 
@@ -123,6 +127,7 @@ Do not blindly copy these; answer from the exact production build and Google def
 - [ ] Test first install, legal acknowledgement, API login, logout/change-key, reinstall/update behavior, notifications, no-network behavior and faction-change isolation.
 - [ ] Verify About, Legal & Privacy, Settings and Member Center remain readable on small phones and large Android displays.
 - [ ] Verify release build contains no developer PIN/secrets, test API keys, private backend credentials or debug-only access paths.
+- [ ] Verify merged release manifest still has both `firebase_analytics_collection_enabled=false` and `firebase_messaging_auto_init_enabled=false`.
 
 ## 7. Navigation/usability release bar
 
