@@ -1,0 +1,61 @@
+name: TornFCA Mobile Navigation Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify simplified persistent navigation
+        run: |
+          set -euo pipefail
+          CURRENT=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
+          WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+
+          # Five tabs for members, Leadership conditionally adds the sixth.
+          grep -q 'navItem("Home"' "$CURRENT"
+          grep -q 'navItem("Faction"' "$CURRENT"
+          grep -q 'navItem("War"' "$CURRENT"
+          grep -q 'navItem("Training"' "$CURRENT"
+          grep -q 'if(identity!=null&&identity.leader)nav.addView(navItem("Leadership"' "$CURRENT"
+          grep -q 'navItem("More"' "$CURRENT"
+
+          # Home remains a summary instead of a full tool catalog.
+          grep -q '"Your faction companion"' "$CURRENT"
+          grep -q '"My Day"' "$CURRENT"
+          grep -q '"My War Prep"' "$CURRENT"
+          grep -q 'NotificationInboxActivity.class' "$CURRENT"
+
+          # Faction and Leadership use explicit second-level groupings.
+          grep -q '"Faction Tools & Community"' "$CURRENT"
+          grep -q 'renderFactionTools' "$CURRENT"
+          grep -q '"People & Activity"' "$CURRENT"
+          grep -q '"War & Finance"' "$CURRENT"
+          grep -q '"Faction Operations"' "$CURRENT"
+          grep -q 'beginSubmenu' "$CURRENT"
+
+          # Training is first-class and complete.
+          grep -q 'navItem("Training"' "$CURRENT"
+          grep -q 'TrainingCenterActivity.class' "$CURRENT"
+          grep -q 'TrainingProgressActivity.class' "$CURRENT"
+          grep -q 'TrainingAdminActivity.class' "$CURRENT"
+
+          # Profile avatar identity is present on the persistent shell.
+          grep -q 'tornfca-profile-avatar' "$CURRENT"
+          grep -q 'duckforce_noir_art' "$CURRENT"
+
+          # War compatibility routes feed back into the persistent War tab.
+          grep -q 'TornFcaCurrentActivity.class' "$WARHUB"
+          grep -q 'TornFcaCurrentActivity.EXTRA_SECTION,"War"' "$WARHUB"
+          grep -q 'WarCenterActivity.class' "$CURRENT"
+          grep -q 'TerritoryWarActivity.class' "$CURRENT"
+
+          echo 'TornFCA mobile navigation audit passed.'
