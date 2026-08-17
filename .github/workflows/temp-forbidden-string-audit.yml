@@ -1,0 +1,23 @@
+name: Temporary TornFCA Forbidden String Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Find remaining legacy faction restriction
+        run: |
+          echo 'Searching current source tree for compiled Duck Force-only restriction...'
+          if grep -R -n -F 'This build is restricted to Duck Force members.' app/src/main; then
+            echo 'Forbidden legacy restriction is still present.'
+            exit 1
+          fi
+          echo 'No exact legacy restriction found in app/src/main.'
