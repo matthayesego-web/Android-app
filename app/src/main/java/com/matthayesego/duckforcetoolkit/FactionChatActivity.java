@@ -11,7 +11,6 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONArray;
@@ -26,7 +25,8 @@ import java.util.List;
 public class FactionChatActivity extends Activity {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private boolean active=false,loading=false;private AuthSession session;private Spinner channelSpinner;private EditText messageField;
-    private final Runnable poll=()->{if(active){load(false);handler.postDelayed(poll,20000L);}};
+    private final Runnable poll=this::pollOnce;
+    private void pollOnce(){if(active){load(false);handler.postDelayed(poll,20000L);}}
     @Override protected void onCreate(Bundle b){super.onCreate(b);renderLoading("Opening your faction community…");bootstrap();}
     @Override protected void onResume(){super.onResume();active=true;handler.removeCallbacks(poll);handler.postDelayed(poll,20000L);PushNotifications.syncIfReady(this);}
     @Override protected void onPause(){active=false;handler.removeCallbacks(poll);super.onPause();}
