@@ -76,6 +76,7 @@ public class LegalActivity extends Activity {
                     return;
                 }
                 LegalAcceptanceStore.acceptCurrent(this);
+                PushNotifications.initialize(this);
                 Intent i=new Intent(this,TornFcaActivity.class);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 startActivity(i);
