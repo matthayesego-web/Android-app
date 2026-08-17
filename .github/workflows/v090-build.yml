@@ -63,10 +63,15 @@ jobs:
           grep -q 'cachedSession' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
           grep -q 'AVATAR_REFRESH_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
           grep -q 'profile_image' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
-          grep -q 'tornfca-profile-avatar' app/src/main/java/com/matthayesego/duckforcetoolkit/V095CompanionActivity.java
           grep -q 'PermanentApiException' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
           grep -q 'TornApiClient.validateKey' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           grep -q '10000L' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
+
+          # Cache identity must use collision-resistant fingerprints, never raw 32-bit key hashes.
+          grep -q 'keyFingerprint' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          grep -q 'MessageDigest.getInstance("SHA-256")' app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          grep -q 'String cacheKey=fingerprint(value)' app/src/main/java/com/matthayesego/duckforcetoolkit/TornStatsClient.java
+          grep -q 'fingerprint(targets.toString())' app/src/main/java/com/matthayesego/duckforcetoolkit/FFScouterClient.java
 
           # API-key retention / logout must remain explicit and device-local.
           grep -q 'AES/GCM/NoPadding' app/src/main/java/com/matthayesego/duckforcetoolkit/SecureApiKeyStore.java
@@ -74,6 +79,11 @@ jobs:
           grep -q 'prepareNextSave' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
           grep -q 'Log Out / Change API Key' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
           grep -q 'TornApiClient.clearMemoryCache' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
+
+          # Multi-faction tenant identity must not regress to a Duck Force-only membership gate.
+          if grep -q 'restricted to Duck Force members' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberFactionActivity.java; then echo "Member faction views must remain multi-faction"; exit 1; fi
+          grep -q 'TornFcaBrand.VERSION' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberFactionActivity.java
+          grep -q 'repairFactionIdentity' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
 
           # Member features remain self/public-faction scoped and tolerate Torn field changes.
           grep -q 'loadSelfSnapshot' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
@@ -88,6 +98,11 @@ jobs:
           # Leadership and war-wall gates must remain layered.
           grep -q 'AccessPolicy.isLeaderPosition(position)' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPayoutActivity.java
           grep -q 'DeveloperPreviewStore.isMemberPreview' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'requiresLeadership(target)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'TARGET_ACTIVITY.equals(target)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'TARGET_PULSE.equals(target)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'TARGET_LOOKUP.equals(target)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'TARGET_WAR_PAYOUT.equals(target)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
           grep -q 'loadFaction(key)' app/src/main/java/com/matthayesego/duckforcetoolkit/OcTrackerActivity.java
           grep -q 'simulateWar' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
           grep -q 'War wall simulation' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaScreens.java
