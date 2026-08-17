@@ -1,0 +1,86 @@
+name: TornFCA Current Shell Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Verify consolidated player shell
+        run: |
+          set -euo pipefail
+          CURRENT=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
+          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          LEGAL=app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          MANIFEST=app/src/main/AndroidManifest.xml
+
+          test -f "$CURRENT"
+          grep -q 'class TornFcaCurrentActivity extends TornFcaActivity' "$CURRENT"
+          grep -q 'TornFcaCurrentActivity.class' "$ACCESS"
+          grep -q 'TornFcaCurrentActivity.class' "$LEGAL"
+          grep -q '.TornFcaCurrentActivity" android:exported="false"' "$MANIFEST"
+          test "$(grep -c 'android:exported="true"' "$MANIFEST")" -eq 1
+
+          # Current version is always derived from Android build metadata on visible current surfaces.
+          grep -q 'TornFcaBrand.VERSION' "$CURRENT"
+          grep -q 'VERSION=BuildConfig.VERSION_NAME' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaBrand.java
+          if grep -Eq 'v0\.9\.(1[0-9]|2[0-8])' "$CURRENT"; then
+            echo 'Current shell must not contain a stale visible 0.9.x version'; exit 1
+          fi
+
+          # Member-first current routes.
+          grep -q 'MemberDailyActivity.class' "$CURRENT"
+          grep -q 'MemberCenterActivity.class' "$CURRENT"
+          grep -q 'WarPrepActivity.class' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_WAR' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_OC' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_CHAIN' "$CURRENT"
+          grep -q 'MemberFactionActivity.class' "$CURRENT"
+          grep -q 'MemberDirectoryActivity.class' "$CURRENT"
+          grep -q 'FactionResourcesActivity.class' "$CURRENT"
+          grep -q 'FactionChatActivity.class' "$CURRENT"
+          grep -q 'NotificationInboxActivity.class' "$CURRENT"
+
+          # Full training stack must stay surfaced.
+          grep -q 'TrainingCenterActivity.class' "$CURRENT"
+          grep -q 'TrainingProgressActivity.class' "$CURRENT"
+          grep -q 'TrainingAdminActivity.class' "$CURRENT"
+          grep -q 'Guide & Training Management' "$CURRENT"
+          grep -q 'Training Center' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          grep -q 'My Training Progress' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+
+          # Ranked War / Territories split must remain the current War destination.
+          grep -q 'WarHubActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q 'WarCenterActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+          grep -q 'TerritoryWarActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+          grep -q '/faction/warfareterritory' app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarActivity.java
+          grep -q '/territorywars' app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarActivity.java
+          grep -q '/territorywarreport' app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarDetailActivity.java
+
+          # Leadership operations surfaced only through verified leader UI.
+          grep -q 'AccessPolicy.isLeaderPosition' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_ACTIVITY' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_PULSE' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_LOOKUP' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_WAR_PAYOUT' "$CURRENT"
+          grep -q 'FeatureRouterActivity.TARGET_BANKING' "$CURRENT"
+          grep -q '"ARMORY"' "$CURRENT"
+
+          # Legal/current launch paths cannot bypass the current shell.
+          if grep -q 'new Intent(this,TornFcaActivity.class)' "$ACCESS"; then
+            echo 'Returning-user launcher bypasses current shell'; exit 1
+          fi
+          if grep -q 'new Intent(this,TornFcaActivity.class)' "$LEGAL"; then
+            echo 'First-run legal flow bypasses current shell'; exit 1
+          fi
+
+          echo 'Current TornFCA shell integration audit passed.'
