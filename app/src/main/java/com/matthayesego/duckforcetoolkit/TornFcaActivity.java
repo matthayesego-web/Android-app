@@ -35,12 +35,15 @@ import java.nio.ByteBuffer;
 public class TornFcaActivity extends V098CompanionActivity {
     private static final long AVATAR_REFRESH_MS=6L*60L*60L*1000L;
     private volatile boolean avatarRefreshInFlight=false;
+    private View observedIdentityRoot;
 
     @Override public void setContentView(View view){
         super.setContentView(view);
         ViewGroup root=findViewById(android.R.id.content);
         if(root!=null){
             TornFcaBrand.apply(this,root);
+            installIdentityRepair(root);
+            repairFactionIdentity(root);
             addApiRequirementNotice(root);
             addKeyRetentionControls(root);
             retargetBankingCards(root);
@@ -54,6 +57,8 @@ public class TornFcaActivity extends V098CompanionActivity {
         ViewGroup root=findViewById(android.R.id.content);
         if(root!=null){
             TornFcaBrand.apply(this,root);
+            installIdentityRepair(root);
+            repairFactionIdentity(root);
             addApiRequirementNotice(root);
             addKeyRetentionControls(root);
             retargetBankingCards(root);
@@ -74,6 +79,41 @@ public class TornFcaActivity extends V098CompanionActivity {
         if(title==null)title=findText(root,"Sign in to Duck Force");
         if(title==null)title=findText(root,"Connect your Torn account");
         return title;
+    }
+
+    private void installIdentityRepair(ViewGroup root){
+        if(observedIdentityRoot==root)return;
+        observedIdentityRoot=root;
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{
+            if(isFinishing())return;
+            try{repairFactionIdentity(root);}catch(Exception ignored){}
+        });
+    }
+
+    /**
+     * The premium shell still contains an old Duck Force fallback in its legacy presentation layer.
+     * Replace only those fallback identity strings with the already-verified cached Torn scope. No
+     * network request is made here, and an actual Duck Force identity remains unchanged.
+     */
+    private void repairFactionIdentity(View root){
+        String key=new SecureApiKeyStore(this).load();if(key==null||key.isBlank())return;
+        AuthSession hot=TornApiClient.cachedSession(key);
+        FactionScopeCache.Scope scope=hot==null?FactionScopeCache.load(this,key):null;
+        String faction=hot!=null?hot.factionName:scope==null?"":scope.factionName;
+        String position=hot!=null?hot.position:scope==null?"":scope.position;
+        if(faction==null||faction.isBlank())return;
+        if(DeveloperPreviewStore.isMemberPreview(this))position="Member Preview";
+        repairFactionText(root,faction.trim(),position==null?"":position.trim());
+    }
+
+    private void repairFactionText(View view,String faction,String position){
+        if(view instanceof TextView){
+            TextView t=(TextView)view;String raw=t.getText()==null?"":t.getText().toString();
+            if(raw.startsWith("Duck Force  •  "))t.setText(faction+"  •  "+(position.isEmpty()?"Member":position));
+            else if(raw.startsWith("Duck Force • ")&&raw.length()<80)t.setText(faction+" • "+(position.isEmpty()?"Member":position));
+            else if("Duck Force has no current or upcoming ranked war.".equals(raw))t.setText(faction+" has no current or upcoming ranked war.");
+        }
+        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)repairFactionText(g.getChildAt(i),faction,position);}
     }
 
     private void addApiRequirementNotice(View root){
@@ -134,7 +174,7 @@ public class TornFcaActivity extends V098CompanionActivity {
 
     private AvatarDownload downloadAvatar(String value)throws Exception{
         URL url=new URL(value);if(!"https".equalsIgnoreCase(url.getProtocol()))return null;HttpURLConnection c=(HttpURLConnection)url.openConnection();
-        try{c.setConnectTimeout(8000);c.setReadTimeout(12000);c.setUseCaches(true);c.setInstanceFollowRedirects(true);c.setRequestProperty("User-Agent","Mozilla/5.0 (Android) TornFCA/0.9.16");c.setRequestProperty("Accept","image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");c.setRequestProperty("Referer","https://www.torn.com/");int code=c.getResponseCode();if(code<200||code>=300)return null;try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];int n,total=0;while((n=in.read(buffer))!=-1){total+=n;if(total>8*1024*1024)return null;out.write(buffer,0,n);}byte[] bytes=out.toByteArray();Drawable drawable=decodeDrawable(bytes);return drawable==null?null:new AvatarDownload(drawable,bytes);}}finally{c.disconnect();}
+        try{c.setConnectTimeout(8000);c.setReadTimeout(12000);c.setUseCaches(true);c.setInstanceFollowRedirects(true);c.setRequestProperty("User-Agent","Mozilla/5.0 (Android) TornFCA/"+TornFcaBrand.VERSION);c.setRequestProperty("Accept","image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");c.setRequestProperty("Referer","https://www.torn.com/");int code=c.getResponseCode();if(code<200||code>=300)return null;try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];int n,total=0;while((n=in.read(buffer))!=-1){total+=n;if(total>8*1024*1024)return null;out.write(buffer,0,n);}byte[] bytes=out.toByteArray();Drawable drawable=decodeDrawable(bytes);return drawable==null?null:new AvatarDownload(drawable,bytes);}}finally{c.disconnect();}
     }
 
     private ImageView findHeaderAvatar(View view){if(view instanceof ImageView&&"tornfca-profile-avatar".equals(view.getTag()))return(ImageView)view;if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){ImageView found=findHeaderAvatar(g.getChildAt(i));if(found!=null)return found;}}return null;}
