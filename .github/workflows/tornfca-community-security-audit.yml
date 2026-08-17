@@ -20,11 +20,16 @@ jobs:
           set -euo pipefail
 
           # Android notification surface: permission is explicit, Analytics collection is disabled,
-          # and the FCM service is never exported. FCM itself remains enabled for push delivery.
+          # Messaging auto-init is disabled until legal acknowledgement, and the FCM service is never exported.
           grep -q 'android.permission.POST_NOTIFICATIONS' app/src/main/AndroidManifest.xml
           grep -q 'firebase_analytics_collection_enabled" android:value="false"' app/src/main/AndroidManifest.xml
+          grep -q 'firebase_messaging_auto_init_enabled" android:value="false"' app/src/main/AndroidManifest.xml
           grep -q 'TornFcaMessagingService" android:exported="false"' app/src/main/AndroidManifest.xml
           grep -q 'com.google.firebase.MESSAGING_EVENT' app/src/main/AndroidManifest.xml
+          grep -q 'LegalAcceptanceStore.hasAcceptedCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaApplication.java
+          grep -q 'PushNotifications.initialize(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaApplication.java
+          grep -q 'LegalAcceptanceStore.acceptCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          grep -q 'PushNotifications.initialize(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
           grep -q 'if(factionId>0&&currentFaction!=factionId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
           grep -q 'target_player_id' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
           grep -q 'if(targetPlayerId>0&&currentPlayer!=targetPlayerId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
