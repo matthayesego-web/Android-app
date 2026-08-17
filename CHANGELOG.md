@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.23 — 2026-08-17
+
+- Added **Faction Resources** to the free Member Center for ordinary faction members.
+- Added a five-step local onboarding checklist covering faction identity, training expectations, organized crime readiness, war/chain expectations, and faction guides.
+- Scoped onboarding progress to both `player_id` and `faction_id`, so joining a different faction starts a separate checklist rather than carrying another faction's onboarding state forward.
+- Added quick links from Faction Resources to My Day, Training Center, Faction Directory, and My War.
+- Reused the existing freshly verified faction-scoped guide library for onboarding, training, trading, war prep, community rules, and other faction-local member resources; no new backend tenant datastore was introduced.
+- Generalized Leader/Co-leader publishing from training-only guides to broader faction member guides while retaining the same server-side faction/leadership authorization and archive controls.
+- Kept Faction Resources useful when the shared backend is unavailable: local onboarding and native member shortcuts continue to work while shared faction guides report their unavailable state clearly.
+- Bumped Android versionCode to 40 and versionName to 0.9.23.
+
 ## v0.9.22 — 2026-08-17
 
 - Added **My Training Progress** to the free Member Center.
