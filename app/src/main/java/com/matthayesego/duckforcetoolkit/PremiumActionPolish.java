@@ -29,13 +29,12 @@ public final class PremiumActionPolish {
     private static final int SURFACE_2 = Color.rgb(8,13,20);
     private static final int TEXT = Color.rgb(246,248,251);
     private static final int MUTED = Color.rgb(145,155,169);
-    private static final Map<View,Boolean> APPLIED=Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<View,Boolean> POLISHED=Collections.synchronizedMap(new WeakHashMap<>());
 
     private PremiumActionPolish() {}
 
     public static void apply(Activity activity, View root) {
         if (activity == null || root == null) return;
-        if (APPLIED.put(root, Boolean.TRUE) != null) return;
         polishTree(activity, root);
         polishNamedHeading(root, "Command center", 27f);
         polishNamedHeading(root, "Your faction hub", 27f);
@@ -52,6 +51,7 @@ public final class PremiumActionPolish {
     }
 
     private static void polishButton(Activity activity, Button button) {
+        if (POLISHED.put(button, Boolean.TRUE) != null) return;
         button.setAllCaps(false);
         button.setTextSize(13f);
         button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -64,16 +64,16 @@ public final class PremiumActionPolish {
     private static void polishClickableText(Activity activity, TextView text) {
         if (!text.isClickable()) return;
         String raw = value(text);
-        if (raw.toUpperCase(Locale.US).contains("OPEN WAR CENTER")) {
-            int accent = text.getCurrentTextColor();
-            text.setText("Open War Center  →");
-            text.setTextSize(13f);
-            text.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-            text.setGravity(Gravity.CENTER);
-            text.setMinHeight(dp(activity, 48));
-            text.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
-            text.setBackground(actionBackground(activity, accent, 13));
-        }
+        if (!raw.toUpperCase(Locale.US).contains("OPEN WAR CENTER")) return;
+        if (POLISHED.put(text, Boolean.TRUE) != null) return;
+        int accent = text.getCurrentTextColor();
+        text.setText("Open War Center  →");
+        text.setTextSize(13f);
+        text.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        text.setGravity(Gravity.CENTER);
+        text.setMinHeight(dp(activity, 48));
+        text.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
+        text.setBackground(actionBackground(activity, accent, 13));
     }
 
     private static void polishActionCard(Activity activity, LinearLayout card) {
@@ -85,6 +85,7 @@ public final class PremiumActionPolish {
         if (texts.size() < 2) return;
         TextView eyebrow = texts.get(0);
         if (!looksLikeEyebrow(value(eyebrow))) return;
+        if (POLISHED.put(card, Boolean.TRUE) != null) return;
 
         TextView title = texts.get(1);
         boolean compact = card.getParent() instanceof LinearLayout
@@ -216,7 +217,7 @@ public final class PremiumActionPolish {
 
     private static void polishNamedHeading(View root, String exact, float size) {
         TextView view = findText(root, exact);
-        if (view == null) return;
+        if (view == null || POLISHED.put(view, Boolean.TRUE) != null) return;
         view.setTextSize(size);
         view.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         view.setLineSpacing(0f, 1.02f);
