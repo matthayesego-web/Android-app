@@ -24,7 +24,7 @@ public final class TornStatsClient {
     public static final String FAQ_URL="https://www.tornstats.com/faq";
     public static final String REGISTER_URL="https://www.tornstats.com/register";
     private static final String PREFS="tornfca_tornstats_consent_v2";
-    private static final String USER_AGENT="TornFCA/0.9.18 Android";
+    private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android";
     private static final Pattern API_KEY=Pattern.compile("^[A-Za-z0-9]{16}$");
     private static final long ACCOUNT_READY_MS=30L*60L*1000L;
     private static long nextRequestAtMs=0L;
@@ -96,7 +96,9 @@ public final class TornStatsClient {
     }
 
     private static JSONObject getCached(String value,long ttl)throws IOException{
-        String cacheKey=Integer.toHexString(value.hashCode());CacheEntry cached=CACHE.get(cacheKey);long now=System.currentTimeMillis();
+        // Provider URLs include the opted-in Torn key. Namespace cache entries with SHA-256 rather
+        // than Java's 32-bit hashCode so two keys/spy paths cannot collide inside one process.
+        String cacheKey=fingerprint(value);CacheEntry cached=CACHE.get(cacheKey);long now=System.currentTimeMillis();
         if(cached!=null&&cached.expiresAt>now)try{return new JSONObject(cached.body);}catch(Exception ignored){CACHE.remove(cacheKey);}
         JSONObject result;
         try{result=get(value);}catch(IOException e){throw translateAccountError(e);}
