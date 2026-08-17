@@ -7,7 +7,7 @@ import android.os.Bundle;
 
 /**
  * TornFCA launcher shim.
- * v0.9.27 keeps the old beta access-code wall removed and routes first-time/current-legal-version
+ * v0.9.28 keeps the old beta access-code wall removed and routes first-time/current-legal-version
  * users through the legal acknowledgement screen before opening the Torn account sign-in shell.
  */
 public class AccessGateActivity extends Activity {
