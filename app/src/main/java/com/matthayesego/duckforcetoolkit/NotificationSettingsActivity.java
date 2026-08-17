@@ -1,0 +1,34 @@
+package com.matthayesego.duckforcetoolkit;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.Intent;
+import android.os.Build;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Toast;
+
+public class NotificationSettingsActivity extends Activity {
+    private static final int REQUEST_NOTIFICATIONS=4102;
+    @Override protected void onCreate(Bundle b){super.onCreate(b);NotificationCenter.ensureChannels(this);render();}
+    @Override protected void onResume(){super.onResume();render();}
+    private void render(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Settings","Notifications","Choose exactly which TornFCA alerts are allowed to interrupt you.");String system=NotificationCenter.canPost(this)?"Android permission is enabled.":"Android notification permission is not enabled.";LinearLayout permission=TornFcaUi.card(this,"DEVICE PERMISSION","Android notifications",system,NotificationCenter.canPost(this)?TornFcaUi.GREEN:TornFcaUi.GOLD);Button enable=TornFcaUi.button(this,Build.VERSION.SDK_INT>=33?"Request Notification Permission":"Open Android Notification Settings",TornFcaUi.BLUE);enable.setOnClickListener(v->requestOrOpen());LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));ep.topMargin=TornFcaUi.dp(this,10);permission.addView(enable,ep);TornFcaUi.add(this,r,permission);
+        addToggle(r,"MASTER SWITCH","Notifications",AppSettingsStore.notificationsEnabled(this),v->AppSettingsStore.setNotificationsEnabled(this,v),TornFcaUi.GOLD,"Turns TornFCA notification delivery on or off without changing your individual category choices.");
+        TornFcaUi.addSection(this,r,"Alert categories");
+        addToggle(r,"WAR","Ranked war",AppSettingsStore.warAlerts(this),v->AppSettingsStore.setWarAlerts(this,v),TornFcaUi.RED,"War scheduled, starting and participation alerts when cloud delivery is available.");
+        addToggle(r,"OC","Organized crime",AppSettingsStore.ocAlerts(this),v->AppSettingsStore.setOcAlerts(this,v),TornFcaUi.PURPLE,"Personal OC assignment, readiness and completion reminders.");
+        addToggle(r,"CHAIN","Chain",AppSettingsStore.chainAlerts(this),v->AppSettingsStore.setChainAlerts(this,v),TornFcaUi.BLUE,"Chain status and time-sensitive participation reminders.");
+        addToggle(r,"FACTION","Faction updates",AppSettingsStore.factionAlerts(this),v->AppSettingsStore.setFactionAlerts(this,v),TornFcaUi.GOLD,"Important faction announcements and notices.");
+        addToggle(r,"CHAT","Faction chat",AppSettingsStore.chatAlerts(this),v->AppSettingsStore.setChatAlerts(this,v),TornFcaUi.BLUE,"New messages from TornFCA faction chat once community sync is connected.");
+        addToggle(r,"PERSONAL","Personal reminders",AppSettingsStore.personalAlerts(this),v->AppSettingsStore.setPersonalAlerts(this,v),TornFcaUi.GREEN,"Personal TornFCA reminders and account-specific alerts.");
+        int player=currentPlayerId();boolean premium=player>0&&PremiumEntitlementStore.hasPremium(this,player);LinearLayout timing=TornFcaUi.card(this,premium?"PREMIUM ALERT TUNING":"STANDARD ALERT TIMING","War reminder lead time",premium?("Currently "+AppSettingsStore.warLeadMinutes(this)+" minutes before a scheduled war."):"Free members use the standard 15-minute reminder. Premium can choose longer lead times.",premium?TornFcaUi.GOLD:TornFcaUi.BORDER);if(premium){Button cycle=TornFcaUi.button(this,"Change Lead Time",TornFcaUi.GOLD);cycle.setOnClickListener(v->{int now=AppSettingsStore.warLeadMinutes(this);AppSettingsStore.setWarLeadMinutes(this,now==15?30:now==30?60:15);render();});LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));cp.topMargin=TornFcaUi.dp(this,9);timing.addView(cycle,cp);}TornFcaUi.add(this,r,timing);
+        Button test=TornFcaUi.button(this,"Send Test Notification",TornFcaUi.GREEN);test.setOnClickListener(v->{if(!NotificationCenter.canPost(this)){Toast.makeText(this,"Enable Android notifications first.",Toast.LENGTH_SHORT).show();requestOrOpen();}else NotificationCenter.test(this);});r.addView(test,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,48)));setContentView(s);s.requestApplyInsets();}
+    private interface Setter{void set(boolean value);}private void addToggle(LinearLayout r,String eye,String title,boolean value,Setter setter,int accent,String body){LinearLayout c=TornFcaUi.card(this,eye,title,body+"\nStatus: "+(value?"ON":"OFF"),value?accent:TornFcaUi.BORDER);Button b=TornFcaUi.button(this,value?"Turn Off":"Turn On",value?TornFcaUi.BORDER:accent);b.setOnClickListener(v->{setter.set(!value);render();});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));p.topMargin=TornFcaUi.dp(this,9);c.addView(b,p);TornFcaUi.add(this,r,c);}
+    private void requestOrOpen(){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},REQUEST_NOTIFICATIONS);return;}Intent i=new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);i.putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName());startActivity(i);}
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(requestCode==REQUEST_NOTIFICATIONS)render();}
+    private int currentPlayerId(){String key=new SecureApiKeyStore(this).load();if(key==null)return 0;AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return hot.playerId;FactionScopeCache.Scope s=FactionScopeCache.load(this,key);return s==null?0:s.playerId;}
+}

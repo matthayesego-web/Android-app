@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application android:allowBackup="false" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
         <activity android:name=".AccessGateActivity" android:exported="true" android:launchMode="singleTask" android:clearTaskOnLaunch="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
         <activity android:name=".TornFcaActivity" android:exported="false"/>
@@ -23,6 +24,10 @@
         <activity android:name=".TornFcaScreens$QuickIntel" android:exported="false"/>
         <activity android:name=".TornFcaScreens$PremiumPreview" android:exported="false"/>
         <activity android:name=".TornFcaScreens$DeveloperConsole" android:exported="false"/>
+        <activity android:name=".SettingsActivity" android:exported="false"/>
+        <activity android:name=".NotificationSettingsActivity" android:exported="false"/>
+        <activity android:name=".NotificationInboxActivity" android:exported="false"/>
+        <activity android:name=".MemberCenterActivity" android:exported="false"/>
 
         <!-- Working feature implementations. Base/legacy shells are intentionally not launchable activities. -->
         <activity android:name=".WarCenterActivity" android:exported="false"/>
