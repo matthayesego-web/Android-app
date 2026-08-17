@@ -3,7 +3,6 @@ package com.matthayesego.duckforcetoolkit;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -23,85 +22,27 @@ public class TerritoryWarActivity extends Activity {
     private int factionId;
     private String factionName;
 
-    @Override protected void onCreate(Bundle b){
-        super.onCreate(b);keyStore=new SecureApiKeyStore(this);
-        factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);
-        factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);
-        if(factionName==null||factionName.isBlank())factionName="Faction";
-        showLoading();load();
-    }
+    @Override protected void onCreate(Bundle b){super.onCreate(b);keyStore=new SecureApiKeyStore(this);factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);if(factionName==null||factionName.isBlank())factionName="Faction";showLoading();load();}
 
-    private void load(){
-        String key=keyStore.load();if(key==null||key.isBlank()){renderError("Reconnect your Torn API key to use Territories.");return;}
-        new Thread(()->{
-            try{
-                session=TornApiClient.cachedSession(key);if(session==null)session=TornApiClient.authenticate(key);
-                if(factionId<=0)factionId=session.factionId;if(factionName==null||"Faction".equals(factionName))factionName=session.factionName;
-                JSONArray owned=array(TornApiClient.getJson("/faction/"+factionId+"/territory",key),"territory");
-                JSONArray warfare=array(TornApiClient.getJson("/faction/warfareterritory?limit=100&sort=DESC",key),"warfareterritory");
-                JSONArray active=new JSONArray();
-                for(int i=0;i<warfare.length();i++){JSONObject w=warfare.optJSONObject(i);if(w!=null&&involvesFaction(w,factionId)&&isActive(w))active.put(w);}
-                JSONArray history=array(TornApiClient.getJson("/faction/"+factionId+"/territorywars?limit=8&sort=DESC",key),"territorywars");
-                runOnUiThread(()->render(owned,active,history));
-            }catch(Exception e){renderError(e.getMessage()==null?"Unable to load territory data.":e.getMessage());}
-        },"TornFCA-Territories").start();
-    }
+    private void load(){String key=keyStore.load();if(key==null||key.isBlank()){renderError("Reconnect your Torn API key to use Territories.");return;}new Thread(()->{try{session=TornApiClient.cachedSession(key);if(session==null)session=TornApiClient.authenticate(key);if(factionId<=0)factionId=session.factionId;if(factionName==null||"Faction".equals(factionName))factionName=session.factionName;JSONArray owned=array(TornApiClient.getJson("/faction/"+factionId+"/territory",key),"territory");JSONArray warfare=array(TornApiClient.getJson("/faction/warfareterritory?limit=100&sort=DESC",key),"warfareterritory");JSONArray active=new JSONArray();for(int i=0;i<warfare.length();i++){JSONObject w=warfare.optJSONObject(i);if(w!=null&&involvesFaction(w)&&isActive(w))active.put(w);}JSONArray history=array(TornApiClient.getJson("/faction/"+factionId+"/territorywars?limit=8&sort=DESC",key),"territorywars");runOnUiThread(()->render(owned,active,history));}catch(Exception e){renderError(e.getMessage()==null?"Unable to load territory data.":e.getMessage());}},"TornFCA-Territories").start();}
 
-    private void render(JSONArray owned,JSONArray active,JSONArray history){
-        ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
-        TornFcaUi.header(this,r,"War Center","Territories",factionName+" • ownership, live assaults and territory-war participation.");
+    private void render(JSONArray owned,JSONArray active,JSONArray history){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"War Center","Territories",factionName+" • ownership, live assaults and territory-war participation.");
+        TornFcaUi.addSection(this,r,"At a glance");int respect=0,rackets=0;for(int i=0;i<owned.length();i++){JSONObject t=owned.optJSONObject(i);if(t==null)continue;respect+=t.optInt("respect",0);if(t.optJSONObject("racket")!=null)rackets++;}String summary=owned.length()+" owned territor"+(owned.length()==1?"y":"ies")+" • "+format(respect)+" daily respect"+(rackets>0?" • "+rackets+" racket"+(rackets==1?"":"s"):"")+"\n"+active.length()+" active territory war"+(active.length()==1?"":"s")+" involving your faction.";TornFcaUi.add(this,r,TornFcaUi.card(this,"TERRITORY STATUS","Faction Territory Picture",summary,active.length()>0?TornFcaUi.RED:TornFcaUi.GREEN));
+        TornFcaUi.addSection(this,r,"Live territory wars");if(active.length()==0)TornFcaUi.add(this,r,TornFcaUi.card(this,"QUIET","No active territory assault","Torn's current territory-warfare feed does not show an active assault involving your faction.",TornFcaUi.BORDER));else for(int i=0;i<active.length();i++){JSONObject w=active.optJSONObject(i);if(w!=null)TornFcaUi.add(this,r,activeCard(w));}
+        TornFcaUi.addSection(this,r,"Owned territories");if(owned.length()==0)TornFcaUi.add(this,r,TornFcaUi.card(this,"NO TERRITORIES","No owned blocks returned","Your faction currently has no territory blocks in Torn's territory response.",TornFcaUi.BORDER));else for(int i=0;i<owned.length();i++){JSONObject t=owned.optJSONObject(i);if(t!=null)TornFcaUi.add(this,r,territoryCard(t));}
+        TornFcaUi.addSection(this,r,"Recent territory wars");if(history.length()==0)TornFcaUi.add(this,r,TornFcaUi.card(this,"HISTORY","No completed territory wars returned","Completed assaults involving this faction will appear here when Torn returns them.",TornFcaUi.BORDER));else for(int i=0;i<history.length();i++){JSONObject w=history.optJSONObject(i);if(w!=null)TornFcaUi.add(this,r,historyCard(w));}
+        TornFcaUi.add(this,r,TornFcaUi.card(this,"HOW IT WORKS","Territories in plain language","Territories are faction-owned blocks on Torn's city map. Owned blocks produce daily respect and can contain rackets. An assault is fought over limited wall slots; Torn reports each side's score, target and wall participants. Completed reports also expose each member's score, joins and clears.",TornFcaUi.BLUE));setContentView(s);s.requestApplyInsets();}
 
-        TornFcaUi.addSection(this,r,"At a glance");
-        int respect=0,rackets=0;for(int i=0;i<owned.length();i++){JSONObject t=owned.optJSONObject(i);if(t==null)continue;respect+=t.optInt("respect",0);if(t.optJSONObject("racket")!=null)rackets++;}
-        String summary=owned.length()+" owned territor"+(owned.length()==1?"y":"ies")+" • "+format(respect)+" daily respect"+(rackets>0?" • "+rackets+" racket"+(rackets==1?"":"s"):"")+"\n"+active.length()+" active territory war"+(active.length()==1?"":"s")+" involving your faction.";
-        TornFcaUi.add(this,r,TornFcaUi.card(this,"TERRITORY STATUS","Faction Territory Picture",summary,active.length()>0?TornFcaUi.RED:TornFcaUi.GREEN));
+    private LinearLayout activeCard(JSONObject w){SidePair pair=sides(w);JSONObject ours=pair.ours,other=pair.other;String territory=w.optString("territory","?");int target=w.optInt("target",0),ourScore=ours==null?0:ours.optInt("score",0),theirScore=other==null?0:other.optInt("score",0);boolean aggressor=isAggressor(w,ours);JSONArray ourWall=wall(ours),theirWall=wall(other);boolean me=containsPlayer(ourWall,session==null?0:session.playerId);long start=w.optLong("start",0),end=w.optLong("end",0),now=System.currentTimeMillis()/1000L;String timing=start>now?"Starts in "+duration(start-now):start>0?"Running "+duration(now-start):"Timing unavailable";if(end>now)timing+=" • scheduled end in "+duration(end-now);String body=(aggressor?"Assaulting ":"Defending against ")+(other==null?"Opponent":other.optString("name","Opponent"))+"\nScore: "+format(ourScore)+" – "+format(theirScore)+(target>0?" • Target "+format(target):"")+"\nWall: "+ourWall.length()+" ours • "+theirWall.length()+" theirs • "+(me?"YOU ARE ON THE WALL":"you are not currently on the wall")+"\n"+timing;return TornFcaUi.card(this,"LIVE • "+territory,"Territory "+territory,body,TornFcaUi.RED);}
 
-        TornFcaUi.addSection(this,r,"Live territory wars");
-        if(active.length()==0)TornFcaUi.add(this,r,TornFcaUi.card(this,"QUIET","No active territory assault","Torn's current territory-warfare feed does not show an active assault involving your faction.",TornFcaUi.BORDER));
-        else for(int i=0;i<active.length();i++){JSONObject w=active.optJSONObject(i);if(w!=null)TornFcaUi.add(this,r,activeCard(w));}
+    private LinearLayout territoryCard(JSONObject t){String id=t.optString("id","?");int sector=t.optInt("sector",0),slots=t.optInt("slots",0),respect=t.optInt("respect",0),size=t.optInt("size",0),density=t.optInt("density",0);JSONObject racket=t.optJSONObject("racket");String body="Sector "+sector+" • "+slots+" wall slots • "+format(respect)+" respect/day\nSize "+size+" • Density "+density;if(racket!=null){String desc=racket.optString("description","");body+="\nRacket active"+(desc.isBlank()?"":" • "+desc);}long acquired=t.optLong("acquired_at",0);if(acquired>0)body+="\nHeld since "+DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(acquired*1000L));return TornFcaUi.card(this,racket==null?"OWNED":"OWNED • RACKET","Territory "+id,body,racket==null?TornFcaUi.GOLD:TornFcaUi.PURPLE);}
 
-        TornFcaUi.addSection(this,r,"Owned territories");
-        if(owned.length()==0)TornFcaUi.add(this,r,TornFcaUi.card(this,"NO TERRITORIES","No owned blocks returned","Your faction currently has no territory blocks in Torn's territory response.",TornFcaUi.BORDER));
-        else for(int i=0;i<owned.length();i++){JSONObject t=owned.optJSONObject(i);if(t!=null)TornFcaUi.add(this,r,territoryCard(t));}
-
-        TornFcaUi.addSection(this,r,"Recent territory wars");
-        if(history.length()==0)TornFcaUi.add(this,r,TornFcaUi.card(this,"HISTORY","No completed territory wars returned","Completed assaults involving this faction will appear here when Torn returns them.",TornFcaUi.BORDER));
-        else for(int i=0;i<history.length();i++){JSONObject w=history.optJSONObject(i);if(w!=null)TornFcaUi.add(this,r,historyCard(w));}
-
-        LinearLayout learn=TornFcaUi.card(this,"HOW IT WORKS","Territories in plain language","Territories are faction-owned blocks on Torn's city map. Owned blocks produce daily respect and can contain rackets. An assault is fought over limited wall slots; Torn reports each side's score, target and wall participants. Completed reports also expose each member's score, joins and clears.",TornFcaUi.BLUE);TornFcaUi.add(this,r,learn);
-        setContentView(s);s.requestApplyInsets();
-    }
-
-    private LinearLayout activeCard(JSONObject w){
-        SidePair pair=sides(w);JSONObject ours=pair.ours,other=pair.other;String territory=w.optString("territory","?");int target=w.optInt("target",0),ourScore=ours==null?0:ours.optInt("score",0),theirScore=other==null?0:other.optInt("score",0);boolean aggressor=ours!=null&&(ours==w.optJSONObject("aggressor")||ours.optBoolean("is_aggressor",false));
-        JSONArray ourWall=wall(ours),theirWall=wall(other);boolean me=containsPlayer(ourWall,session==null?0:session.playerId);long start=w.optLong("start",0),end=w.optLong("end",0),now=System.currentTimeMillis()/1000L;
-        String timing=start>now?"Starts in "+duration(start-now):start>0?"Running "+duration(now-start):"Timing unavailable";if(end>now)timing+=" • scheduled end in "+duration(end-now);
-        String body=(aggressor?"Assaulting ":"Defending against ")+(other==null?"Opponent":other.optString("name","Opponent"))+"\nScore: "+format(ourScore)+" – "+format(theirScore)+(target>0?" • Target "+format(target):"")+"\nWall: "+ourWall.length()+" ours • "+theirWall.length()+" theirs • "+(me?"YOU ARE ON THE WALL":"you are not currently on the wall")+"\n"+timing;
-        return TornFcaUi.card(this,"LIVE • "+territory,"Territory "+territory,body,TornFcaUi.RED);
-    }
-
-    private LinearLayout territoryCard(JSONObject t){
-        String id=t.optString("id","?");int sector=t.optInt("sector",0),slots=t.optInt("slots",0),respect=t.optInt("respect",0),size=t.optInt("size",0),density=t.optInt("density",0);JSONObject racket=t.optJSONObject("racket");
-        String body="Sector "+sector+" • "+slots+" wall slots • "+format(respect)+" respect/day\nSize "+size+" • Density "+density;
-        if(racket!=null){String desc=racket.optString("description","");body+="\nRacket active"+(desc.isBlank()?"":" • "+desc);}
-        long acquired=t.optLong("acquired_at",0);if(acquired>0)body+="\nHeld since "+DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(acquired*1000L));
-        return TornFcaUi.card(this,racket==null?"OWNED":"OWNED • RACKET","Territory "+id,body,racket==null?TornFcaUi.GOLD:TornFcaUi.PURPLE);
-    }
-
-    private LinearLayout historyCard(JSONObject w){
-        int warId=w.optInt("id",0);String territory=w.optString("territory","?");SidePair pair=sides(w);JSONObject ours=pair.ours,other=pair.other;boolean aggressor=ours!=null&&ours.optBoolean("is_aggressor",false);String result=w.optString("result","completed");String outcome=outcome(result,aggressor);int accent="WIN".equals(outcome)?TornFcaUi.GREEN:"LOSS".equals(outcome)?TornFcaUi.RED:TornFcaUi.GOLD;
-        long end=w.optLong("end",0);String date=end>0?DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(end*1000L)):"Unknown date";String body=(aggressor?"Assault vs ":"Defense vs ")+(other==null?"Opponent":other.optString("name","Opponent"))+"\n"+humanResult(result)+" • "+date+" • War #"+warId;
-        if(ours!=null&&other!=null)body+="\nFinal score: "+format(ours.optInt("score",0))+" – "+format(other.optInt("score",0));
-        LinearLayout c=TornFcaUi.card(this,outcome,"Territory "+territory,body,accent);Button open=TornFcaUi.button(this,"View Territory War Details",TornFcaUi.BLUE);open.setEnabled(warId>0);open.setOnClickListener(v->openDetail(warId));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));p.topMargin=TornFcaUi.dp(this,9);c.addView(open,p);return c;
-    }
+    private LinearLayout historyCard(JSONObject w){int warId=w.optInt("id",0);String territory=w.optString("territory","?");SidePair pair=sides(w);JSONObject ours=pair.ours,other=pair.other;boolean aggressor=isAggressor(w,ours);String result=w.optString("result","completed");String outcome=outcome(result,aggressor);int accent="WIN".equals(outcome)?TornFcaUi.GREEN:"LOSS".equals(outcome)?TornFcaUi.RED:TornFcaUi.GOLD;long end=w.optLong("end",0);String date=end>0?DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(end*1000L)):"Unknown date";String body=(aggressor?"Assault vs ":"Defense vs ")+(other==null?"Opponent":other.optString("name","Opponent"))+"\n"+humanResult(result)+" • "+date+" • War #"+warId;if(ours!=null&&other!=null)body+="\nFinal score: "+format(ours.optInt("score",0))+" – "+format(other.optInt("score",0));LinearLayout c=TornFcaUi.card(this,outcome,"Territory "+territory,body,accent);Button open=TornFcaUi.button(this,"View Territory War Details",TornFcaUi.BLUE);open.setEnabled(warId>0);open.setOnClickListener(v->openDetail(warId));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));p.topMargin=TornFcaUi.dp(this,9);c.addView(open,p);return c;}
 
     private void openDetail(int warId){Intent i=new Intent(this,TerritoryWarDetailActivity.class);i.putExtra(TerritoryWarDetailActivity.EXTRA_WAR_ID,warId);i.putExtra(FactionOpsActivity.EXTRA_FACTION_ID,factionId);if(session!=null){i.putExtra(TerritoryWarDetailActivity.EXTRA_PLAYER_ID,session.playerId);i.putExtra(TerritoryWarDetailActivity.EXTRA_PLAYER_NAME,session.playerName);}startActivity(i);}
-
-    private SidePair sides(JSONObject w){
-        JSONObject ag=w.optJSONObject("aggressor"),def=w.optJSONObject("defender");if(ag!=null||def!=null){if(ag!=null&&ag.optInt("id",0)==factionId)return new SidePair(ag,def);if(def!=null&&def.optInt("id",0)==factionId)return new SidePair(def,ag);return new SidePair(null,null);}
-        JSONArray fs=w.optJSONArray("factions");JSONObject ours=null,other=null;for(int i=0;fs!=null&&i<fs.length();i++){JSONObject f=fs.optJSONObject(i);if(f==null)continue;if(f.optInt("id",0)==factionId)ours=f;else other=f;}return new SidePair(ours,other);
-    }
-    private boolean involvesFaction(JSONObject w,int id){SidePair p=sides(w);return p.ours!=null;}
+    private SidePair sides(JSONObject w){JSONObject ag=w.optJSONObject("aggressor"),def=w.optJSONObject("defender");if(ag!=null||def!=null){if(ag!=null&&ag.optInt("id",0)==factionId)return new SidePair(ag,def);if(def!=null&&def.optInt("id",0)==factionId)return new SidePair(def,ag);return new SidePair(null,null);}JSONArray fs=w.optJSONArray("factions");JSONObject ours=null,other=null;for(int i=0;fs!=null&&i<fs.length();i++){JSONObject f=fs.optJSONObject(i);if(f==null)continue;if(f.optInt("id",0)==factionId)ours=f;else other=f;}return new SidePair(ours,other);}
+    private boolean isAggressor(JSONObject war,JSONObject ours){if(ours==null)return false;JSONObject ag=war.optJSONObject("aggressor");if(ag!=null)return ag.optInt("id",0)==ours.optInt("id",0);return ours.optBoolean("is_aggressor",false);}
+    private boolean involvesFaction(JSONObject w){return sides(w).ours!=null;}
     private boolean isActive(JSONObject w){String result=w.optString("result","");long end=w.optLong("end",0),now=System.currentTimeMillis()/1000L;return "in_progress".equalsIgnoreCase(result)||end==0||end>now;}
     private JSONArray wall(JSONObject side){if(side==null)return new JSONArray();JSONArray a=side.optJSONArray("players_on_wall");if(a==null)a=side.optJSONArray("playerIds");return a==null?new JSONArray():a;}
     private boolean containsPlayer(JSONArray a,int id){if(id<=0)return false;for(int i=0;i<a.length();i++){Object value=a.opt(i);if(value instanceof JSONObject&&((JSONObject)value).optInt("id",0)==id)return true;try{if(Integer.parseInt(String.valueOf(value))==id)return true;}catch(Exception ignored){}}return false;}
@@ -110,7 +51,6 @@ public class TerritoryWarActivity extends Activity {
     private String duration(long seconds){if(seconds<0)seconds=0;long d=seconds/86400,h=(seconds%86400)/3600,m=(seconds%3600)/60;if(d>0)return d+"d "+h+"h";if(h>0)return h+"h "+m+"m";return Math.max(1,m)+"m";}
     private String format(long v){return java.text.NumberFormat.getIntegerInstance(Locale.US).format(v);}
     private JSONArray array(JSONObject root,String key){JSONArray a=root==null?null:root.optJSONArray(key);return a==null?new JSONArray():a;}
-
     private void showLoading(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"War Center","Territories","Loading ownership, live assaults and territory-war history…");TornFcaUi.add(this,r,TornFcaUi.card(this,"LOADING","Building the territory picture","Checking Torn's current territory ownership and warfare feeds.",TornFcaUi.BLUE));setContentView(s);s.requestApplyInsets();}
     private void renderError(String message){runOnUiThread(()->{ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"War Center","Territories","Territory data unavailable");TornFcaUi.add(this,r,TornFcaUi.card(this,"ERROR","Unable to load Territories",message,TornFcaUi.RED));Button retry=TornFcaUi.button(this,"Retry",TornFcaUi.GOLD);retry.setOnClickListener(v->{showLoading();load();});r.addView(retry,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,48)));setContentView(s);s.requestApplyInsets();});}
     private static final class SidePair{final JSONObject ours,other;SidePair(JSONObject ours,JSONObject other){this.ours=ours;this.other=other;}}
