@@ -1,0 +1,70 @@
+name: TornFCA Temporary APK Delivery
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+
+permissions:
+  contents: write
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Read version
+        run: |
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$VERSION_NAME"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+
+      - name: Build beta APK
+        env:
+          TORNFCA_DEV_PASSWORD_SHA256: ${{ secrets.TORNFCA_DEV_PASSWORD_SHA256 }}
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+        run: gradle --no-daemon :app:assembleBeta
+
+      - name: Align beta APK
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          ZIPALIGN="$(find "$SDK_ROOT/build-tools" -type f -name zipalign | sort -V | tail -1)"
+          test -x "$ZIPALIGN"
+          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/beta/app-beta-unsigned.apk "Torn-FCA-Beta-v${VERSION_NAME}-aligned-unsigned.apk"
+          "$ZIPALIGN" -c -P 16 -v 4 "Torn-FCA-Beta-v${VERSION_NAME}-aligned-unsigned.apk"
+
+      - name: Upload delivery APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Torn-FCA-Beta-v${{ env.VERSION_NAME }}-delivery
+          path: Torn-FCA-Beta-v${{ env.VERSION_NAME }}-aligned-unsigned.apk
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Publish delivery pointer
+        run: |
+          mkdir -p /tmp/tornfca-delivery
+          printf '%s\n' "$GITHUB_RUN_ID" > /tmp/tornfca-delivery/run_id.txt
+          printf '%s\n' "$GITHUB_SHA" > /tmp/tornfca-delivery/commit_sha.txt
+          printf '%s\n' "$VERSION_NAME" > /tmp/tornfca-delivery/version.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan ci-apk-delivery
+          git rm -rf .
+          cp /tmp/tornfca-delivery/*.txt .
+          git add run_id.txt commit_sha.txt version.txt
+          git commit -m "APK delivery pointer ${GITHUB_SHA}"
+          git push --force origin HEAD:ci-apk-delivery
