@@ -4,13 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 
-/**
- * Compatibility entry point for older War Center shortcuts.
- *
- * The visible War landing page now lives inside TornFcaCurrentActivity so the bottom navigation
- * remains present. Ranked War and Territories still open their dedicated detail activities from
- * that persistent War tab.
- */
+/** Compatibility entry point for older War Center shortcuts. */
 public class WarHubActivity extends Activity {
     @SuppressWarnings("unused") private static final String RANKED_LABEL="Ranked War";
     @SuppressWarnings("unused") private static final String TERRITORY_LABEL="Territories";
@@ -19,8 +13,10 @@ public class WarHubActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-        Intent i=new Intent(this,TornFcaCurrentActivity.class);
-        i.putExtra(TornFcaCurrentActivity.EXTRA_SECTION,"War");
+        boolean beta=BuildConfig.APPLICATION_ID.endsWith(".beta");
+        Intent i=new Intent(this,beta?BetaCommandActivity.class:TornFcaCurrentActivity.class);
+        if(beta)i.putExtra(BetaCommandActivity.EXTRA_SECTION,"Operations");
+        else i.putExtra(TornFcaCurrentActivity.EXTRA_SECTION,"War");
         copyScope(i);
         startActivity(i);
         finish();
