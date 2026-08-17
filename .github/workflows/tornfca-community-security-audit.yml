@@ -61,10 +61,11 @@ jobs:
           grep -q "announcement changes" backend/TornFcaCommunityBackend.gs
           grep -q "urn:ietf:params:oauth:grant-type:jwt-bearer" backend/TornFcaCommunityBackend.gs
 
-          # Settings remain the player-facing account/privacy control surface.
+          # Settings remain the player-facing account/privacy control surface. Audit behavior, not labels.
           grep -q 'prepareNextSave' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           grep -q 'PushNotifications.unregisterAsync' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
-          grep -q 'External Intelligence Providers' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
+          grep -q 'FFScouterClient.setConsent(this,key,false)' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
+          grep -q 'TornStatsClient.setConsent(this,false)' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
 
           # Premium is server/player-ID based; basic faction membership and leadership are not paywalled.
           grep -q 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAccess.java
