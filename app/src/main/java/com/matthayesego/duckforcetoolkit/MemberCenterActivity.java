@@ -12,7 +12,47 @@ import android.widget.ScrollView;
 public class MemberCenterActivity extends Activity {
     @Override protected void onCreate(Bundle b){super.onCreate(b);PushNotifications.syncIfReady(this);int player=currentPlayerId();if(player>0)PremiumAccess.refresh(this,player);render();}
     @Override protected void onResume(){super.onResume();render();}
-    private void render(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"More","Member Center","Your daily faction tools, training resources, personal participation and faction community in one place.");addLaunch(r,"TODAY","My Day","Bars, cooldowns, refills, personal OC, chain, current war, faction standing and what to do next.",TornFcaUi.GREEN,MemberDailyActivity.class,null);addLaunch(r,"FACTION","Faction Overview","Your faction status and member-safe faction information.",TornFcaUi.GOLD,MemberFactionActivity.class,null);addLaunch(r,"DIRECTORY","Faction Directory","Search the current roster and open member-safe status cards without leadership analytics.",TornFcaUi.BLUE,MemberDirectoryActivity.class,null);addLaunch(r,"RESOURCES","Faction Resources","Faction-local onboarding checklist, custom guides and shortcuts to the member tools you need most.",TornFcaUi.GOLD,FactionResourcesActivity.class,null);addLaunch(r,"TRAINING","Training Center","Universal training guides plus your current faction's private rules and custom guide library.",TornFcaUi.PURPLE,TrainingCenterActivity.class,null);addLaunch(r,"PROGRESS","My Training Progress","Track your own battle-stat gains and Xanax use from a faction-specific local baseline, then compare them with current faction expectations.",TornFcaUi.GREEN,TrainingProgressActivity.class,null);addLaunch(r,"WAR PREP","My War Prep","Personal bars, cooldowns, travel, refills and a war-specific readiness checklist without inventing universal faction requirements.",TornFcaUi.GOLD,WarPrepActivity.class,null);addLaunch(r,"WAR","My War","Current personal ranked-war participation plus your recent completed-war history.",TornFcaUi.RED,MemberWarActivity.class,null);addLaunch(r,"OC","My Organized Crime","Your personal OC assignment/readiness view. Leadership-wide OC data remains permission-gated.",TornFcaUi.PURPLE,null,FeatureRouterActivity.TARGET_OC);addLaunch(r,"CHAIN","Chain Status","Current faction chain status and participation context.",TornFcaUi.BLUE,null,FeatureRouterActivity.TARGET_CHAIN);addLaunch(r,"COMMUNITY","Faction Chat",CommunityBackendClient.isConfigured()?"Chat with authenticated members of your faction inside TornFCA.":"Faction chat client is installed; community backend connection is pending.",TornFcaUi.BLUE,FactionChatActivity.class,null);addLaunch(r,"ALERTS","Notification Inbox","Keep important TornFCA alerts available after they leave Android's notification shade.",TornFcaUi.GOLD,NotificationInboxActivity.class,null);int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS);addLaunch(r,premium?"PREMIUM ACTIVE":"PREMIUM","Premium Insights",premium?"Your 30-day personal activity, ranked-war trend and local payout history.":"See the Premium personal analytics experience and what it adds beyond the free member core.",TornFcaUi.GOLD,PremiumInsightsActivity.class,null);setContentView(s);s.requestApplyInsets();}
-    private void addLaunch(LinearLayout r,String eye,String title,String body,int accent,Class<?> activity,String feature){LinearLayout c=TornFcaUi.card(this,eye,title,body,accent);Button b=TornFcaUi.button(this,"Open "+title,accent);b.setOnClickListener(v->{if(activity!=null)startActivity(new Intent(this,activity));else{Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,feature);startActivity(i);}});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));p.topMargin=TornFcaUi.dp(this,10);c.addView(b,p);TornFcaUi.add(this,r,c);}
+
+    private void render(){
+        ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
+        TornFcaUi.header(this,r,"More","Member Center","Start with My Day, then use the section that matches what you are doing. Core faction-member tools stay free.");
+
+        TornFcaUi.addSection(this,r,"Start here");
+        addLaunch(r,"TODAY","My Day","One-screen summary of bars, cooldowns, refills, your OC, chain, current war and what may need attention.",TornFcaUi.GREEN,MemberDailyActivity.class,null,"Open My Day");
+
+        TornFcaUi.addSection(this,r,"Daily & readiness");
+        addLaunch(r,"WAR PREP","My War Prep","Check your personal readiness and a war-specific checklist before fighting starts.",TornFcaUi.GOLD,WarPrepActivity.class,null,"Open War Prep");
+        addLaunch(r,"WAR","My War","See your current ranked-war participation and recent completed-war history.",TornFcaUi.RED,MemberWarActivity.class,null,"Open My War");
+        addLaunch(r,"OC","My Organized Crime","See your own OC assignment and readiness. Leadership-wide OC information remains permission-gated.",TornFcaUi.PURPLE,null,FeatureRouterActivity.TARGET_OC,"Open My OC");
+        addLaunch(r,"CHAIN","Chain Status","See the current faction chain and your participation context.",TornFcaUi.BLUE,null,FeatureRouterActivity.TARGET_CHAIN,"Open Chain Status");
+
+        TornFcaUi.addSection(this,r,"Growth & training");
+        addLaunch(r,"TRAINING","Training Center","Read TornFCA starter guides plus your faction's current training rules and private guide library.",TornFcaUi.PURPLE,TrainingCenterActivity.class,null,"Open Training Center");
+        addLaunch(r,"PROGRESS","My Training Progress","Track your own battle-stat and Xanax progress from a private faction-specific baseline.",TornFcaUi.GREEN,TrainingProgressActivity.class,null,"Open My Progress");
+
+        TornFcaUi.addSection(this,r,"My faction");
+        addLaunch(r,"RESOURCES","Faction Resources","Start here when joining a faction: onboarding checklist, local rules, guides and useful shortcuts.",TornFcaUi.GOLD,FactionResourcesActivity.class,null,"Open Faction Resources");
+        addLaunch(r,"OVERVIEW","Faction Overview","Member-safe faction status and current faction information.",TornFcaUi.GOLD,MemberFactionActivity.class,null,"Open Faction Overview");
+        addLaunch(r,"DIRECTORY","Faction Directory","Search the current roster and open member-safe status cards without leadership analytics.",TornFcaUi.BLUE,MemberDirectoryActivity.class,null,"Open Directory");
+
+        TornFcaUi.addSection(this,r,"Community & alerts");
+        addLaunch(r,"COMMUNITY","Faction Chat",CommunityBackendClient.isConfigured()?"Chat with authenticated members of your current faction inside TornFCA.":"Faction chat is installed; the shared community connection is not configured in this build.",TornFcaUi.BLUE,FactionChatActivity.class,null,"Open Faction Chat");
+        addLaunch(r,"ALERTS","Notification Inbox","Review important TornFCA alerts after they leave Android's notification shade.",TornFcaUi.GOLD,NotificationInboxActivity.class,null,"Open Notification Inbox");
+
+        TornFcaUi.addSection(this,r,"Optional upgrade");
+        int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS);
+        addLaunch(r,premium?"PREMIUM ACTIVE":"PREMIUM","Premium Insights",premium?"Your deeper personal history and analytics are active.":"Optional deeper history, analytics, automation and convenience. The core member tools above remain free.",TornFcaUi.GOLD,PremiumInsightsActivity.class,null,premium?"Open Premium Insights":"Preview Premium");
+
+        setContentView(s);s.requestApplyInsets();
+    }
+
+    private void addLaunch(LinearLayout r,String eye,String title,String body,int accent,Class<?> activity,String feature,String action){
+        LinearLayout c=TornFcaUi.card(this,eye,title,body,accent);
+        Runnable open=()->{if(activity!=null)startActivity(new Intent(this,activity));else{Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,feature);startActivity(i);}};
+        c.setClickable(true);c.setFocusable(true);c.setOnClickListener(v->open.run());
+        Button b=TornFcaUi.button(this,action,accent);b.setOnClickListener(v->open.run());
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));p.topMargin=TornFcaUi.dp(this,10);c.addView(b,p);TornFcaUi.add(this,r,c);
+    }
+
     private int currentPlayerId(){String key=new SecureApiKeyStore(this).load();if(key==null)return 0;AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return hot.playerId;FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);return scope==null?0:scope.playerId;}
 }
