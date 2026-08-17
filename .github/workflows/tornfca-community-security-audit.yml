@@ -45,6 +45,14 @@ jobs:
           grep -q "if(channel!=='leadership')tcPushToFaction_" backend/TornFcaCommunityBackend.gs
           grep -q 'tcHash_(apiKey)' backend/TornFcaCommunityBackend.gs
 
+          # Training is tenant-scoped and bypasses the short identity cache so faction changes revoke access immediately.
+          grep -q "action.indexOf('training_')===0" backend/TornFcaCommunityBackend.gs
+          grep -q 'tcVerifyUser_(key,freshIdentity)' backend/TornFcaCommunityBackend.gs
+          grep -q 'const cached=forceFresh?null:cache.get(ck)' backend/TornFcaCommunityBackend.gs
+          grep -q "Number(values\[i\]\[1\])!==Number(factionId)" backend/TornFcaCommunityBackend.gs
+          grep -q 'Guide does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
+          grep -q "if(!tcLeader_(user.position))throw new Error('Faction Leader or Co-leader access is required to change training rules.')" backend/TornFcaCommunityBackend.gs
+
           # Personal pushes are scoped to the exact verified player as well as faction.
           grep -q 'target_player_id:String(playerId)' backend/TornFcaCommunityBackend.gs
 
