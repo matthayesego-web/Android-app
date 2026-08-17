@@ -79,11 +79,20 @@ jobs:
           grep -q 'prepareNextSave' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
           grep -q 'Log Out / Change API Key' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
           grep -q 'TornApiClient.clearMemoryCache' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
+          grep -q 'FactionMemberCache.clear()' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
 
           # Multi-faction tenant identity must not regress to a Duck Force-only membership gate.
           if grep -q 'restricted to Duck Force members' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberFactionActivity.java; then echo "Member faction views must remain multi-faction"; exit 1; fi
+          if grep -q 'restricted to Duck Force members' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionActivity.java; then echo "Base authentication must remain multi-faction"; exit 1; fi
+          if grep -q 'DUCK_FORCE_NAME' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionActivity.java; then echo "Base authentication must not reintroduce a faction-name allowlist"; exit 1; fi
+          grep -q 'APP_VERSION = TornFcaBrand.VERSION' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionActivity.java
           grep -q 'TornFcaBrand.VERSION' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberFactionActivity.java
           grep -q 'repairFactionIdentity' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
+
+          # Local banking fallback must remain scoped to both user and faction tenant.
+          grep -q 'row.put("factionId", session.factionId)' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingDraftStore.java
+          grep -q 'rowFaction!=current.factionId' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingDraftStore.java
+          grep -q 'legacy/unscoped rows never auto-sync' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingDraftStore.java
 
           # Member features remain self/public-faction scoped and tolerate Torn field changes.
           grep -q 'loadSelfSnapshot' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
