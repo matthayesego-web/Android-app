@@ -1,0 +1,61 @@
+name: TornFCA Member Core Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Verify free member core and tenant boundaries
+        run: |
+          set -euo pipefail
+
+          # The Member Center must keep the expanded free core discoverable.
+          grep -q '"My Day"' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          grep -q '"Faction Directory"' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          grep -q '"Faction Resources"' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          grep -q '"Training Center"' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          grep -q '"My Training Progress"' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          grep -q '"My War Prep"' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          grep -q 'Core faction participation tools above remain free' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+
+          # New member activities must remain internal to the app.
+          grep -q 'MemberDirectoryActivity" android:exported="false"' app/src/main/AndroidManifest.xml
+          grep -q 'FactionResourcesActivity" android:exported="false"' app/src/main/AndroidManifest.xml
+          grep -q 'TrainingCenterActivity" android:exported="false"' app/src/main/AndroidManifest.xml
+          grep -q 'TrainingProgressActivity" android:exported="false"' app/src/main/AndroidManifest.xml
+          grep -q 'WarPrepActivity" android:exported="false"' app/src/main/AndroidManifest.xml
+
+          # Personal training progress is own-player data and its baseline is player+faction scoped.
+          grep -q '/user/battlestats' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          grep -q '/user/personalstats?cat=drugs' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          grep -q 'Your baseline stays on this device' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+
+          # Onboarding/resources are player+faction local and shared guides use the verified faction backend.
+          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
+          grep -q 'CommunityBackendClient.trainingLibrary' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
+          grep -q 'Resources belong to the faction' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
+
+          # War prep is own-player data and checklist state must be isolated by player+faction+war cycle.
+          grep -q 'selections=bars,cooldowns,travel,refills,organizedcrime' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"+cycle()+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          grep -q 'No universal war requirements invented' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          grep -q 'Faction Resources' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+
+          # Shared training writes remain server-side faction/leadership gated.
+          grep -q "action.indexOf('training_')===0" backend/TornFcaCommunityBackend.gs
+          grep -q 'tcVerifyUser_(key,freshIdentity)' backend/TornFcaCommunityBackend.gs
+          grep -q 'Guide does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
+          grep -q 'Faction Leader or Co-leader access is required to change training rules.' backend/TornFcaCommunityBackend.gs
+
+          echo 'TornFCA free member-core audit passed.'
