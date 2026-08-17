@@ -30,7 +30,7 @@ import java.util.WeakHashMap;
 public final class TornFcaBrand {
     public static final String NAME="TornFCA";
     public static final String LONG_NAME="Torn Faction Companion App";
-    public static final String VERSION="0.9.20";
+    public static final String VERSION=BuildConfig.VERSION_NAME;
 
     private static final int[] LEGACY_BRAND_COLORS=new int[]{
             Color.rgb(241,190,86),Color.rgb(241,194,106),Color.rgb(243,184,52),Color.rgb(215,160,68),Color.rgb(242,197,107)
@@ -264,7 +264,7 @@ public final class TornFcaBrand {
                 .replace("v0.9.17","v0.9.20")
                 .replace("v0.9.18","v0.9.20")
                 .replace("v0.9.19","v0.9.20");
-        if(branded.contains("Encrypted on this device"))branded=branded.replaceAll("v0\\.9\\.\\d+","v"+VERSION);
+        branded=branded.replaceAll("v0\\.9\\.\\d+","v"+VERSION);
         return branded;
     }
 

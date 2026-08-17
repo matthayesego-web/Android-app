@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.21 — 2026-08-17
+
+- Expanded the free member core with a searchable faction directory and member-safe roster cards.
+- Added a free Training Center with universal TornFCA starter guides.
+- Added faction-scoped training rules so Leader/Co-leader can publish stat-gain expectations, regular Xanax expectations, and notes/exceptions.
+- Added a faction-scoped custom training guide library with publishing and archive controls.
+- Enforced guide/rule tenant isolation by verified `faction_id`; every training action now performs a fresh Torn faction check so old-faction content is revoked immediately after a faction change.
+- Kept advanced member history, trend/compliance analytics, and automated follow-up in the Premium/Faction Pro roadmap rather than paywalling basic member guidance.
+- Updated the Google Play/public-release roadmap to make EULA, Terms & Conditions, About/login acknowledgement, Privacy Policy, and Data safety explicit production gates.
+- Updated Community backend schema to add `TrainingRules` and `TrainingGuides` while preserving existing chat/push data when setup is rerun.
+- Bumped Android versionCode to 38 and versionName to 0.9.21.
+
 ## v0.4.3 — 2026-08-14
 
 - Restored the Duck Force noir artwork after the v0.4.2 image-rendering regression.
