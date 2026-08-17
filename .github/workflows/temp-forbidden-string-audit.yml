@@ -1,4 +1,4 @@
-name: Temporary TornFCA Forbidden String Audit
+name: TornFCA Legacy Restriction Audit
 
 on:
   push:
@@ -9,17 +9,14 @@ permissions:
   contents: read
 
 jobs:
-  trace:
+  audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Trace legacy Activity references and restriction
+      - name: Reject legacy single-faction restriction
         run: |
-          echo 'References to ToolkitActivity/MainActivity outside their own files:'
-          grep -R -n -E 'ToolkitActivity|MainActivity' app/src/main/java \
-            --exclude=ToolkitActivity.java --exclude=MainActivity.java || true
-          echo 'Remaining exact Duck Force-only restriction:'
           if grep -R -n -F 'This build is restricted to Duck Force members.' app/src/main; then
+            echo 'Legacy single-faction restriction must not be compiled into TornFCA.'
             exit 1
           fi
-          echo 'No exact legacy restriction found in app/src/main.'
+          echo 'No legacy Duck Force-only authentication restriction found.'
