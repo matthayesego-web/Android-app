@@ -6,9 +6,9 @@ import android.content.SharedPreferences;
 /**
  * Local cache for a backend-verified premium entitlement.
  *
- * This class deliberately does not accept client-side payment claims. A future backend must
- * verify Torn receipt/payment activity and then return the entitlement tied to the numeric
- * Torn player ID. The app only caches that verified result for quick access/offline display.
+ * This class deliberately never grants developer/test Premium. Production entitlement state is
+ * only the last backend-verified result for the numeric Torn player ID. Owner-only simulation is
+ * applied one layer higher by {@link PremiumAccess}, where remote kill switches still win.
  */
 public final class PremiumEntitlementStore {
     public static final String TIER_FREE = "FREE";
@@ -28,7 +28,6 @@ public final class PremiumEntitlementStore {
     }
 
     public static boolean hasPremium(Context context, int playerId) {
-        if (DeveloperSettings.simulatePremium(context)) return true;
         SharedPreferences p = prefs(context);
         if (playerId <= 0 || p.getInt(KEY_PLAYER_ID, 0) != playerId) return false;
         if (!TIER_PREMIUM.equals(p.getString(KEY_TIER, TIER_FREE))) return false;
@@ -51,12 +50,15 @@ public final class PremiumEntitlementStore {
     }
 
     public static String summary(Context context) {
-        if (DeveloperSettings.simulatePremium(context)) return "PREMIUM • developer simulation";
         SharedPreferences p = prefs(context);
         int playerId = p.getInt(KEY_PLAYER_ID, 0);
         if (playerId <= 0) return "FREE • no verified entitlement cached";
         String tier = p.getString(KEY_TIER, TIER_FREE);
         String source = p.getString(KEY_SOURCE, "backend");
+        long expiresAt = p.getLong(KEY_EXPIRES_AT, 0L);
+        if (TIER_PREMIUM.equals(tier) && expiresAt > 0L && expiresAt <= System.currentTimeMillis() / 1000L) {
+            return "FREE • cached Premium expired";
+        }
         return tier + " • player " + playerId + " • " + source;
     }
 
