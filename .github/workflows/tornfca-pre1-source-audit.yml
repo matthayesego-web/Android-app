@@ -1,0 +1,76 @@
+name: TornFCA Pre-1.0 Source Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify v0.10.1 source release gates
+        run: |
+          set -euo pipefail
+
+          grep -q 'versionName = "0.10.1"' app/build.gradle.kts
+          grep -q 'versionCode = 56' app/build.gradle.kts
+          grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
+
+          # Every deployable Apps Script backend must parse before it can reach the Google deployment step.
+          for file in \
+            backend/AccessBackend.gs \
+            backend/TornFcaCommunityBackend.gs \
+            backend/TornFcaPremiumBackend.gs \
+            backend/TornFcaDeveloperBackend.gs \
+            backend/TornFcaWarPayBackend.gs; do
+            cp "$file" "/tmp/$(basename "$file").js"
+            node --check "/tmp/$(basename "$file").js"
+          done
+
+          # Minimum audited backend source versions.
+          grep -q "const DF_TOOLKIT_VERSION='1.1.0'" backend/AccessBackend.gs
+          grep -q "const TC_VERSION='1.4.0'" backend/TornFcaCommunityBackend.gs
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.1.0'" backend/TornFcaPremiumBackend.gs
+          grep -q "const TD_VERSION='1.3.0'" backend/TornFcaDeveloperBackend.gs
+          grep -q "const TW_VERSION='1.1.0'" backend/TornFcaWarPayBackend.gs
+
+          # Tenant/role freshness for shared financial/leadership data.
+          grep -q "tornGet_('/user/faction',apiKey)" backend/AccessBackend.gs
+          grep -q "twTornGet_('/user/faction',apiKey)" backend/TornFcaWarPayBackend.gs
+
+          # Premium payment safety and setup-password cleanup.
+          grep -q 'LockService.getScriptLock' backend/TornFcaPremiumBackend.gs
+          grep -q "receiptSource='XANAX_LOG_4103:'" backend/TornFcaPremiumBackend.gs
+          grep -q 'bootstrapPremiumAdminPassword' backend/TornFcaPremiumBackend.gs
+          grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" backend/TornFcaPremiumBackend.gs
+          grep -q 'bootstrapTornFcaDeveloperAdminPassword' backend/TornFcaDeveloperBackend.gs
+          grep -q "deleteProperty('DEVELOPER_ADMIN_PASSWORD_SETUP')" backend/TornFcaDeveloperBackend.gs
+
+          # Community moderation stays conservative until an explicit capability policy is approved.
+          grep -q "setProperty('MODERATION_ALLOW_LEADERS','false')" backend/TornFcaCommunityBackend.gs
+          grep -q "setProperty('MODERATION_ABILITIES','')" backend/TornFcaCommunityBackend.gs
+
+          # No backend may persist a client API key. OWNER_API_KEY is read-only server configuration for payment scanning.
+          if grep -R -n -E "setProperty\([^,]*(API_KEY|apiKey|api_key)" backend; then
+            echo 'Backend code must not persist Torn API keys from client requests.' >&2
+            exit 1
+          fi
+
+          # Premium must remain centralized and production-safe.
+          test -f docs/PREMIUM_MATRIX_0.10.1.md
+          grep -q 'getBoolean(KEY_PREMIUM_SIM, false)' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
+          RAW_GATES="$(grep -R -l 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit --include='*.java' | grep -v '/PremiumAccess.java$' || true)"
+          test -z "$RAW_GATES" || { echo "Raw Premium gate bypass: $RAW_GATES" >&2; exit 1; }
+
+          # Operator docs must describe the current multi-faction and conservative moderation model.
+          grep -q 'TornFCA access-control architecture' ACCESS_CONTROL.md
+          grep -q 'Initial safe values' docs/V1_BACKEND_GO_LIVE.md
+          grep -q 'MODERATION_ABILITIES.*blank' docs/V1_BACKEND_GO_LIVE.md
+
+          echo 'TornFCA v0.10.1 pre-1.0 source audit passed.'
