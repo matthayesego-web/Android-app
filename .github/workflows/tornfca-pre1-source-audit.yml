@@ -14,13 +14,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Verify v0.10.1 source release gates
+      - name: Verify v0.10.2 source release gates
         run: |
           set -euo pipefail
 
-          grep -q 'versionName = "0.10.1"' app/build.gradle.kts
-          grep -q 'versionCode = 56' app/build.gradle.kts
+          grep -q 'versionName = "0.10.2"' app/build.gradle.kts
+          grep -q 'versionCode = 57' app/build.gradle.kts
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
+
+          # Launcher mark must stay on the supplied cyan/purple shield direction with no text asset dependency.
+          ICON=app/src/main/res/drawable/tornfca_mark.xml
+          test -f "$ICON"
+          grep -q '#78E9FF' "$ICON"
+          grep -q '#9A78FF' "$ICON"
+          grep -q 'Signature torn cuts' "$ICON"
+          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 
           # Beta and production candidates must use the same approved command shell while keeping variant branding distinct.
           RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
@@ -149,6 +158,11 @@ jobs:
           grep -q 'Premium extends the same tracker to a 30-day history' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
           ! grep -q 'extends the same tracker to 14/30 days' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
 
+          # Notification destructive action must require confirmation.
+          INBOX=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
+          grep -q 'confirmClear(rows.length())' "$INBOX"
+          grep -q 'Clear notification inbox?' "$INBOX"
+
           # Torn API disclosure must be visible at key entry and material changes require re-acceptance.
           grep -q 'LEGAL_VERSION="2026-08-17-v4"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
           LOGIN=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
@@ -165,4 +179,4 @@ jobs:
           grep -q 'Initial safe values' docs/V1_BACKEND_GO_LIVE.md
           grep -q 'MONETIZATION_APPROVED=false' docs/V1_BACKEND_GO_LIVE.md
 
-          echo 'TornFCA v0.10.1 pre-1.0 source audit passed.'
+          echo 'TornFCA v0.10.2 pre-1.0 source audit passed.'
