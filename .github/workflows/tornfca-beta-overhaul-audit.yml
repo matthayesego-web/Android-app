@@ -35,8 +35,8 @@ jobs:
           test -f "$SURFACE"
           test -f "$GAUGES"
           test -f "$UX"
-          grep -q 'versionName = "0.9.38"' "$GRADLE"
-          grep -q 'versionCode = 55' "$GRADLE"
+          grep -q 'versionName = "0.10.1"' "$GRADLE"
+          grep -q 'versionCode = 56' "$GRADLE"
           grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
           grep -q 'BetaSurfacePolish.install' "$GATE"
           grep -q 'BetaGaugeLiveData.install' "$GATE"
@@ -81,7 +81,7 @@ jobs:
           test -f app/src/main/res/drawable/ic_beta_developer.xml
           test -f app/src/main/res/drawable/ic_beta_more.xml
 
-          # v0.9.38 developer telemetry remains aggregate, low-write and owner-visible only.
+          # Developer telemetry remains aggregate, low-write and owner-visible only.
           grep -q "const TD_VERSION='1.2.0'" "$DEV_BACKEND"
           grep -q "const TD_USERS='DeveloperUsers'" "$DEV_BACKEND"
           grep -q 'TD_HEARTBEAT_SECONDS=6\*60\*60' "$DEV_BACKEND"
@@ -99,4 +99,8 @@ jobs:
           grep -q 'current_total' "$DEV_CONSOLE"
           grep -q 'total_unique' "$DEV_CONSOLE"
 
-          echo 'Torn FCA Beta v0.9.38 UX/backend-preservation audit passed.'
+          # v0.10.1 owns the pre-1.0 premium matrix release gate.
+          test -f docs/PREMIUM_MATRIX_0.10.1.md
+          test -f .github/workflows/tornfca-premium-matrix-audit.yml
+
+          echo 'Torn FCA Beta v0.10.1 UX/backend-preservation audit passed.'
