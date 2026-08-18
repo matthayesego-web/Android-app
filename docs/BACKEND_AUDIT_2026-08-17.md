@@ -29,7 +29,7 @@ Security/state:
 - legacy single-faction settings/listener token remain for migration compatibility
 
 ### 2. Community backend — `backend/TornFcaCommunityBackend.gs`
-Version: **1.5.0**
+Version: **1.6.0**
 Android client: `CommunityBackendClient`
 
 Server-backed:
@@ -49,6 +49,13 @@ Security/state:
 - non-owner moderators can only see/resolve reports in their verified faction
 - exact final moderation capability matrix remains intentionally undecided
 - launch-safe defaults: `MODERATION_ALLOW_LEADERS=false`, blank `MODERATION_ABILITIES`
+
+Scale hardening:
+- chat polling reads bounded 500-row chunks and stops after 75 matching messages or 5,000 global recent rows
+- chat polling no longer calls `getDataRange()` on the entire historical message sheet
+- exact message/report lookups use TextFinder-backed row searches
+- duplicate report checks read only the recent report tail rather than the full report history
+- this is a hot-path optimization, not a claim that Apps Script has been load-tested for thousands of simultaneous users
 
 ### 3. Premium backend — `backend/TornFcaPremiumBackend.gs`
 Version: **1.2.0**
@@ -136,6 +143,18 @@ Security/state:
 - local receipt is saved first; cloud upload is best-effort and never breaks payout calculation
 - opening WarPay starts a best-effort faction receipt refresh
 
+## Android permission freshness
+
+`TornApiClient.authenticateFreshFaction()` now invalidates cached faction identity, faction alias, position abilities and the cached AuthSession before leadership-only navigation is authorized.
+
+The guarded Android routes are:
+- Activity Tracker
+- Faction Pulse
+- Member Dossier
+- WarPay
+
+This re-verification occurs on tool entry rather than on every ordinary navigation action. Leadership authorization is evaluated before Premium authorization, so Premium cannot create faction authority. `tornfca-permission-freshness-audit.yml` protects this invariant.
+
 ## Local-only by design
 
 These do not need a TornFCA server merely because they use local persistence:
@@ -158,7 +177,7 @@ These primarily compute/display current Torn data and should continue using the 
 - OC views
 - faction activity/pulse/strength calculations
 - live bars/cooldowns/refills/travel data
-- Beta dashboard gauges
+- command dashboard gauges
 
 FFScouter/TornStats remain optional external integrations, not TornFCA data stores. Basic provider access is not a TornFCA Premium paywall; Premium may add convenience/aggregation around separately authorized provider data.
 
@@ -195,9 +214,12 @@ The in-app Privacy Policy further documents cloud faction workflow data, aggrega
 
 - `.github/workflows/tornfca-premium-matrix-audit.yml`
 - `.github/workflows/tornfca-pre1-source-audit.yml`
+- `.github/workflows/tornfca-permission-freshness-audit.yml`
 - `.github/workflows/tornfca-member-core-audit.yml`
 - `.github/workflows/tornfca-community-security-audit.yml`
 - `.github/workflows/tornfca-beta-overhaul-audit.yml`
+- `.github/workflows/tornfca-current-shell-audit.yml`
+- `.github/workflows/tornfca-mobile-navigation-audit.yml`
 - `.github/workflows/tornfca-backend-live-audit.yml`
 - `.github/workflows/tornfca-cloud-candidate.yml`
 
@@ -221,6 +243,7 @@ Firebase values remain separate configuration. See `docs/V1_BACKEND_GO_LIVE.md`.
 - any decision to cloud-sync personal checklist/baseline state (currently intentionally local)
 - legacy faction-chat/listener compatibility cleanup if a future breaking release warrants it
 - live deployment of all five Apps Script services
-- signed v0.10.1 Beta + on-device Free/Premium matrix smoke test
+- signed v0.10.1 Beta + on-device Free/Premium/permission-change smoke test
 - monetization approval/payment-path decision before enabling automatic paid scanning
+- actual load/concurrency testing against deployed Apps Script services
 - final promotion decision to v1.0.0/main only after live gates pass
