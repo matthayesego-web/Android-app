@@ -8,15 +8,20 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
 
-/** Player-facing About page. Detailed architecture and release notes remain in the repository. */
+/** Player-facing About page. Five taps on the Version card opens the hidden developer channel. */
 public class AboutActivity extends Activity {
+    private int versionTaps=0;private long versionTapAt=0L;
     @Override protected void onCreate(Bundle b){super.onCreate(b);render();}
     @Override protected void onResume(){super.onResume();render();}
 
     private void render(){
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
-        TornFcaUi.header(this,r,"More","About TornFCA","Torn Faction Companion App • v"+TornFcaBrand.VERSION);
+        TornFcaUi.header(this,r,"More","About TornFCA","Torn Faction Companion App");
+
+        LinearLayout version=TornFcaUi.card(this,"VERSION","TornFCA v"+TornFcaBrand.VERSION,"Beta channel • Android package "+BuildConfig.APPLICATION_ID,TornFcaUi.BLUE);version.setClickable(true);version.setFocusable(true);version.setOnClickListener(v->versionTap());TornFcaUi.add(this,r,version);
 
         TornFcaUi.addSection(this,r,"What TornFCA is");
         TornFcaUi.add(this,r,TornFcaUi.card(this,"FACTION COMPANION","Built around everyday faction life","TornFCA brings your daily status, training, faction resources, war prep, OC, chains, community tools and faction information into one companion. Leadership tools appear only when your verified faction access allows them. TornFCA complements Torn rather than replacing it.",TornFcaUi.GOLD));
@@ -41,5 +46,6 @@ public class AboutActivity extends Activity {
         setContentView(s);s.requestApplyInsets();
     }
 
+    private void versionTap(){long now=System.currentTimeMillis();versionTaps=(now-versionTapAt<=3000L)?versionTaps+1:1;versionTapAt=now;if(versionTaps>=5){versionTaps=0;versionTapAt=0L;Toast.makeText(this,"Developer channel unlocked.",Toast.LENGTH_SHORT).show();startActivity(new Intent(this,DeveloperGateActivity.class));}}
     private void open(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}catch(Exception ignored){}}
 }
