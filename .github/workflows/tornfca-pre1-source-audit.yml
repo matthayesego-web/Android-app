@@ -36,7 +36,7 @@ jobs:
           # Minimum audited backend source versions.
           grep -q "const DF_TOOLKIT_VERSION='1.1.0'" backend/AccessBackend.gs
           grep -q "const TC_VERSION='1.4.0'" backend/TornFcaCommunityBackend.gs
-          grep -q "const TORNFCA_PREMIUM_VERSION='1.1.0'" backend/TornFcaPremiumBackend.gs
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.2.0'" backend/TornFcaPremiumBackend.gs
           grep -q "const TD_VERSION='1.3.0'" backend/TornFcaDeveloperBackend.gs
           grep -q "const TW_VERSION='1.1.0'" backend/TornFcaWarPayBackend.gs
 
@@ -44,11 +44,13 @@ jobs:
           grep -q "tornGet_('/user/faction',apiKey)" backend/AccessBackend.gs
           grep -q "twTornGet_('/user/faction',apiKey)" backend/TornFcaWarPayBackend.gs
 
-          # Premium payment safety and setup-password cleanup.
+          # Premium payment safety, approval fail-closed behavior and setup-password cleanup.
           grep -q 'LockService.getScriptLock' backend/TornFcaPremiumBackend.gs
           grep -q "receiptSource='XANAX_LOG_4103:'" backend/TornFcaPremiumBackend.gs
           grep -q 'bootstrapPremiumAdminPassword' backend/TornFcaPremiumBackend.gs
           grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" backend/TornFcaPremiumBackend.gs
+          grep -q "setProperty('MONETIZATION_APPROVED','false')" backend/TornFcaPremiumBackend.gs
+          grep -q 'if(!premiumMonetizationApproved_())throw new Error' backend/TornFcaPremiumBackend.gs
           grep -q 'bootstrapTornFcaDeveloperAdminPassword' backend/TornFcaDeveloperBackend.gs
           grep -q "deleteProperty('DEVELOPER_ADMIN_PASSWORD_SETUP')" backend/TornFcaDeveloperBackend.gs
 
@@ -67,6 +69,20 @@ jobs:
           grep -q 'getBoolean(KEY_PREMIUM_SIM, false)' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
           RAW_GATES="$(grep -R -l 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit --include='*.java' | grep -v '/PremiumAccess.java$' || true)"
           test -z "$RAW_GATES" || { echo "Raw Premium gate bypass: $RAW_GATES" >&2; exit 1; }
+          grep -q 'PremiumAccess.MEMBER_DOSSIER' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
+          grep -q 'PremiumAccess.FACTION_PULSE' app/src/main/java/com/matthayesego/duckforcetoolkit/QuickIntelActivity.java
+
+          # Torn API ToS disclosure must be visible at key entry and material changes require re-acceptance.
+          grep -q 'LEGAL_VERSION="2026-08-17-v4"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
+          LOGIN=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
+          LEGAL=app/src/main/java/com/matthayesego/duckforcetoolkit/LegalDocumentActivity.java
+          grep -q 'Data Storage:' "$LOGIN"
+          grep -q 'Data Sharing:' "$LOGIN"
+          grep -q 'Purpose:' "$LOGIN"
+          grep -q 'Key Storage & Sharing:' "$LOGIN"
+          grep -q 'Key Access Level:' "$LOGIN"
+          grep -q 'Torn API service disclosure' "$LEGAL"
+          grep -q 'Automatic paid entitlement processing is designed to remain disabled' "$LEGAL"
 
           # Operator docs must describe the current multi-faction and conservative moderation model.
           grep -q 'TornFCA access-control architecture' ACCESS_CONTROL.md
