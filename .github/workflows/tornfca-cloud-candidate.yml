@@ -26,6 +26,7 @@ jobs:
 
       - name: Read version
         run: |
+          set -euo pipefail
           VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
           VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
           test -n "$VERSION_NAME"
@@ -47,18 +48,39 @@ jobs:
         run: |
           set -euo pipefail
           for var in TORNFCA_FACTION_BACKEND_URL TORNFCA_PREMIUM_BACKEND_URL TORNFCA_COMMUNITY_BACKEND_URL TORNFCA_DEVELOPER_BACKEND_URL TORNFCA_WARPAY_BACKEND_URL; do
-            value="${!var}"
-            test -n "$value" || (echo "Missing $var" && exit 1)
+            value="${!var:-}"
+            test -n "$value" || { echo "Missing $var"; exit 1; }
             case "$value" in https://*) ;; *) echo "$var must be HTTPS"; exit 1;; esac
           done
-          test -n "$TORNFCA_FIREBASE_APP_ID"
-          test -n "$TORNFCA_FIREBASE_API_KEY"
-          test -n "$TORNFCA_FIREBASE_PROJECT_ID"
-          test -n "$TORNFCA_FIREBASE_SENDER_ID"
+          test -n "${TORNFCA_FIREBASE_APP_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_APP_ID'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_API_KEY:-}" || { echo 'Missing TORNFCA_FIREBASE_API_KEY'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_PROJECT_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_PROJECT_ID'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_SENDER_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_SENDER_ID'; exit 1; }
+
+      - name: Require all five deployed backends to be live
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+        run: |
+          set -euo pipefail
+          check_backend() {
+            url="$1"
+            expected="$2"
+            body="$(curl --fail --silent --show-error --location --max-time 25 "$url")"
+            printf '%s\n' "$body" | grep -F '"ok":true' >/dev/null
+            printf '%s\n' "$body" | grep -F "$expected" >/dev/null
+          }
+          check_backend "$TORNFCA_FACTION_BACKEND_URL" 'TornFCA Faction Backend'
+          check_backend "$TORNFCA_COMMUNITY_BACKEND_URL" 'TornFCA Community Backend'
+          check_backend "$TORNFCA_PREMIUM_BACKEND_URL" 'TornFCA Premium Entitlements'
+          check_backend "$TORNFCA_DEVELOPER_BACKEND_URL" 'TornFCA Developer Control Plane'
+          check_backend "$TORNFCA_WARPAY_BACKEND_URL" 'TornFCA WarPay Backend'
 
       - name: Build cloud-enabled unsigned release
         env:
-          TORNFCA_DEV_PASSWORD_SHA256: ${{ secrets.TORNFCA_DEV_PASSWORD_SHA256 }}
           TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
           TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
           TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
@@ -72,6 +94,7 @@ jobs:
 
       - name: Align and inspect release
         run: |
+          set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           ZIPALIGN="$(find "$SDK_ROOT/build-tools" -type f -name zipalign | sort -V | tail -1)"
           test -x "$ZIPALIGN"
@@ -83,6 +106,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: TornFCA-v${{ env.VERSION_NAME }}-cloud-candidate
-          path: TornFCA-v${{ env.VERSION_NAME }}-cloud-aligned-unsigned-release.apk
+          path: TornFCA-v${VERSION_NAME}-cloud-aligned-unsigned-release.apk
           if-no-files-found: error
           retention-days: 14
