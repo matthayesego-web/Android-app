@@ -1,12 +1,14 @@
 /**
- * TornFCA shared faction backend v1.0.0.
+ * TornFCA shared faction backend v1.1.0.
  * API keys verify requests and are never stored. Shared data is tenant-scoped by verified Torn faction ID.
+ * Faction membership and position are read fresh from Torn on every authenticated request; only stable basic player
+ * identity may be cached briefly by a SHA-256 API-key fingerprint.
  *
  * Existing single-faction deployments remain compatible: legacy Settings restrictions and the legacy listener token
  * are honored when present. New deployments default to unrestricted multi-faction tenancy, with every shared row
  * keyed by faction_id.
  */
-const DF_TOOLKIT_VERSION='1.0.0';
+const DF_TOOLKIT_VERSION='1.1.0';
 const DF_SHEETS=Object.freeze({
   SETTINGS:'Settings',
   RANKS:'RankAccess',
@@ -148,12 +150,16 @@ function handleListenerEvent_(body){
 }
 
 function rotateFactionListenerToken_(actor){
-  const token=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,''),hash=sha256_(token),sheet=db_().getSheetByName(DF_SHEETS.LISTENERS),values=sheet.getDataRange().getValues(),row=[actor.faction_id,hash,Math.floor(Date.now()/1000),actor.id,safeCellText_(actor.name)];
-  for(let i=1;i<values.length;i++){
-    if(Number(values[i][0])!==Number(actor.faction_id))continue;
-    sheet.getRange(i+1,1,1,5).setValues([row]);return token;
-  }
-  sheet.appendRow(row);return token;
+  const token=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,''),hash=sha256_(token),sheet=db_().getSheetByName(DF_SHEETS.LISTENERS),row=[actor.faction_id,hash,Math.floor(Date.now()/1000),actor.id,safeCellText_(actor.name)];
+  const lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    const values=sheet.getDataRange().getValues();
+    for(let i=1;i<values.length;i++){
+      if(Number(values[i][0])!==Number(actor.faction_id))continue;
+      sheet.getRange(i+1,1,1,5).setValues([row]);return token;
+    }
+    sheet.appendRow(row);return token;
+  }finally{lock.releaseLock();}
 }
 
 function validateFactionListenerToken_(factionId,token){
@@ -163,15 +169,20 @@ function validateFactionListenerToken_(factionId,token){
 }
 
 function verifyFactionUser_(apiKey){
-  const fp=sha256_(apiKey),cache=CacheService.getScriptCache(),cacheKey='faction_identity:'+fp,cached=cache.get(cacheKey);let user=null;
-  if(cached){try{user=JSON.parse(cached);}catch(_){} }
-  if(!user){
-    const factionData=tornGet_('/user/faction',apiKey),faction=factionData&&factionData.faction;if(!faction)throw new Error('Torn account is not currently in a faction.');
-    const basicData=tornGet_('/user/basic',apiKey),profile=basicData&&basicData.profile||{};
-    user={id:Number(profile.id||0),name:String(profile.name||'Unknown'),faction_id:Number(faction.id||0),faction_name:String(faction.name||''),position:String(faction.position||'')};
-    if(!user.id||!user.faction_id)throw new Error('Unable to verify Torn player/faction identity.');
-    cache.put(cacheKey,JSON.stringify(user),90);
+  // Tenant membership/position is authorization-sensitive and is always fresh.
+  const factionData=tornGet_('/user/faction',apiKey),faction=factionData&&factionData.faction;
+  if(!faction||!Number(faction.id||0))throw new Error('Torn account is not currently in a faction.');
+
+  // Numeric player identity is stable and can be cached briefly without caching faction authorization.
+  const fp=sha256_(apiKey),cache=CacheService.getScriptCache(),cacheKey='faction_basic:'+fp,cached=cache.get(cacheKey);let profile=null;
+  if(cached){try{profile=JSON.parse(cached);}catch(_){} }
+  if(!profile||!Number(profile.id||0)){
+    const basicData=tornGet_('/user/basic',apiKey);profile=basicData&&basicData.profile||{};
+    if(!Number(profile.id||0))throw new Error('Unable to verify Torn player identity.');
+    profile={id:Number(profile.id),name:String(profile.name||'Unknown')};
+    cache.put(cacheKey,JSON.stringify(profile),120);
   }
+  const user={id:Number(profile.id),name:String(profile.name||'Unknown'),faction_id:Number(faction.id||0),faction_name:String(faction.name||''),position:String(faction.position||'')};
 
   const settings=settings_(),restrict=String(settings.restrict_faction||'false').toLowerCase()==='true',expectedId=Number(settings.faction_id||0),expectedName=String(settings.faction_name||'').trim();
   if(restrict){
@@ -184,9 +195,10 @@ function verifyFactionUser_(apiKey){
 function isLeaderOrCoLeader_(position){const n=String(position||'').toLowerCase().replace(/[-_\s]/g,'');return n==='leader'||n==='coleader';}
 
 function syncFactionPositions_(apiKey,actor){
-  const result=tornGet_('/faction/positions',apiKey),positions=Array.isArray(result.positions)?result.positions:[],sheet=db_().getSheetByName(DF_SHEETS.POSITIONS),values=sheet.getDataRange().getValues();
+  const result=tornGet_('/faction/positions',apiKey),positions=Array.isArray(result.positions)?result.positions:[],sheet=db_().getSheetByName(DF_SHEETS.POSITIONS);
   const lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
+    const values=sheet.getDataRange().getValues();
     for(let i=values.length-1;i>=1;i--)if(Number(values[i][0])===Number(actor.faction_id))sheet.deleteRow(i+1);
     if(positions.length){
       const now=new Date(),rows=positions.map(p=>[actor.faction_id,safeCellText_(String(p.name||'')),JSON.stringify(Array.isArray(p.abilities)?p.abilities:[]),now,actor.id,safeCellText_(actor.name)]);
