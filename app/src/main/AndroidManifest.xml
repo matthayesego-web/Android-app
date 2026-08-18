@@ -60,6 +60,7 @@
         <activity android:name=".AboutActivity" android:exported="false"/>
         <activity android:name=".DeveloperGateActivity" android:exported="false"/>
         <activity android:name=".DeveloperPanelActivity" android:exported="false"/>
+        <activity android:name=".DeveloperBackendActivity" android:exported="false"/>
         <activity android:name=".PremiumAdminActivity" android:exported="false"/>
         <activity android:name=".LeadershipAttentionActivity" android:exported="false"/>
         <activity android:name=".FactionStrengthActivity" android:exported="false"/>
