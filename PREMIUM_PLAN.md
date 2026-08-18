@@ -1,147 +1,119 @@
 # TornFCA Premium Plan
 
 ## Product principle
-TornFCA must remain useful to a normal faction member without payment. Premium should sell convenience, automation, history, analytics and shared leadership workflow — not access to the basic information a member needs to participate in their faction.
+TornFCA Free is a complete faction companion. Premium sells convenience, aggregation, longer history, analytics, automation and personalization — not basic faction participation or faction authority.
 
-## Entitlement model
-TornFCA should support three entitlement levels:
+Torn permissions remain the authorization boundary for faction administration. Premium never grants a user leadership access and essential leadership tools are not removed because a leader is Free.
+
+For the detailed tool-by-tool release boundary, see `docs/PREMIUM_MATRIX_0.10.1.md`.
+
+## v1.0 entitlement model
 
 ### FREE
-Bound to the authenticated Torn `player_id` and current `faction_id`.
+Default for every authenticated Torn player.
 
-### PREMIUM PLAYER
-A player-level entitlement for personal convenience features. It follows the Torn player between factions.
+### PREMIUM
+Player-level entitlement keyed to the verified numeric Torn `player_id`. It follows the player between factions. The backend is authoritative; the Android app caches only backend-verified state.
 
-### FACTION PRO
-A faction-level entitlement keyed by `faction_id`. Leadership purchases/manages the faction entitlement and the enabled Faction Pro tools become available to authorized members according to their real Torn faction permissions.
+A separate faction-wide paid tier is **deferred beyond v1.0**. The older Faction Pro concept is not a v1.0 dependency and must not be implied in current product copy or authorization logic.
 
-Entitlements must ultimately be verified by the TornFCA backend. Local toggles are acceptable only for developer/test preview and must never be the production authorization boundary.
+## FREE CORE
 
----
+### Member essentials
+- Torn sign-in/API connection and identity.
+- My Day.
+- My War Prep.
+- Ranked War current/upcoming status, score, recent history and standard detail.
+- Territories and territory-war details.
+- Personal OC and chain status.
+- Training Center and personal Training Progress.
+- Faction Overview, Directory and Resources/onboarding.
+- Faction Chat and Notification Inbox.
+- Standard notification categories and standard 15-minute war reminder.
 
-# FREE CORE — keep free
+### Leadership essentials
+When the signed-in Torn account has the required faction permission:
+- 7-day Activity Tracker.
+- Basic Leadership Attention list.
+- Basic WarPay calculator/current receipt workflow.
+- Banking request/queue workflow.
+- Current Armory Auditor.
+- Training management and notice publishing.
+- Existing OC/war administration.
+- TornFCA community moderation when authorized.
 
-## Home / identity
-- Torn login/API connection
-- Faction-adaptive TornFCA theme
-- Current faction and position
-- Player avatar/header
-- Basic Home attention summary
+### FFScouter / TornStats rule
+Basic provider access is not a TornFCA Premium product. If a player separately opts in and their provider account/key is entitled to the data, TornFCA may surface that provider data in Free.
 
-## War
-- Current/upcoming ranked-war status and score
-- Recent ranked-war history and W/L results
-- Personal war participation
-- Opposing-faction FFScouter lookup using the player's own FFScouter entitlement
-- Basic WarPay calculator for authorized leadership
-- Current WarPay manual Torn payment handoff
+Premium can sell saved views, aggregation, history, comparisons and workflow around provider data, but it must not charge a second time merely to reveal raw provider data the player can already access.
 
-## Faction
-- Faction roster/directory
-- Basic member status
-- Personal faction status
-- Basic Member Dossier
-- Basic notices/resources
+## PREMIUM — v0.10.1 / v1.0 launch set
 
-## Chain / OC
-- Current chain status
-- Personal OC assignment/readiness
-- Basic participation/obligation visibility
+### Personal Insights
+- 30-day personal outgoing activity trends.
+- Ranked-war participation trends.
+- Recent faction-war result summary.
+- Personal local WarPay receipt analytics.
 
-## Leadership essentials
-- Permission-aware Leadership hub
-- Basic attention list
-- Basic WarPay
-- Existing essential faction operations that are required for ordinary faction participation
+### Smart Alerts
+- Selectable 15/30/60-minute war reminder lead time.
+- Future advanced automation can extend this without removing the Free notification categories.
 
-## FFScouter rule
-TornFCA must not charge a second time for basic access to FFScouter data that the player is already entitled to receive from FFScouter. TornFCA Premium may add workflow, saved analysis and automation around FFScouter, while provider-level premium data remains controlled by FFScouter's own entitlement.
+### Extended Activity Tracker
+- Free leadership view: 7 days.
+- Premium leadership view: selectable 14/30-day review.
+- This makes Premium the deeper-history option while preserving a useful Free participation tool.
 
----
+### Faction Pulse
+- One-screen leadership convenience snapshot combining online/available state, hospital/jail/travel, OC gaps and territory-wall status.
+- Underlying roster/status information remains available through Free tools.
 
-# PREMIUM PLAYER
+### Member Dossier
+- All-in-one advanced member-intelligence view combining Torn status with separately opted-in FFScouter/TornStats data.
+- Free keeps Directory/basic member status and basic provider tools.
 
-Personal convenience features that do not require the whole faction to subscribe.
+## Good Premium candidates after v1.0
 
-- Smart war-start / chain / OC reminders
-- Configurable push notifications
-- Advanced "While You Were Away" digest
-- Longer personal participation history
-- Personal performance trends
-- Saved scouting targets and quick views
-- Saved dashboard preferences
-- Advanced personal filters/search
-- Optional cosmetic personalization beyond the automatic faction theme
+- Saved scouting targets and quick views.
+- Saved dashboard preferences and advanced filters.
+- WarPay presets, rule templates, payout-model comparison, longer history, exports and analytics.
+- Extended Armory audit history, saved reports and exports.
+- Banking reconciliation history and exports.
+- Advanced war-to-war participation analytics.
+- OC/chain automated exception queues and follow-up workflow.
+- Cosmetic personalization and saved layouts.
 
----
+These are roadmap candidates, not implemented features unless separately shipped and tested.
 
-# FACTION PRO
+## Payment / entitlement behavior
 
-High-value shared leadership tooling.
+Current Premium backend source supports a configurable Torn in-game item-payment model and defaults to 15 Premium days per Xanax with stacking enabled. The payment backend must be deployed and live-tested before production monetization is considered active.
 
-## WarPay Pro
-- Saved payout presets per faction
-- Saved slider profiles
-- Rule/penalty templates
-- Penalty reason library
-- Approval/review workflow before payout
-- Persistent payment queue state
-- Payout history and audit trail
-- CSV/copy/export packages
-- Compare payout models before committing
-- War-to-war payout analytics
+Production rules:
+- Numeric Torn player ID is the entitlement identity.
+- Status reads require the signed-in user's Torn key and can only read that user's entitlement.
+- Admin grant/config changes require verified owner identity plus the admin password.
+- Client-side payment claims never grant Premium.
+- Expired entitlement falls back to Free.
+- Remote `disable_premium`, maintenance and minimum-version controls override entitlement.
 
-## War operations
-- War readiness dashboard
-- Participation exception monitoring
-- Advanced opponent comparison views
-- Long-term war history analytics
-- Member performance trends
-- Automated pre-war / during-war attention queues
+## Developer testing
 
-## Member intelligence
-- Advanced Member Dossier
-- Participation/OC/chain history
-- Inactivity and availability trends
-- Configurable faction requirements
-- Requirement violation summaries
+Owner-only Premium simulation exists to test both matrix states. It defaults OFF, is accepted only for the verified developer player ID, is applied by `PremiumAccess`, and is never written into the backend entitlement cache.
 
-## OC / Chain automation
-- OC exception monitoring
-- Missing-assignment / readiness alerts
-- Chain participation monitoring
-- Automated leadership follow-up queues
+## Release gate
 
-## Armory / Banking workflow
-- Extended armory audit history
-- Saved audit reports
-- Banking request reconciliation/history
-- Leadership exports and audit trails
+Before v1.0.0:
+1. Deploy/redeploy all five Apps Script backends.
+2. Configure the backend URLs in the signed candidate.
+3. Run the automated Premium Matrix audit.
+4. Device-test Free member, Free leader, Premium member, Premium leader, expired Premium, remote Premium disable and owner simulation.
+5. Verify basic FFScouter/TornStats use is identical for Free and Premium when provider consent/entitlement is the same.
+6. Verify no essential leadership route requires Premium.
+7. Verify backend entitlement refresh, expiration, revoke/grant and payment dedupe.
+8. Complete the final privacy/data-safety and release checklist.
 
-## Shared faction customization
-- Leadership-selected faction accent/theme override
-- Optional faction branding/header configuration
-- Shared dashboard configuration
-- Shared rule presets
+## Version policy
 
----
-
-# Closed beta premium strategy
-
-Before monetization is live, closed-beta testers should be able to exercise Premium features without real charges through a developer/test entitlement mode. The UI should still visibly identify which features are Free, Premium Player, and Faction Pro so we can test the product boundary.
-
-Before production monetization:
-1. Build the TornFCA entitlement backend keyed by `player_id` and `faction_id`.
-2. Integrate Google Play Billing for Android digital entitlements.
-3. Verify purchase tokens server-side before granting production entitlements.
-4. Add restore-purchase and entitlement refresh paths.
-5. Add clear subscription/product descriptions and cancellation/support information.
-6. Keep developer entitlement simulation unavailable in public production builds except behind the hidden password-protected developer console.
-
-# Recommended rollout
-
-- **v0.9.10:** Remove beta code, rebuild WarPay, finalize Premium plan.
-- **v0.9.11:** Add entitlement framework + developer Premium/Faction Pro preview states.
-- **v0.9.12:** Implement first Premium Player and Faction Pro feature gates.
-- **v0.9.13:** Play Billing/backend integration and closed-beta readiness.
-- **v1.0.0:** Production candidate only after multi-faction testing, privacy/data-safety review, billing verification and store review readiness.
+- **v0.10.1:** monetization matrix + pre-1.0 hardening.
+- **v1.0.0:** only after live backends, signed build, device smoke test and release gates pass.
