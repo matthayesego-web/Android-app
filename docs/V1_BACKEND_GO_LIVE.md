@@ -35,7 +35,7 @@ Expected GET identity: `TornFCA Faction Backend`, version `1.1.0`.
 
 New deployments are multi-faction by default. Existing legacy restriction settings remain compatible.
 
-## 2. Community backend — v1.5.0
+## 2. Community backend — v1.6.0
 
 Sheet: `TornFCA - Community Backend`
 
@@ -44,6 +44,8 @@ Source: `backend/TornFcaCommunityBackend.gs`
 Run once: `setupTornFcaCommunityBackend()`
 
 Every Community request re-reads current faction membership/position from Torn, so changing factions or losing a leadership role does not retain stale tenant access. Stable player identity may be cached briefly without caching faction authorization. Duplicate-sensitive shared writes are ScriptLock-protected.
+
+v1.6.0 also hardens the hot chat path for growth: chat polling scans bounded recent chunks rather than loading the full historical `ChatMessages` sheet on every poll, while exact message/report lookups use server-side TextFinder-style row searches. This avoids history growth progressively slowing every active chat user.
 
 ### Initial moderation policy
 
@@ -64,7 +66,7 @@ For Firebase Cloud Messaging, add Apps Script Script Properties:
 
 GitHub Actions secret: `TORNFCA_COMMUNITY_BACKEND_URL`
 
-Expected GET identity: `TornFCA Community Backend`, version `1.5.0`.
+Expected GET identity: `TornFCA Community Backend`, version `1.6.0`.
 
 ## 3. Premium backend — v1.2.0
 
@@ -186,12 +188,13 @@ Permanent Android signing secrets remain separate and must not be rotated during
 After all five URLs are configured:
 
 1. Run **TornFCA Backend Live Audit**.
-2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.5.0, Premium 1.2.0, Developer 1.3.0, WarPay 1.1.0.
+2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.6.0, Premium 1.2.0, Developer 1.3.0, WarPay 1.1.0.
 3. It compiles both side-by-side Beta and release candidates.
 4. It verifies Beta package `com.matthayesego.duckforcetoolkit.beta` and release package `com.matthayesego.duckforcetoolkit`.
 5. Run **TornFCA Premium Matrix Audit**.
-6. Run **TornFCA Cloud Candidate**; it refuses to build against missing/stale backends.
-7. Do not promote to `main` until the signed Beta receives an on-device smoke test.
+6. Run **TornFCA Permission Freshness Audit**.
+7. Run **TornFCA Cloud Candidate**; it refuses to build against missing/stale backends.
+8. Do not promote to `main` until the signed Beta receives an on-device smoke test.
 
 ## On-device v1.0 backend smoke test
 
@@ -202,6 +205,7 @@ Minimum pass list:
 - read faction notices
 - submit/read a banking request
 - open Community chat and send/read a message
+- repeatedly refresh chat after building some history and confirm recent messages remain responsive/correct
 - switch/change faction scope during testing and confirm old Community tenant data is not retained
 - submit a chat report
 - verify owner moderation/recovery; test wider moderator capabilities only after policy is explicitly configured
@@ -213,6 +217,7 @@ Minimum pass list:
 - verify Developer Control Plane status/config/user counts
 - calculate/save WarPay receipt, restart, and re-read it from cloud
 - perform two near-simultaneous WarPay saves for one war and confirm one faction/war row
+- verify a leadership-only route re-checks current leadership before opening
 - disable Premium remotely and verify Premium convenience locks while Free tools remain usable
 - disable/re-enable one noncritical remote feature
 - verify offline/local-safe behavior without corrupting cloud state
