@@ -126,13 +126,27 @@ public final class TornApiClient {
         return session;
     }
 
+    /**
+     * Re-verifies current faction/position for security-sensitive leadership navigation without
+     * disabling normal caching everywhere else. Key ownership/access metadata may remain cached,
+     * but faction identity and position/ability rows are evicted before authentication.
+     */
+    public static AuthSession authenticateFreshFaction(String key) throws IOException {
+        validateKey(key);
+        SESSION_CACHE.remove(sessionKey(key));
+        evictPath("/user?selections=profile,faction", key);
+        evictPath("/user/faction", key);
+        evictPath("/faction/positions", key);
+        return authenticate(key);
+    }
+
     private static JSONObject await(FutureTask<JSONObject> task) throws IOException {
         try {return task.get();}
         catch (InterruptedException e) {Thread.currentThread().interrupt();throw new IOException("Torn login verification was interrupted.");}
         catch (ExecutionException e) {Throwable cause=e.getCause();if(cause instanceof IOException)throw(IOException)cause;throw new IOException(cause==null?"Torn login verification failed.":cause.getMessage());}
     }
 
-    /** Returns the already verified in-process session so feature navigation does not re-authenticate. */
+    /** Returns the already verified in-process session so ordinary feature navigation does not re-authenticate. */
     public static AuthSession cachedSession(String key) {
         if (key == null || key.trim().isEmpty()) return null;
         SessionEntry entry = SESSION_CACHE.get(sessionKey(key));
@@ -309,6 +323,14 @@ public final class TornApiClient {
                     + java.net.URLEncoder.encode(key, StandardCharsets.UTF_8.name()), key);
             CACHE.put(cacheKey(url, key), new CacheEntry(json.toString(), System.currentTimeMillis() + ttl));
         } catch (Exception ignored) {}
+    }
+
+    private static void evictPath(String path,String key){
+        try{
+            String joiner=path.contains("?")?"&":"?";
+            String url=canonicalizeTornUrl(BASE+path+joiner+"key="+java.net.URLEncoder.encode(key,StandardCharsets.UTF_8.name()),key);
+            CACHE.remove(cacheKey(url,key));
+        }catch(Exception ignored){}
     }
 
     private static long queryLong(String url, String name) {
