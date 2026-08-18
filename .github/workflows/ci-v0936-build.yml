@@ -18,10 +18,17 @@ jobs:
           gradle-version: '8.13'
       - name: Compile beta
         run: gradle --no-daemon :app:assembleBeta
+      - name: Align beta APK
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          ZIPALIGN="$(find "$SDK_ROOT/build-tools" -type f -name zipalign | sort -V | tail -1)"
+          test -x "$ZIPALIGN"
+          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/beta/app-beta-unsigned.apk Torn-FCA-Beta-v0.9.36-aligned-unsigned.apk
+          "$ZIPALIGN" -c -P 16 -v 4 Torn-FCA-Beta-v0.9.36-aligned-unsigned.apk
       - name: Upload beta APK
         uses: actions/upload-artifact@v7
         with:
-          name: Torn-FCA-Beta-v0.9.36-unsigned
-          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          name: Torn-FCA-Beta-v0.9.36-aligned-unsigned
+          path: Torn-FCA-Beta-v0.9.36-aligned-unsigned.apk
           if-no-files-found: error
           retention-days: 2
