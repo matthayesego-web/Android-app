@@ -55,9 +55,9 @@ public final class DeveloperSettings {
     }
 
     public static boolean simulatePremium(Context context) {
-        // Closed-beta default: every tester receives the elevated Premium state unless the
-        // password-protected developer console explicitly switches this device back to Free/real.
-        return prefs(context).getBoolean(KEY_PREMIUM_SIM, true);
+        // Production-safe default: no device receives Premium merely for installing a beta.
+        // PremiumAccess separately restricts this simulation flag to the verified owner ID.
+        return prefs(context).getBoolean(KEY_PREMIUM_SIM, false);
     }
 
     public static void setSimulatePremium(Context context, boolean enabled) {
@@ -80,7 +80,9 @@ public final class DeveloperSettings {
 
     public static int activityDays(Context context) {
         int days = prefs(context).getInt(KEY_ACTIVITY_DAYS, 30);
-        return days == 7 || days == 14 || days == 30 ? days : 30;
+        int requested = days == 7 || days == 14 || days == 30 ? days : 30;
+        int playerId = PremiumAccess.currentPlayerId(context);
+        return PremiumAccess.has(context, playerId, PremiumAccess.EXTENDED_ACTIVITY) ? requested : 7;
     }
 
     public static void setActivityDays(Context context, int days) {
