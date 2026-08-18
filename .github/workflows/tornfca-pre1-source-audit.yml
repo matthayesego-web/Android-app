@@ -65,6 +65,16 @@ jobs:
           grep -q "setProperty('MODERATION_ABILITIES','')" backend/TornFcaCommunityBackend.gs
           grep -q 'tcCanModerate_' backend/TornFcaCommunityBackend.gs
 
+          # Scale/rate protections: direct Torn traffic stays around 30/min sustained and chat polls conservatively.
+          API=app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          CHAT=app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
+          DEV_BACKEND=backend/TornFcaDeveloperBackend.gs
+          grep -q 'TOKEN_REFILL_MS = 2000L' "$API"
+          grep -q 'TOKEN_CAPACITY = 3.0' "$API"
+          grep -q 'handler.postDelayed(poll,20000L)' "$CHAT"
+          grep -q 'TD_HEARTBEAT_SECONDS=6\*60\*60' "$DEV_BACKEND"
+          grep -q "tcRate_(user.id,'chat_list',2)" backend/TornFcaCommunityBackend.gs
+
           # No backend may persist a client API key. OWNER_API_KEY is only read as server scanner config.
           if grep -R -n -E "setProperty\([^,]*(API_KEY|apiKey|api_key)" backend; then
             echo 'Backend code must not persist Torn API keys from client requests.' >&2
@@ -78,6 +88,8 @@ jobs:
           test -z "$RAW_GATES" || { echo "Raw Premium gate bypass: $RAW_GATES" >&2; exit 1; }
           grep -q 'PremiumAccess.MEMBER_DOSSIER' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
           grep -q 'PremiumAccess.FACTION_PULSE' app/src/main/java/com/matthayesego/duckforcetoolkit/QuickIntelActivity.java
+          grep -q 'Premium extends the same tracker to a 30-day history' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          ! grep -q 'extends the same tracker to 14/30 days' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
 
           # Torn API disclosure must be visible at key entry and material changes require re-acceptance.
           grep -q 'LEGAL_VERSION="2026-08-17-v4"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
