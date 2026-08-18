@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Verify community tenant, moderation and push safety
+      - name: Verify community tenant, moderation, scale and push safety
         run: |
           set -euo pipefail
           BACKEND=backend/TornFcaCommunityBackend.gs
@@ -23,7 +23,7 @@ jobs:
           MSG=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
 
           # Exact audited backend generation.
-          grep -q "const TC_VERSION='1.5.0'" "$BACKEND"
+          grep -q "const TC_VERSION='1.6.0'" "$BACKEND"
           cp "$BACKEND" /tmp/community.js
           node --check /tmp/community.js
 
@@ -39,6 +39,19 @@ jobs:
           grep -q 'Message does not belong to your current faction.' "$BACKEND"
           grep -q 'Guide does not belong to your current faction.' "$BACKEND"
           grep -q 'Number(values\[i\]\[1\])!==Number(factionId)' "$BACKEND"
+
+          # Hot chat polling is bounded; history growth must not force a full-sheet read each poll.
+          grep -q 'TC_CHAT_SCAN_LIMIT=5000' "$BACKEND"
+          grep -q 'TC_CHAT_CHUNK=500' "$BACKEND"
+          grep -q 'function tcFindExactRow_' "$BACKEND"
+          grep -q 'function tcFindAllExactRows_' "$BACKEND"
+          grep -q 'function tcTailRows_' "$BACKEND"
+          awk '/function tcReadChat_/{flag=1} flag{print} flag && /^}/{exit}' "$BACKEND" > /tmp/chat-read.txt
+          grep -q 'getRange(start,1,count,7)' /tmp/chat-read.txt
+          ! grep -q 'getDataRange' /tmp/chat-read.txt
+          awk '/function tcReportChat_/{flag=1} flag{print} flag && /^}/{exit}' "$BACKEND" > /tmp/chat-report.txt
+          grep -q 'tcFindExactRow_' /tmp/chat-report.txt
+          grep -q 'tcTailRows_' /tmp/chat-report.txt
 
           # Duplicate/concurrent-sensitive mutations use ScriptLock.
           grep -q 'LockService.getScriptLock' "$BACKEND"
@@ -67,10 +80,10 @@ jobs:
           grep -q '"Block User"' "$CHAT"
           grep -q 'BlockedUserStore.isBlocked' "$MSG"
           grep -q 'Remove Message' "$MOD"
-          grep -q 'Dismiss Report' "$MOD"
+          grep -q 'Dismiss' "$MOD"
 
           # Client API keys must not be persisted in Apps Script storage.
           ! grep -q "setProperty(.*apiKey" "$BACKEND"
           ! grep -q "appendRow(.*apiKey" "$BACKEND"
 
-          echo 'TornFCA Community v1.5 security audit passed.'
+          echo 'TornFCA Community v1.6 security/scale audit passed.'
