@@ -37,8 +37,8 @@ jobs:
           test -f "$GAUGES"
           test -f "$UX"
           test -f "$RUNTIME"
-          grep -q 'versionName = "0.10.1"' "$GRADLE"
-          grep -q 'versionCode = 56' "$GRADLE"
+          grep -q 'versionName = "0.10.2"' "$GRADLE"
+          grep -q 'versionCode = 57' "$GRADLE"
           grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
           grep -q 'TornFcaCommandRuntime.install(getApplication())' "$GATE"
           grep -q 'BetaSurfacePolish.install(app)' "$RUNTIME"
@@ -114,7 +114,13 @@ jobs:
           grep -q 'current_total' "$DEV_CONSOLE"
           grep -q 'total_unique' "$DEV_CONSOLE"
 
+          # Launcher icon remains shield-based and text-free.
+          ICON=app/src/main/res/drawable/tornfca_mark.xml
+          grep -q '#78E9FF' "$ICON"
+          grep -q '#9A78FF' "$ICON"
+          grep -q 'Signature torn cuts' "$ICON"
+
           test -f docs/PREMIUM_MATRIX_0.10.1.md
           test -f .github/workflows/tornfca-premium-matrix-audit.yml
 
-          echo 'Torn FCA v0.10.1 command UX/backend-preservation audit passed.'
+          echo 'Torn FCA v0.10.2 command UX/backend-preservation audit passed.'
