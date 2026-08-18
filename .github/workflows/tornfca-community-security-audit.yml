@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Verify community tenant, moderation, scale and push safety
+      - name: Verify community tenant, moderation, War Prep, scale and push safety
         run: |
           set -euo pipefail
           BACKEND=backend/TornFcaCommunityBackend.gs
@@ -21,26 +21,24 @@ jobs:
           CHAT=app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
           MOD=app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityModerationActivity.java
           MSG=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+          WARPREP=app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          WARPREP_ADMIN=app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepLeadershipActivity.java
 
-          # Exact audited backend generation.
-          grep -q "const TC_VERSION='1.6.0'" "$BACKEND"
+          grep -q "const TC_VERSION='1.7.0'" "$BACKEND"
           cp "$BACKEND" /tmp/community.js
           node --check /tmp/community.js
 
-          # Every request receives a freshly verified current faction/position.
           grep -q 'const user=tcVerifyUser_(key);' "$BACKEND"
           grep -q "tcTornGet_('/user/faction',apiKey)" "$BACKEND"
           grep -q "tcTornGet_('/user/basic',apiKey)" "$BACKEND"
           ! grep -q 'freshIdentity' "$BACKEND"
           ! grep -q 'community_identity:' "$BACKEND"
 
-          # Chat/report/training/device state remains faction-scoped.
           grep -q 'Number(values\[i\]\[1\])!==user.faction_id' "$BACKEND"
           grep -q 'Message does not belong to your current faction.' "$BACKEND"
           grep -q 'Guide does not belong to your current faction.' "$BACKEND"
           grep -q 'Number(values\[i\]\[1\])!==Number(factionId)' "$BACKEND"
 
-          # Hot chat polling is bounded; history growth must not force a full-sheet read each poll.
           grep -q 'TC_CHAT_SCAN_LIMIT=5000' "$BACKEND"
           grep -q 'TC_CHAT_CHUNK=500' "$BACKEND"
           grep -q 'function tcFindExactRow_' "$BACKEND"
@@ -53,7 +51,6 @@ jobs:
           grep -q 'tcFindExactRow_' /tmp/chat-report.txt
           grep -q 'tcTailRows_' /tmp/chat-report.txt
 
-          # Duplicate/concurrent-sensitive mutations use ScriptLock.
           grep -q 'LockService.getScriptLock' "$BACKEND"
           grep -q 'function tcReportChat_' "$BACKEND"
           grep -q 'function tcModerationResolve_' "$BACKEND"
@@ -61,7 +58,6 @@ jobs:
           grep -q 'function tcSaveTrainingGuide_' "$BACKEND"
           grep -q 'function tcRegisterDevice_' "$BACKEND"
 
-          # Moderation is conservative by default but capability-configurable.
           grep -q 'TC_MODERATOR_PLAYER_ID=3987363' "$BACKEND"
           grep -q "setProperty('MODERATION_ALLOW_LEADERS','false')" "$BACKEND"
           grep -q "setProperty('MODERATION_ABILITIES','')" "$BACKEND"
@@ -72,7 +68,25 @@ jobs:
           grep -q 'Moderation report belongs to another faction.' "$BACKEND"
           grep -q '\[Removed by TornFCA moderation\]' "$BACKEND"
 
-          # Safety controls remain available in the normal community client/UI.
+          # War Prep is multi-tenant by verified faction ID and resets completion by ranked-war ID.
+          grep -q "const TC_WAR_PREP_CONFIG='WarPrepConfig'" "$BACKEND"
+          grep -q "const TC_WAR_PREP_STATUS='WarPrepStatus'" "$BACKEND"
+          grep -q "action==='warprep_state'" "$BACKEND"
+          grep -q "action==='warprep_status_save'" "$BACKEND"
+          grep -q "action==='warprep_leadership'" "$BACKEND"
+          grep -q "action==='warprep_config_save'" "$BACKEND"
+          grep -q 'user.faction_id,warId,user.id' "$BACKEND"
+          grep -q 'app_users_only:true' "$BACKEND"
+          grep -q 'warPrepState' "$CLIENT"
+          grep -q 'saveWarPrepStatus' "$CLIENT"
+          grep -q 'warPrepLeadership' "$CLIENT"
+          grep -q 'saveWarPrepConfig' "$CLIENT"
+          grep -q 'tornfca_war_prep_v2' "$WARPREP"
+          grep -q 'war.warId' "$WARPREP"
+          grep -q 'persistChecklistMetadata' "$WARPREP"
+          grep -q 'authenticateFreshFaction' "$WARPREP_ADMIN"
+          grep -q 'APP USERS THIS WAR' "$WARPREP_ADMIN"
+
           grep -q 'reportChatMessage' "$CLIENT"
           grep -q 'moderationReports' "$CLIENT"
           grep -q 'resolveModerationReport' "$CLIENT"
@@ -82,8 +96,7 @@ jobs:
           grep -q 'Remove Message' "$MOD"
           grep -q 'Dismiss' "$MOD"
 
-          # Client API keys must not be persisted in Apps Script storage.
           ! grep -q "setProperty(.*apiKey" "$BACKEND"
           ! grep -q "appendRow(.*apiKey" "$BACKEND"
 
-          echo 'TornFCA Community v1.6 security/scale audit passed.'
+          echo 'TornFCA Community v1.7 security/War Prep/scale audit passed.'
