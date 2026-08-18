@@ -68,9 +68,12 @@ jobs:
           grep -q 'ADVANCED_ALERTS="advanced_alerts"' "$ACCESS"
           grep -q 'PERSONAL_INSIGHTS="personal_insights"' "$ACCESS"
 
-          # Activity is useful in Free (7 days) and deeper in Premium (14/30 days).
+          # Activity is useful in Free (7 days); Premium gets the deeper 30-day customer view.
           grep -q 'return PremiumAccess.has(context, playerId, PremiumAccess.EXTENDED_ACTIVITY) ? requested : 7;' "$DEV"
+          grep -q 'getInt(KEY_ACTIVITY_DAYS, 30)' "$DEV"
           grep -q 'int days=DeveloperSettings.activityDays(this);' "$OPS"
+          grep -q 'Premium extends the same tracker to a 30-day history' "$PREVIEW"
+          ! grep -q 'extends the same tracker to 14/30 days' "$PREVIEW"
 
           # Advanced all-in-one leadership convenience routes are Premium.
           grep -q 'TARGET_PULSE.equals(target))return PremiumAccess.FACTION_PULSE' "$ROUTER"
@@ -133,6 +136,7 @@ jobs:
           grep -q 'FFScouter' "$MATRIX"
           grep -q 'TornStats' "$MATRIX"
           grep -q 'Provider data is not a TornFCA paywall' "$MATRIX"
+          grep -q 'Premium leadership view: 30-day review' "$PLAN"
           grep -q 'A separate faction-wide paid tier is \*\*deferred beyond v1.0\*\*' "$PLAN"
 
           echo 'TornFCA v0.10.1 Premium matrix audit passed.'
