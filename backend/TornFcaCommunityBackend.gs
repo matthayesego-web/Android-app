@@ -1,5 +1,5 @@
 /**
- * TornFCA Community Backend v1.6.0.
+ * TornFCA Community Backend v1.7.0.
  * Deploy this file as its OWN Google Apps Script web app, separate from faction, premium and developer backends.
  * Torn API keys are used only to verify the current request and are never written to Sheets/Properties/Cache.
  * Faction membership/position is read fresh from Torn on every request; only stable basic player identity may be
@@ -11,13 +11,16 @@
  *
  * Scale note: chat polling reads bounded recent chunks rather than the entire historical chat sheet. Exact message
  * and report lookups use TextFinder so old history does not make each active poll progressively more expensive.
+ * War Prep configuration and completion rows are always keyed by freshly verified faction_id + war_id.
  */
-const TC_VERSION='1.6.0';
+const TC_VERSION='1.7.0';
 const TC_CHAT='ChatMessages';
 const TC_REPORTS='ChatReports';
 const TC_DEVICES='PushDevices';
 const TC_TRAINING_RULES='TrainingRules';
 const TC_TRAINING_GUIDES='TrainingGuides';
+const TC_WAR_PREP_CONFIG='WarPrepConfig';
+const TC_WAR_PREP_STATUS='WarPrepStatus';
 const TC_CHANNELS=['general','war','oc','leadership'];
 const TC_MODERATOR_PLAYER_ID=3987363;
 const TC_CHAT_SCAN_LIMIT=5000;
@@ -33,7 +36,9 @@ function setupTornFcaCommunityBackend(){
   tcEnsureSheet_(ss,TC_DEVICES,['token_hash','faction_id','player_id','token','preferences_json','platform','updated_at','active']);
   tcEnsureSheet_(ss,TC_TRAINING_RULES,['faction_id','stat_gain_target','xanax_target','notes','updated_by_id','updated_by_name','updated_at']);
   tcEnsureSheet_(ss,TC_TRAINING_GUIDES,['id','faction_id','title','category','body','author_id','author_name','updated_at','active']);
-  return{ok:true,sheet_id:ss.getId(),schema_version:6,next:'Deploy this Apps Script as a web app. Moderation remains owner-only until MODERATION_ALLOW_LEADERS and/or MODERATION_ABILITIES are deliberately configured. Store Firebase service-account values only in Script Properties if cloud push is desired.'};
+  tcEnsureSheet_(ss,TC_WAR_PREP_CONFIG,['faction_id','items_json','updated_by_id','updated_by_name','updated_at']);
+  tcEnsureSheet_(ss,TC_WAR_PREP_STATUS,['faction_id','war_id','player_id','player_name','completed_json','first_seen_at','updated_at']);
+  return{ok:true,sheet_id:ss.getId(),schema_version:7,next:'Deploy this Apps Script as a web app. Moderation remains owner-only until MODERATION_ALLOW_LEADERS and/or MODERATION_ABILITIES are deliberately configured. Store Firebase service-account values only in Script Properties if cloud push is desired.'};
 }
 
 function doGet(){return tcJson_({ok:true,app:'TornFCA Community Backend',version:TC_VERSION,authenticated_actions:'POST only'});}
@@ -44,7 +49,7 @@ function doPost(e){
     if(!key)throw new Error('API key required.');
     const user=tcVerifyUser_(key);
 
-    if(action==='config')return tcJson_({ok:true,user:tcPublicUser_(user),capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,push:tcFirebaseConfigured_()}});
+    if(action==='config')return tcJson_({ok:true,user:tcPublicUser_(user),capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,war_prep:true,push:tcFirebaseConfigured_()}});
     if(action==='chat_list')return tcJson_({ok:true,user:tcPublicUser_(user),messages:tcReadChat_(user,body)});
     if(action==='chat_send')return tcJson_({ok:true,message:tcSendChat_(user,body)});
     if(action==='chat_report')return tcJson_({ok:true,report:tcReportChat_(user,body)});
@@ -69,6 +74,16 @@ function doPost(e){
       if(!tcLeader_(user.position))throw new Error('Faction Leader or Co-leader access is required to archive training guides.');
       return tcJson_({ok:true,archived:tcArchiveTrainingGuide_(user,body)});
     }
+    if(action==='warprep_state')return tcJson_({ok:true,warPrep:tcWarPrepState_(user,body)});
+    if(action==='warprep_status_save')return tcJson_({ok:true,warPrep:tcSaveWarPrepStatus_(user,body)});
+    if(action==='warprep_leadership'){
+      if(!tcLeader_(user.position))throw new Error('Faction Leader or Co-leader access is required to review War Prep.');
+      return tcJson_({ok:true,warPrep:tcWarPrepLeadership_(user,body)});
+    }
+    if(action==='warprep_config_save'){
+      if(!tcLeader_(user.position))throw new Error('Faction Leader or Co-leader access is required to change War Prep options.');
+      return tcJson_({ok:true,warPrep:tcSaveWarPrepConfig_(user,body)});
+    }
     if(action==='push_register')return tcJson_({ok:true,device:tcRegisterDevice_(user,body)});
     if(action==='push_unregister')return tcJson_({ok:true,removed:tcUnregisterDevice_(user,body)});
     if(action==='push_test'){
@@ -86,11 +101,8 @@ function doPost(e){
 }
 
 function tcVerifyUser_(apiKey){
-  // Current faction membership/position is tenant authorization and must never come from a stale cache.
   const factionData=tcTornGet_('/user/faction',apiKey),faction=factionData&&factionData.faction;
   if(!faction||!Number(faction.id||0))throw new Error('Torn account is not currently in a faction.');
-
-  // Stable player identity may be cached briefly without caching faction authorization.
   const fp=tcHash_(apiKey),cache=CacheService.getScriptCache(),ck='basic:'+fp,cached=cache.get(ck);let profile=null;
   if(cached){try{profile=JSON.parse(cached);}catch(_){} }
   if(!profile||!Number(profile.id||0)){
@@ -303,6 +315,50 @@ function tcArchiveTrainingGuide_(user,body){
     }
     throw new Error('Guide not found.');
   }finally{lock.releaseLock();}
+}
+
+function tcWarPrepSheets_(){
+  const ss=tcDb_();
+  return{config:tcEnsureSheet_(ss,TC_WAR_PREP_CONFIG,['faction_id','items_json','updated_by_id','updated_by_name','updated_at']),status:tcEnsureSheet_(ss,TC_WAR_PREP_STATUS,['faction_id','war_id','player_id','player_name','completed_json','first_seen_at','updated_at'])};
+}
+function tcDefaultWarPrepItems_(){return[
+  {id:'item1',title:'Reviewed current war mode and timing'},
+  {id:'item2',title:'Checked travel'},
+  {id:'item3',title:'Checked cooldowns & refills'},
+  {id:'item4',title:'Reviewed faction resources'},
+  {id:'item5',title:'Reviewed current instructions'}
+];}
+function tcWarId_(body){const warId=Math.floor(Number(body&&body.warId||0));if(warId<=0)throw new Error('A current or upcoming ranked-war ID is required for shared War Prep.');return warId;}
+function tcReadWarPrepConfig_(factionId){
+  const sheet=tcWarPrepSheets_().config,row=tcFindExactRow_(sheet,1,String(factionId));if(row<2)return tcDefaultWarPrepItems_();
+  let parsed=[];try{parsed=JSON.parse(String(sheet.getRange(row,2).getValue()||'[]'));}catch(_){}
+  if(!Array.isArray(parsed)||!parsed.length)return tcDefaultWarPrepItems_();return parsed.slice(0,8).map((v,i)=>({id:String(v&&v.id||('item'+(i+1))),title:String(v&&v.title||'').slice(0,120)})).filter(v=>v.title);
+}
+function tcFindWarPrepStatusRow_(sheet,factionId,warId,playerId){
+  const rows=tcFindAllExactRows_(sheet,3,String(playerId));for(let i=0;i<rows.length;i++){const meta=sheet.getRange(rows[i],1,1,3).getValues()[0];if(Number(meta[0])===Number(factionId)&&Number(meta[1])===Number(warId))return rows[i];}return 0;
+}
+function tcReadWarPrepStatus_(user,warId){
+  const sheet=tcWarPrepSheets_().status,row=tcFindWarPrepStatusRow_(sheet,user.faction_id,warId,user.id);if(row<2)return{war_id:warId,player_id:user.id,player_name:user.name,completed:{},first_seen_at:0,updated_at:0};
+  const v=sheet.getRange(row,1,1,7).getValues()[0];let completed={};try{completed=JSON.parse(String(v[4]||'{}'));}catch(_){}
+  return{war_id:Number(v[1]||warId),player_id:Number(v[2]||user.id),player_name:String(v[3]||user.name),completed:completed,first_seen_at:Number(v[5]||0),updated_at:Number(v[6]||0)};
+}
+function tcTouchWarPrep_(user,warId){
+  const lock=LockService.getScriptLock();lock.waitLock(10000);try{const sheet=tcWarPrepSheets_().status,row=tcFindWarPrepStatusRow_(sheet,user.faction_id,warId,user.id);if(row>=2)return;const now=Math.floor(Date.now()/1000);sheet.appendRow([user.faction_id,warId,user.id,tcSafe_(user.name),'{}',now,now]);}finally{lock.releaseLock();}
+}
+function tcWarPrepState_(user,body){const warId=tcWarId_(body);tcTouchWarPrep_(user,warId);return{war_id:warId,items:tcReadWarPrepConfig_(user.faction_id),status:tcReadWarPrepStatus_(user,warId),scope:'verified_faction_only'};}
+function tcSanitizeCompleted_(raw){
+  let value=raw;if(typeof raw==='string'){try{value=JSON.parse(raw);}catch(_){value={};}}if(!value||typeof value!=='object'||Array.isArray(value))value={};const out={};Object.keys(value).slice(0,16).forEach(k=>{const key=String(k).slice(0,40);if(key)out[key]=tcBool_(value[k]);});return out;
+}
+function tcSaveWarPrepStatus_(user,body){
+  tcRate_(user.id,'warprep_status_save',1);const warId=tcWarId_(body),completed=tcSanitizeCompleted_(body.completed),sheet=tcWarPrepSheets_().status,lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{const now=Math.floor(Date.now()/1000),row=tcFindWarPrepStatusRow_(sheet,user.faction_id,warId,user.id),json=JSON.stringify(completed);if(row>=2){const first=Number(sheet.getRange(row,6).getValue()||now);sheet.getRange(row,1,1,7).setValues([[user.faction_id,warId,user.id,tcSafe_(user.name),tcSafe_(json),first,now]]);}else sheet.appendRow([user.faction_id,warId,user.id,tcSafe_(user.name),tcSafe_(json),now,now]);return{war_id:warId,player_id:user.id,completed:completed,updated_at:now};}finally{lock.releaseLock();}
+}
+function tcWarPrepLeadership_(user,body){
+  const warId=tcWarId_(body),sheet=tcWarPrepSheets_().status,values=sheet.getDataRange().getValues(),members=[];for(let i=1;i<values.length;i++){if(Number(values[i][0])!==user.faction_id||Number(values[i][1])!==warId)continue;let completed={};try{completed=JSON.parse(String(values[i][4]||'{}'));}catch(_){}members.push({player_id:Number(values[i][2]||0),player_name:String(values[i][3]||'Member'),completed:completed,first_seen_at:Number(values[i][5]||0),updated_at:Number(values[i][6]||0)});}members.sort((a,b)=>a.player_name.localeCompare(b.player_name));return{war_id:warId,items:tcReadWarPrepConfig_(user.faction_id),members:members,app_users_only:true,scope:'verified_faction_only'};
+}
+function tcSaveWarPrepConfig_(user,body){
+  let input=body&&body.items;if(typeof input==='string'){try{input=JSON.parse(input);}catch(_){input=[];}}if(!Array.isArray(input))throw new Error('War Prep items must be an array.');const clean=[];for(let i=0;i<input.length&&clean.length<8;i++){const raw=input[i],title=String(raw&&typeof raw==='object'?raw.title:raw||'').trim().slice(0,120);if(title)clean.push({id:'item'+(clean.length+1),title:title});}if(!clean.length)throw new Error('Add at least one War Prep checklist item.');
+  const sheet=tcWarPrepSheets_().config,lock=LockService.getScriptLock();lock.waitLock(10000);try{const now=Math.floor(Date.now()/1000),row=tcFindExactRow_(sheet,1,String(user.faction_id)),values=[user.faction_id,tcSafe_(JSON.stringify(clean)),user.id,tcSafe_(user.name),now];if(row>=2)sheet.getRange(row,1,1,5).setValues([values]);else sheet.appendRow(values);return{items:clean,updated_by_id:user.id,updated_by_name:user.name,updated_at:now};}finally{lock.releaseLock();}
 }
 
 function tcRegisterDevice_(user,body){
