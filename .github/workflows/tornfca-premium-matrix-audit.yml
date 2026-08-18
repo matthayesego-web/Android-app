@@ -23,6 +23,9 @@ jobs:
           DEV=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
           ROUTER=app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
           OPS=app/src/main/java/com/matthayesego/duckforcetoolkit/FactionOpsActivity.java
+          DOSSIER=app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
+          QUICK=app/src/main/java/com/matthayesego/duckforcetoolkit/QuickIntelActivity.java
+          TOOLHOST=app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java
           INSIGHTS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
           ALERTS=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
           SETTINGS=app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
@@ -74,6 +77,13 @@ jobs:
           grep -q 'TARGET_LOOKUP.equals(target))return PremiumAccess.MEMBER_DOSSIER' "$ROUTER"
           grep -q 'PremiumAccess.has(this,playerId,premium)' "$ROUTER"
 
+          # Premium target screens also defend themselves against accidental internal-route bypasses.
+          grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.MEMBER_DOSSIER)' "$DOSSIER"
+          grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.FACTION_PULSE)' "$QUICK"
+          grep -q 'if(MODE_PULSE.equals(mode))' "$QUICK"
+          # Legacy/basic quick lookup remains independently available and must not be mapped to Dossier Premium.
+          grep -q 'MODE_LOOKUP="LOOKUP"' "$QUICK"
+
           # Developer feature switches must still be honored before launch.
           grep -q '!DeveloperSettings.featureEnabled(this,feature)' "$ROUTER"
 
@@ -92,6 +102,10 @@ jobs:
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.ADVANCED_ALERTS)' "$ALERTS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$SETTINGS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$PREVIEW"
+
+          # Basic embedded utilities are protected as Free, not treated as TornFCA Premium products.
+          grep -q 'ARMORY("Faction Armory Auditor"' "$TOOLHOST"
+          grep -q 'TRAIN("Company Train Calculator"' "$TOOLHOST"
 
           # Payment backend must honor stacking and be replay/concurrency-safe.
           grep -q "const TORNFCA_PREMIUM_VERSION='1.1.0'" "$PREMIUM_BACKEND"
@@ -112,6 +126,7 @@ jobs:
           # Product copy protects competitive/free fundamentals and provider boundaries.
           grep -q 'Basic WarPay calculator' "$MATRIX"
           grep -q 'Current Armory Auditor' "$MATRIX"
+          grep -q 'Company Train Calculator' "$MATRIX"
           grep -q 'Banking' "$MATRIX"
           grep -q 'FFScouter' "$MATRIX"
           grep -q 'TornStats' "$MATRIX"
