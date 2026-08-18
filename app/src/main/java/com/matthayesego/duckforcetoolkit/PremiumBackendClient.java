@@ -25,12 +25,15 @@ public final class PremiumBackendClient {
     public static void refreshAsync(Context context,int playerId){
         if(context==null||playerId<=0||!isConfigured())return;
         Context app=context.getApplicationContext();
+        SecureApiKeyStore keyStore=new SecureApiKeyStore(app);
+        String apiKey=keyStore.load();
+        if(apiKey==null||apiKey.trim().isEmpty())return;
         SharedPreferences p=app.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
         long last=p.getLong("last_"+playerId,0L);long now=System.currentTimeMillis();
         if(now-last<REFRESH_MS)return;
         p.edit().putLong("last_"+playerId,now).apply();
         new Thread(()->{try{
-            JSONObject response=status(playerId);if(!response.optBoolean("ok",false))return;
+            JSONObject response=status(apiKey,playerId);if(!response.optBoolean("ok",false))return;
             JSONObject entitlement=response.optJSONObject("entitlement");if(entitlement==null)return;
             String tier=entitlement.optString("tier",PremiumEntitlementStore.TIER_FREE);
             long verifiedAt=entitlement.optLong("verified_at",System.currentTimeMillis()/1000L);
@@ -41,14 +44,30 @@ public final class PremiumBackendClient {
         }).start();
     }
 
-    public static JSONObject status(int playerId)throws Exception{JSONObject request=new JSONObject();request.put("action","status");request.put("player_id",playerId);return post(request);}
-
-    public static JSONObject updateConfig(String developerPassword,int daysPerXanax,String requiredMessage)throws Exception{
-        JSONObject request=new JSONObject();request.put("action","admin_config");request.put("admin_password",developerPassword==null?"":developerPassword);request.put("days_per_xanax",daysPerXanax);request.put("required_message",requiredMessage==null?"":requiredMessage);return checked(post(request));
+    public static JSONObject status(String apiKey,int playerId)throws Exception{
+        JSONObject request=request("status",apiKey);request.put("player_id",playerId);return checked(post(request));
     }
 
-    public static JSONObject grant(String developerPassword,int playerId,int days)throws Exception{
-        JSONObject request=new JSONObject();request.put("action","admin_grant");request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);return checked(post(request));
+    /** Retained only for binary/source compatibility; authenticated status now requires the signed-in Torn key. */
+    @Deprecated public static JSONObject status(int playerId)throws Exception{throw new Exception("Authenticated premium status requires the signed-in Torn API key.");}
+
+    public static JSONObject updateConfig(String apiKey,String developerPassword,int daysPerXanax,String requiredMessage)throws Exception{
+        JSONObject request=request("admin_config",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("days_per_xanax",daysPerXanax);request.put("required_message",requiredMessage==null?"":requiredMessage);return checked(post(request));
+    }
+
+    /** Retained for source compatibility; server-side admin changes require verified developer identity. */
+    @Deprecated public static JSONObject updateConfig(String developerPassword,int daysPerXanax,String requiredMessage)throws Exception{throw new Exception("Verified developer Torn identity is required for premium administration.");}
+
+    public static JSONObject grant(String apiKey,String developerPassword,int playerId,int days)throws Exception{
+        JSONObject request=request("admin_grant",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);return checked(post(request));
+    }
+
+    /** Retained for source compatibility; server-side admin changes require verified developer identity. */
+    @Deprecated public static JSONObject grant(String developerPassword,int playerId,int days)throws Exception{throw new Exception("Verified developer Torn identity is required for premium administration.");}
+
+    private static JSONObject request(String action,String apiKey)throws Exception{
+        String key=apiKey==null?"":apiKey.trim();if(key.isEmpty())throw new Exception("Signed-in Torn API key required.");
+        TornApiClient.validateKey(key);JSONObject request=new JSONObject();request.put("action",action);request.put("apiKey",key);return request;
     }
 
     private static JSONObject checked(JSONObject response)throws Exception{if(!response.optBoolean("ok",false))throw new Exception(response.optString("error","Premium backend request failed."));return response;}
@@ -59,7 +78,7 @@ public final class PremiumBackendClient {
         try{
             c.setRequestMethod("POST");c.setConnectTimeout(12000);c.setReadTimeout(20000);c.setUseCaches(false);c.setDoOutput(true);
             c.setRequestProperty("Content-Type","text/plain;charset=UTF-8");c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent",USER_AGENT);
-            byte[] payload=body.toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=c.getOutputStream()){out.write(payload);}int code=c.getResponseCode();InputStream in=code>=400?c.getErrorStream():c.getInputStream();String raw=in==null?"":readAll(in);if(code<200||code>=300)throw new Exception("Premium backend HTTP "+code);return new JSONObject(raw);
+            byte[] payload=body.toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=c.getOutputStream()){out.write(payload);}int code=c.getResponseCode();InputStream in=code>=400?c.getErrorStream():c.getInputStream();String raw=in==null?"":readAll(in);if(code<200||code>=300)throw new Exception("Premium backend HTTP "+code);JSONObject response;try{response=new JSONObject(raw);}catch(Exception e){throw new Exception("Premium backend returned an unreadable response.");}return response;
         }finally{c.disconnect();}
     }
 
