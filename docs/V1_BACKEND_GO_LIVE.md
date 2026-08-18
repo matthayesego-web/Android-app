@@ -17,9 +17,9 @@ For each service:
 5. Run the listed setup function once and authorize it.
 6. **Deploy → New deployment → Web app**.
 7. Execute as **Me**.
-8. Access: **Anyone**. TornFCA performs Torn identity/permission checks inside the service; Android clients must be able to reach the endpoint.
+8. Access: **Anyone**. TornFCA performs its own authorization inside each service; Android clients must be able to reach the endpoint.
 9. Deploy and copy the final `/exec` HTTPS URL.
-10. Never place Torn API keys, Firebase private keys, admin passwords or service-account material in source/GitHub.
+10. Never place Torn API keys, Firebase private keys, passwords, TOTP secrets or service-account material in source/GitHub.
 
 ## 1. Faction backend — v1.1.0
 
@@ -56,17 +56,13 @@ v1.7.0 adds faction-scoped shared War Prep:
 
 ### Initial moderation policy
 
-Do not invent a custom-position rule during deployment. The backend supports capability-configured moderation later.
-
 Initial safe values:
-
 - `MODERATION_ALLOW_LEADERS=false`
 - `MODERATION_ABILITIES` = blank
 
 This leaves the verified TornFCA owner as recovery/global moderator until the final capability matrix is explicitly approved.
 
 For Firebase Cloud Messaging, add Apps Script Script Properties:
-
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
@@ -85,9 +81,7 @@ Run once: `setupTornFcaPremiumBackend()`
 
 ### Safe test deployment
 
-The backend deliberately creates/retains:
-
-- `MONETIZATION_APPROVED=false`
+The backend deliberately creates/retains `MONETIZATION_APPROVED=false`.
 
 **Leave this false throughout the v0.10.x/backend/Google Play test phase.** Deploying the Premium backend does not authorize paid usage. Both `installPremiumScanTrigger()` and `scanPremiumPayments()` fail closed while this flag is false.
 
@@ -95,46 +89,21 @@ Do **not** install the automatic payment trigger merely to complete backend depl
 
 ### Premium admin password
 
-In **Project Settings → Script Properties**, temporarily add:
-
+Temporarily add Script Property:
 - `PREMIUM_ADMIN_PASSWORD_SETUP` = private admin password, minimum 10 characters
 
 Run once:
-
 - `bootstrapPremiumAdminPassword()`
 
-It stores only `PREMIUM_ADMIN_SHA256` and deletes the plaintext setup property in a `finally` block. Confirm `PREMIUM_ADMIN_PASSWORD_SETUP` is gone.
+It stores only `PREMIUM_ADMIN_SHA256` and deletes the plaintext setup property. Confirm `PREMIUM_ADMIN_PASSWORD_SETUP` is gone.
 
-### Testing entitlement without monetization
-
-Use the owner-only manual grant path from TornFCA's Premium Admin screen/backend to test:
-
-- Free → Premium transition
-- expiry
-- remote `disable_premium`
-- Premium Matrix behavior
-
-Manual developer/support grants do not mean production monetization is enabled.
-
-### Automatic payment activation — separate release gate
-
-Before any real automatic paid entitlement processing:
-
-1. Handle Torn's current requirement for API-tool creators to contact Torn before charging users for usage.
-2. Decide the distribution/payment path. A Google Play-distributed build must also use a payment method permitted by the applicable Google Play billing/payment program.
-3. Only after the required approval/path is settled, explicitly set `MONETIZATION_APPROVED=true` in Script Properties.
-4. Configure `OWNER_API_KEY` as a server-only Torn key with the minimum log access needed by the scanner.
-5. Run `installPremiumScanTrigger()` once.
-6. Confirm exactly one one-minute `scanPremiumPayments` trigger exists.
-7. Run payment replay/stacking/expiry tests before accepting production payments.
-
-Payment processing is ScriptLock-protected, receipt-idempotent, and honors the `stacking` setting.
+Use the owner-only manual grant path to test Free/Premium while monetization remains disabled.
 
 GitHub Actions secret: `TORNFCA_PREMIUM_BACKEND_URL`
 
 Expected GET identity: `TornFCA Premium Entitlements`, version `1.2.0`.
 
-## 4. Developer control plane — v1.3.0
+## 4. Developer control plane — v1.4.0
 
 Sheet: `TornFCA - Developer Backend`
 
@@ -142,21 +111,37 @@ Source: `backend/TornFcaDeveloperBackend.gs`
 
 Run once: `setupTornFcaDeveloperBackend()`
 
-Temporarily add Script Property:
+### Root Admin enrollment
 
-- `DEVELOPER_ADMIN_PASSWORD_SETUP` = private developer-admin password, minimum 10 characters
+The hidden developer channel no longer uses an app-embedded password or a Torn-player-ID login lock. Developer accounts use individual credentials and individual authenticator secrets.
+
+Temporarily add Script Properties:
+- `DEVELOPER_ROOT_USERNAME_SETUP` = desired Root Admin login name (optional; defaults to `root`)
+- `DEVELOPER_ADMIN_PASSWORD_SETUP` = Root Admin password, minimum 14 characters
 
 Run once:
+- `bootstrapTornFcaDeveloperRoot()`
 
-- `bootstrapTornFcaDeveloperAdminPassword()`
+The function returns the Root Admin's one-time TOTP setup secret and `otpauth://` enrollment URI. Immediately add it to an authenticator app and retain a secure recovery record outside the repository. Confirm both plaintext setup properties were deleted.
 
-Confirm the plaintext setup property is deleted afterward.
+Normal hidden access is:
+**About TornFCA → tap Version 5 times → developer username → password → current 6-digit authenticator code.**
+
+Root/Admin can then use **Developer Access** inside the hidden Developer Panel to:
+- create one-time developer invitations
+- assign Developer or permitted Admin roles
+- revoke access and active sessions
+- reset/re-enroll a developer with a new authenticator secret
+
+Security controls include per-account salted/peppered password hashes, unique TOTP secrets, progressive failed-login lockouts, two-hour developer sessions and audit records. Root cannot be revoked through the app.
+
+Developer credentials authorize only the hidden developer channel for the assigned role. They do **not** create faction authority, banking authority, Community moderation rights, Premium entitlements or Premium-admin authority. Those systems retain their own authorization checks.
+
+For this release, global remote-product policy mutation remains a separate Root recovery boundary and still performs Torn-owner verification in addition to Root password verification.
 
 GitHub Actions secret: `TORNFCA_DEVELOPER_BACKEND_URL`
 
-Expected GET identity: `TornFCA Developer Control Plane`, version `1.3.0`.
-
-This service owns remote policy, emergency feature switches, minimum version, audit records and aggregate user counts. It does not replace the local Developer Gate.
+Expected GET identity: `TornFCA Developer Control Plane`, version `1.4.0`.
 
 ## 5. WarPay backend — v1.1.0
 
@@ -177,7 +162,6 @@ Faction membership/Leader/Co-leader status is re-read from Torn on every backend
 ## Android/Firebase GitHub Actions secrets
 
 A fully cloud-enabled candidate requires:
-
 - `TORNFCA_FACTION_BACKEND_URL`
 - `TORNFCA_COMMUNITY_BACKEND_URL`
 - `TORNFCA_PREMIUM_BACKEND_URL`
@@ -188,14 +172,14 @@ A fully cloud-enabled candidate requires:
 - `TORNFCA_FIREBASE_PROJECT_ID`
 - `TORNFCA_FIREBASE_SENDER_ID`
 
-Permanent Android signing secrets remain separate and must not be rotated during backend deployment.
+Permanent Android signing material remains separate and must not be rotated during backend deployment.
 
 ## Final live verification
 
 After all five URLs are configured:
 
 1. Run **TornFCA Backend Live Audit**.
-2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.7.0, Premium 1.2.0, Developer 1.3.0, WarPay 1.1.0.
+2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.7.0, Premium 1.2.0, Developer 1.4.0, WarPay 1.1.0.
 3. It compiles both side-by-side Beta and release candidates.
 4. It verifies Beta package `com.matthayesego.duckforcetoolkit.beta` and release package `com.matthayesego.duckforcetoolkit`.
 5. Run **TornFCA Premium Matrix Audit**.
@@ -204,33 +188,30 @@ After all five URLs are configured:
 8. Keep the app on the v0.10.x line through Google Play testing.
 9. Do not promote to `main` or v1.0 until Google Play/device testing passes.
 
-## On-device v1.0 backend smoke test
+## On-device backend smoke test
 
 Minimum pass list:
-
 - sign in and reload faction scope
-- re-acknowledge legal version v4 and verify the API-key disclosure is visible at key entry
-- read/publish faction notices with an authorized leadership account
-- submit/read a banking request
-- open Community chat and send/read a message
-- repeatedly refresh chat after building some history and confirm recent messages remain responsive/correct
-- switch/change faction scope during testing and confirm old Community tenant data is not retained
-- verify War Prep resets on a different ranked-war ID
-- customize War Prep in one faction and confirm another faction receives its own independent configuration
-- verify leadership War Prep shows only TornFCA users who synced the current war, never the whole roster as incomplete
-- submit a chat report
-- verify owner moderation/recovery; test wider moderator capabilities only after policy is explicitly configured
-- read/save training content with an authorized account
-- register push token and send personal push test
-- verify Free Premium status
-- use an owner manual grant to test Premium activation/expiry while `MONETIZATION_APPROVED=false`
-- verify automatic payment scanning refuses to start while `MONETIZATION_APPROVED=false`
-- verify Developer Control Plane status/config/user counts
-- calculate/save WarPay receipt, restart, and re-read it from cloud
-- perform two near-simultaneous WarPay saves for one war and confirm one faction/war row
-- verify a leadership-only route re-checks current leadership before opening
-- disable Premium remotely and verify Premium convenience locks while Free tools remain usable
-- disable/re-enable one noncritical remote feature
-- verify offline/local-safe behavior without corrupting cloud state
+- re-acknowledge legal version v4 and verify the API-key disclosure
+- read/publish faction notices with authorized leadership
+- submit/read banking requests
+- test Community chat/report/moderation boundaries
+- switch faction scope and confirm old tenant data is not retained
+- verify War Prep resets on a new ranked-war ID
+- verify separate faction War Prep configurations
+- verify leadership War Prep only lists TornFCA users who synced the current war
+- test training content/push registration
+- verify Free/Premium behavior with manual grants while `MONETIZATION_APPROVED=false`
+- verify automatic payment scanning refuses while monetization is disabled
+- tap About Version five times and verify hidden developer login appears
+- verify incorrect developer password/OTP attempts trigger server lockouts
+- enroll a second Developer with a one-time invite and unique authenticator
+- revoke that Developer and confirm the session immediately loses server access
+- reset/re-enroll a Developer and confirm the old authenticator no longer works
+- verify Developer credentials alone cannot obtain faction, banking, moderation or Premium-admin authority
+- calculate/save/re-read WarPay receipt
+- test concurrent WarPay save dedupe
+- verify leadership-only routes re-check current leadership
+- verify remote disable behavior and offline/local-safe behavior
 
 A failure in one service must not grant broader access to another. Client Torn API keys remain request-only and must never be persisted by the Apps Script backends.
