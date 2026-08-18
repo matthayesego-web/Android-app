@@ -13,10 +13,7 @@ public class WarHubActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-        boolean beta=BuildConfig.APPLICATION_ID.endsWith(".beta");
-        Intent i=new Intent(this,beta?BetaCommandActivity.class:TornFcaCurrentActivity.class);
-        if(beta)i.putExtra(BetaCommandActivity.EXTRA_SECTION,"Operations");
-        else i.putExtra(TornFcaCurrentActivity.EXTRA_SECTION,"War");
+        Intent i=TornFcaCommandRuntime.homeIntent(this,"Operations");
         copyScope(i);
         startActivity(i);
         finish();
