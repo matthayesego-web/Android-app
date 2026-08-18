@@ -27,7 +27,7 @@ public class WarPrepActivity extends Activity {
 
     private void showLoading(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"War Center","My War Prep","Checking your personal readiness, faction checklist and current ranked-war timing…");TornFcaUi.add(this,r,TornFcaUi.card(this,"PERSONAL","Building your war-prep snapshot","Every ranked war receives its own checklist state. When the faction Community backend is connected, leadership can see readiness submitted by TornFCA users only.",TornFcaUi.RED));setContentView(s);s.requestApplyInsets();}
 
-    private void load(){String key=keyStore.load();if(key==null||key.isBlank()){renderError("Reconnect your Torn API key to use My War Prep.");return;}new Thread(()->{try{AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);session=verified;war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),verified.factionId);self=loadSelf(key);loadShared(key);runOnUiThread(this::render);syncSharedAsync();}catch(Exception e){renderError(e.getMessage()==null?"Unable to build your war-prep snapshot.":e.getMessage());}},"TornFCA-WarPrep").start();}
+    private void load(){String key=keyStore.load();if(key==null||key.isBlank()){renderError("Reconnect your Torn API key to use My War Prep.");return;}new Thread(()->{try{AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);session=verified;war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),verified.factionId);self=loadSelf(key);loadShared(key);persistChecklistMetadata();runOnUiThread(this::render);syncSharedAsync();}catch(Exception e){renderError(e.getMessage()==null?"Unable to build your war-prep snapshot.":e.getMessage());}},"TornFCA-WarPrep").start();}
 
     private JSONObject loadSelf(String key)throws Exception{
         try{return TornApiClient.getJson("/user?selections=bars,cooldowns,travel,refills,organizedcrime",key);}
@@ -52,6 +52,7 @@ public class WarPrepActivity extends Activity {
     private String cycle(){long token=war.warId!=0?war.warId:(war.start>0?war.start:0);return token==0?"general":"war"+token;}
     private String prefix(){return"p"+session.playerId+"_f"+session.factionId+"_"+cycle()+"_";}
     private SharedPreferences prefs(){return getSharedPreferences(PREFS,MODE_PRIVATE);}
+    private void persistChecklistMetadata(){if(session==null)return;prefs().edit().putInt(prefix()+"item_count",Math.max(1,Math.min(8,checklistItems.length()))).apply();}
     private boolean done(String id){return prefs().getBoolean(prefix()+id,false);}
     private void toggle(String id){prefs().edit().putBoolean(prefix()+id,!done(id)).apply();render();syncSharedAsync();}
 
