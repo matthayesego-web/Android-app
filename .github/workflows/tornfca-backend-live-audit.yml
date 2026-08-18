@@ -1,0 +1,126 @@
+name: TornFCA Backend Live Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-live-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Verify backend source/setup entrypoints
+        run: |
+          set -euo pipefail
+          grep -q 'function setupTornFcaFactionBackend' backend/AccessBackend.gs
+          grep -q 'function setupTornFcaCommunityBackend' backend/TornFcaCommunityBackend.gs
+          grep -q 'function setupTornFcaPremiumBackend' backend/TornFcaPremiumBackend.gs
+          grep -q 'function setupTornFcaDeveloperBackend' backend/TornFcaDeveloperBackend.gs
+          grep -q 'function setupTornFcaWarPayBackend' backend/TornFcaWarPayBackend.gs
+          grep -q 'function installPremiumScanTrigger' backend/TornFcaPremiumBackend.gs
+          grep -q 'function setPremiumAdminPassword' backend/TornFcaPremiumBackend.gs
+          grep -q 'function setTornFcaDeveloperAdminPassword' backend/TornFcaDeveloperBackend.gs
+
+      - name: Validate required deployment secrets
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: |
+          set -euo pipefail
+          for var in \
+            TORNFCA_FACTION_BACKEND_URL \
+            TORNFCA_COMMUNITY_BACKEND_URL \
+            TORNFCA_PREMIUM_BACKEND_URL \
+            TORNFCA_DEVELOPER_BACKEND_URL \
+            TORNFCA_WARPAY_BACKEND_URL; do
+            value="${!var:-}"
+            test -n "$value" || { echo "Missing $var"; exit 1; }
+            case "$value" in https://*) ;; *) echo "$var must use HTTPS"; exit 1;; esac
+          done
+          test -n "${TORNFCA_FIREBASE_APP_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_APP_ID'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_API_KEY:-}" || { echo 'Missing TORNFCA_FIREBASE_API_KEY'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_PROJECT_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_PROJECT_ID'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_SENDER_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_SENDER_ID'; exit 1; }
+
+      - name: Verify deployed backend identities
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+        run: |
+          set -euo pipefail
+          check_backend() {
+            url="$1"
+            expected="$2"
+            body="$(curl --fail --silent --show-error --location --max-time 25 "$url")"
+            printf '%s\n' "$body" | grep -F '"ok":true' >/dev/null
+            printf '%s\n' "$body" | grep -F "$expected" >/dev/null
+          }
+          check_backend "$TORNFCA_FACTION_BACKEND_URL" 'TornFCA Faction Backend'
+          check_backend "$TORNFCA_COMMUNITY_BACKEND_URL" 'TornFCA Community Backend'
+          check_backend "$TORNFCA_PREMIUM_BACKEND_URL" 'TornFCA Premium Entitlements'
+          check_backend "$TORNFCA_DEVELOPER_BACKEND_URL" 'TornFCA Developer Control Plane'
+          check_backend "$TORNFCA_WARPAY_BACKEND_URL" 'TornFCA WarPay Backend'
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Compile backend-enabled Beta and release candidate
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: gradle --no-daemon :app:assembleBeta :app:assembleRelease
+
+      - name: Verify Beta package remains side-by-side
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -1)"
+          test -x "$AAPT"
+          BETA=app/build/outputs/apk/beta/app-beta-unsigned.apk
+          RELEASE=app/build/outputs/apk/release/app-release-unsigned.apk
+          test -f "$BETA"
+          test -f "$RELEASE"
+          "$AAPT" dump badging "$BETA" | tee beta-badging.txt
+          "$AAPT" dump badging "$RELEASE" | tee release-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit.beta'" beta-badging.txt
+          grep -q "application-label:'Torn FCA Beta'" beta-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit'" release-badging.txt
+
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-backend-live-audit-evidence
+          path: |
+            beta-badging.txt
+            release-badging.txt
+          if-no-files-found: error
+          retention-days: 30
