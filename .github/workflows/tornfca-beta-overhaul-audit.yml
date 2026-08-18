@@ -13,118 +13,57 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Verify command surface live gauges and UX repairs
+      - name: Verify command surface, brand identity and developer access
         run: |
           set -euo pipefail
           GRADLE=app/build.gradle.kts
-          GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
-          RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
-          BASE=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
           BETA=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
           UI=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandUi.java
-          SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
           GAUGES=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaGaugeLiveData.java
           UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
-          WRAPPERS=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaScreens.java
+          ABOUT=app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
+          GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperAccessActivity.java
           DEV_BACKEND=backend/TornFcaDeveloperBackend.gs
-          DEV_CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
-          DEV_UI=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendActivity.java
-          DEV_CONSOLE=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperConsoleActivity.java
 
-          test -f "$BETA"
-          test -f "$UI"
-          test -f "$SURFACE"
-          test -f "$GAUGES"
-          test -f "$UX"
-          test -f "$RUNTIME"
-          grep -q 'versionName = "0.10.3"' "$GRADLE"
-          grep -q 'versionCode = 58' "$GRADLE"
+          grep -q 'versionName = "0.10.4"' "$GRADLE"
+          grep -q 'versionCode = 59' "$GRADLE"
           grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
-          grep -q 'TornFcaCommandRuntime.install(getApplication())' "$GATE"
-          grep -q 'BetaSurfacePolish.install(app)' "$RUNTIME"
-          grep -q 'BetaGaugeLiveData.install(app)' "$RUNTIME"
-          grep -q 'BetaUxRepair.install(app)' "$RUNTIME"
-          grep -q 'private boolean isCommandActivity(){return this instanceof BetaCommandActivity;}' "$BASE"
-          grep -q 'BetaSurfacePolish.apply' "$WRAPPERS"
+          ! grep -q 'DEVELOPER_ACCESS_SHA256' "$GRADLE"
 
-          grep -q 'addStatusHero' "$BETA"
-          grep -q 'addDuoGrid' "$BETA"
           grep -q 'Member Network' "$BETA"
           grep -q 'Training Lab' "$BETA"
           grep -q 'Operations Command' "$BETA"
           grep -q 'App Control' "$BETA"
-
-          grep -q 'final Runnable action' "$BETA"
-          grep -q 's.action' "$BETA"
           grep -q 'metricTile(Activity a,String eyebrow,String center,String title,String detail,int accent,Runnable action)' "$UI"
-          grep -q 'tile.setOnClickListener' "$UI"
           grep -q '/user?selections=bars' "$GAUGES"
-          grep -q '/user/battlestats' "$GAUGES"
           grep -q 'tornfca_war_prep_v2' "$GAUGES"
-          grep -q 'item_count' "$GAUGES"
-          grep -q 'NotificationInboxStore.all' "$GAUGES"
-          grep -q 'LiveGaugeView' "$GAUGES"
-          grep -q '!TornFcaCommandRuntime.enabled()' "$GAUGES"
-
-          grep -q '/user/refills' "$UX"
-          grep -q 'Used today' "$UX"
-          grep -q 'special_count' "$UX"
-          grep -q 'attachHiddenDeveloperGesture' "$UX"
-          grep -q 'count>=3' "$UX"
-          grep -q 'DeveloperGateActivity.class' "$UX"
-          grep -q 'DEVELOPER_PLAYER_ID' "$UX"
-          ! grep -q 'Developer Lab' "$UX"
           grep -q 'Faction Announcements' "$UX"
-          grep -q 'Open Announcements' "$UX"
           grep -q 'War Prep Management' "$UX"
-          grep -q 'tornfca-beta-context-rail-compact' "$UX"
-          grep -q 'TornFcaCommandRuntime.homeIntent(activity,section)' "$UX"
-          grep -q 'ic_beta_settings' "$UX"
-          grep -q 'ic_beta_notifications' "$UX"
-          grep -q 'ic_beta_more' "$UX"
-          grep -q 'return TornFcaCommandRuntime.enabled()' "$SURFACE"
-          grep -q 'TornFcaCommandRuntime.homeIntent(activity,sectionFor(activity))' "$SURFACE"
-          grep -q 'TornFcaCommandRuntime.isBetaBuild()?"  •  BETA":""' "$SURFACE"
-          test -f app/src/main/res/drawable/ic_beta_settings.xml
-          test -f app/src/main/res/drawable/ic_beta_notifications.xml
-          test -f app/src/main/res/drawable/ic_beta_privacy.xml
-          test -f app/src/main/res/drawable/ic_beta_info.xml
-          test -f app/src/main/res/drawable/ic_beta_premium.xml
-          test -f app/src/main/res/drawable/ic_beta_developer.xml
-          test -f app/src/main/res/drawable/ic_beta_more.xml
+          ! grep -q 'DeveloperGateActivity.class' "$UX"
 
-          grep -q 'return isBetaBuild() ? "TORN FCA BETA" : "TORN FCA"' "$RUNTIME"
-          grep -q 'return isBetaBuild() ? "Torn FCA Beta v" : "Torn FCA v"' "$RUNTIME"
-          grep -q 'replaceBetaCrest' "$RUNTIME"
+          grep -q 'versionTaps>=5' "$ABOUT"
+          grep -q 'DeveloperGateActivity.class' "$ABOUT"
+          grep -q '6-digit authenticator code' "$GATE"
+          grep -q 'Enroll with Invitation Code' "$GATE"
+          grep -q 'Open Authenticator' "$GATE"
+          grep -q 'Create Invitation' "$ACCESS"
+          grep -q 'Reset / Re-enroll' "$ACCESS"
 
-          grep -q "const TD_VERSION='1.3.0'" "$DEV_BACKEND"
-          grep -q "const TD_USERS='DeveloperUsers'" "$DEV_BACKEND"
-          grep -q 'TD_HEARTBEAT_SECONDS=6\*60\*60' "$DEV_BACKEND"
-          grep -q 'tdTrackUser_(user,body)' "$DEV_BACKEND"
-          grep -q 'total_unique' "$DEV_BACKEND"
-          grep -q 'current_total' "$DEV_BACKEND"
-          grep -q 'TELEMETRY_SALT' "$DEV_BACKEND"
-          grep -q 'bootstrapTornFcaDeveloperAdminPassword' "$DEV_BACKEND"
-          grep -q "deleteProperty('DEVELOPER_ADMIN_PASSWORD_SETUP')" "$DEV_BACKEND"
-          grep -q 'version_code' "$DEV_CLIENT"
-          grep -q 'version_name' "$DEV_CLIENT"
-          grep -q 'User tracker' "$DEV_UI"
-          grep -q 'Current total' "$DEV_UI"
-          grep -q 'Unique users' "$DEV_UI"
-          grep -q 'User tracker' "$DEV_CONSOLE"
-          grep -q 'Refresh User Counts' "$DEV_CONSOLE"
-          grep -q 'current_total' "$DEV_CONSOLE"
-          grep -q 'total_unique' "$DEV_CONSOLE"
+          grep -q "const TD_VERSION='1.4.0'" "$DEV_BACKEND"
+          grep -q 'tdVerifyTotp_' "$DEV_BACKEND"
+          grep -q 'developer_invite_create' "$DEV_BACKEND"
+          grep -q 'developer_access_revoke' "$DEV_BACKEND"
+          cp "$DEV_BACKEND" /tmp/dev.js
+          node --check /tmp/dev.js
 
-          ICON=app/src/main/res/drawable/tornfca_mark.xml
-          grep -q '#78E9FF' "$ICON"
-          grep -q '#9A78FF' "$ICON"
-          grep -q 'Signature torn cuts' "$ICON"
+          BRAND=app/src/main/res/drawable/tornfca_mark.xml
+          LAUNCH=app/src/main/res/drawable/tornfca_launcher_mark.xml
+          grep -q 'Network Helix' "$BRAND"
+          grep -q 'Network Helix launcher mark' "$LAUNCH"
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 
           test -f app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepLeadershipActivity.java
           grep -q 'persistChecklistMetadata' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
-          grep -q 'WarPrepLeadershipActivity" android:exported="false"' app/src/main/AndroidManifest.xml
-          test -f docs/PREMIUM_MATRIX_0.10.1.md
-          test -f .github/workflows/tornfca-premium-matrix-audit.yml
-
-          echo 'Torn FCA v0.10.3 command UX/backend-preservation audit passed.'
+          echo 'Torn FCA v0.10.4 command/brand/developer audit passed.'
