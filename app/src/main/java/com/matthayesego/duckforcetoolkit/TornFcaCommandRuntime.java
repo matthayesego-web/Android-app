@@ -21,6 +21,7 @@ import java.util.WeakHashMap;
  * command-center layout with normal TornFCA branding and without the Beta marker.
  */
 public final class TornFcaCommandRuntime {
+    private static final String COMMAND_FRAME_TAG="tornfca-command-shell-v2";
     private static final Map<View,Boolean> OBSERVED=Collections.synchronizedMap(new WeakHashMap<>());
     private static boolean installed;
 
@@ -64,10 +65,29 @@ public final class TornFcaCommandRuntime {
         return footerPrefix() + TornFcaBrand.VERSION + "  •  " + faction;
     }
 
+    /** Lightweight sign-in branding only: deliberately does not install legacy layout observers. */
+    public static void normalizePreAuth(Activity activity,View view){
+        if(activity==null||view==null||isCommandShell(view))return;
+        if(view instanceof TextView){
+            TextView t=(TextView)view;String raw=t.getText()==null?"":t.getText().toString(),branded=TornFcaBrand.rebrand(raw);
+            if(!raw.equals(branded))t.setText(branded);
+        }
+        if(view instanceof ImageView)replaceLegacyPreAuthArt(activity,(ImageView)view);
+        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)normalizePreAuth(activity,g.getChildAt(i));}
+    }
+
+    public static boolean isCommandShell(View view){
+        if(view==null)return false;
+        if(COMMAND_FRAME_TAG.equals(String.valueOf(view.getTag())))return true;
+        if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)if(COMMAND_FRAME_TAG.equals(String.valueOf(g.getChildAt(i).getTag())))return true;}
+        return false;
+    }
+
     private static void attachBrandNormalizer(Activity activity){
-        View root=activity.findViewById(android.R.id.content);if(root==null)return;normalizeCommandBranding(activity,root);
+        View root=activity.findViewById(android.R.id.content);if(root==null)return;
+        if(isCommandShell(root))normalizeCommandBranding(activity,root);else normalizePreAuth(activity,root);
         if(OBSERVED.put(root,Boolean.TRUE)!=null)return;
-        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(!activity.isFinishing())normalizeCommandBranding(activity,root);});
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{if(activity.isFinishing())return;if(isCommandShell(root))normalizeCommandBranding(activity,root);else normalizePreAuth(activity,root);});
     }
 
     private static void normalizeCommandBranding(Activity activity,View view){
@@ -80,6 +100,14 @@ public final class TornFcaCommandRuntime {
         }
         if(view instanceof ImageView)replaceBetaCrest(activity,(ImageView)view);
         if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)normalizeCommandBranding(activity,g.getChildAt(i));}
+    }
+
+    private static void replaceLegacyPreAuthArt(Activity activity,ImageView image){
+        try{
+            Drawable current=image.getDrawable(),legacy=activity.getDrawable(R.drawable.duckforce_noir_art);
+            if(current!=null&&legacy!=null&&current.getConstantState()!=null&&legacy.getConstantState()!=null&&current.getConstantState().equals(legacy.getConstantState()))image.setImageResource(isBetaBuild()?R.drawable.tornfca_beta_crest:R.drawable.tornfca_mark);
+            CharSequence d=image.getContentDescription();if(d!=null&&"Duck Force".contentEquals(d))image.setContentDescription("TornFCA");
+        }catch(Exception ignored){}
     }
 
     private static void replaceBetaCrest(Activity activity,ImageView image){
