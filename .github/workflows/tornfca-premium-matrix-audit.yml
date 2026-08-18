@@ -1,0 +1,94 @@
+name: TornFCA Premium Matrix Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  premium-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify Free/Premium enforcement matrix
+        run: |
+          set -euo pipefail
+
+          GRADLE=app/build.gradle.kts
+          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAccess.java
+          STORE=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumEntitlementStore.java
+          DEV=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
+          ROUTER=app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          OPS=app/src/main/java/com/matthayesego/duckforcetoolkit/FactionOpsActivity.java
+          INSIGHTS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+          ALERTS=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
+          SETTINGS=app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
+          PREVIEW=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          MATRIX=docs/PREMIUM_MATRIX_0.10.1.md
+          PLAN=PREMIUM_PLAN.md
+
+          grep -q 'versionName = "0.10.1"' "$GRADLE"
+          grep -q 'versionCode = 56' "$GRADLE"
+
+          # Production entitlement cache must never contain developer simulation logic.
+          if grep -q 'simulatePremium' "$STORE"; then
+            echo 'PremiumEntitlementStore must contain backend-verified state only.' >&2
+            exit 1
+          fi
+          grep -q 'cached Premium expired' "$STORE"
+
+          # Owner-only simulation defaults OFF and is applied only at the central gate.
+          grep -q 'getBoolean(KEY_PREMIUM_SIM, false)' "$DEV"
+          grep -q 'playerId==BuildConfig.DEVELOPER_PLAYER_ID&&DeveloperSettings.simulatePremium' "$ACCESS"
+          grep -q 'RemoteFeaturePolicy.featureDisabled(context,"premium")' "$ACCESS"
+          grep -q 'RemoteFeaturePolicy.maintenanceMode(context)' "$ACCESS"
+          grep -q 'RemoteFeaturePolicy.versionBlocked(context)' "$ACCESS"
+
+          # Current Premium feature IDs are centralized.
+          grep -q 'EXTENDED_ACTIVITY="extended_activity"' "$ACCESS"
+          grep -q 'FACTION_PULSE="faction_pulse"' "$ACCESS"
+          grep -q 'MEMBER_DOSSIER="member_dossier"' "$ACCESS"
+          grep -q 'ADVANCED_ALERTS="advanced_alerts"' "$ACCESS"
+          grep -q 'PERSONAL_INSIGHTS="personal_insights"' "$ACCESS"
+
+          # Activity is useful in Free (7 days) and deeper in Premium (14/30 days).
+          grep -q 'return PremiumAccess.has(context, playerId, PremiumAccess.EXTENDED_ACTIVITY) ? requested : 7;' "$DEV"
+          grep -q 'int days=DeveloperSettings.activityDays(this);' "$OPS"
+
+          # Advanced all-in-one leadership convenience routes are Premium.
+          grep -q 'TARGET_PULSE.equals(target))return PremiumAccess.FACTION_PULSE' "$ROUTER"
+          grep -q 'TARGET_LOOKUP.equals(target))return PremiumAccess.MEMBER_DOSSIER' "$ROUTER"
+          grep -q 'PremiumAccess.has(this,playerId,premium)' "$ROUTER"
+
+          # Developer feature switches must still be honored before launch.
+          grep -q '!DeveloperSettings.featureEnabled(this,feature)' "$ROUTER"
+
+          # Essential leadership/member routes must NOT appear in the premiumFeature mapping.
+          awk '/private String premiumFeature/{flag=1} flag{print} /return null;/{if(flag){exit}}' "$ROUTER" > /tmp/premium-router.txt
+          ! grep -q 'TARGET_WAR_PAYOUT' /tmp/premium-router.txt
+          ! grep -q 'TARGET_BANKING' /tmp/premium-router.txt
+          ! grep -q 'TARGET_ACTIVITY' /tmp/premium-router.txt
+          ! grep -q 'TARGET_WAR.equals' /tmp/premium-router.txt
+          ! grep -q 'TARGET_CHAIN' /tmp/premium-router.txt
+          ! grep -q 'TARGET_OC' /tmp/premium-router.txt
+          ! grep -q 'TARGET_STRENGTH' /tmp/premium-router.txt
+
+          # Existing Premium screens/settings all use the central gate.
+          grep -q 'PremiumAccess.has(this,session.playerId,PremiumAccess.PERSONAL_INSIGHTS)' "$INSIGHTS"
+          grep -q 'PremiumAccess.has(this,player,PremiumAccess.ADVANCED_ALERTS)' "$ALERTS"
+          grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$SETTINGS"
+          grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$PREVIEW"
+
+          # Product copy protects competitive/free fundamentals and provider boundaries.
+          grep -q 'Basic WarPay calculator' "$MATRIX"
+          grep -q 'Current Armory Auditor' "$MATRIX"
+          grep -q 'Banking' "$MATRIX"
+          grep -q 'FFScouter' "$MATRIX"
+          grep -q 'TornStats' "$MATRIX"
+          grep -q 'Provider data is not a TornFCA paywall' "$MATRIX"
+          grep -q 'A separate faction-wide paid tier is \*\*deferred beyond v1.0\*\*' "$PLAN"
+
+          echo 'TornFCA v0.10.1 Premium matrix audit passed.'
