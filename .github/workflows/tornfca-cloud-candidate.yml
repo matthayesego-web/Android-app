@@ -35,18 +35,26 @@ jobs:
 
       - name: Verify cloud configuration is present
         env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
           TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
           TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
           TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
           TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
           TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
         run: |
-          test -n "$TORNFCA_COMMUNITY_BACKEND_URL"
+          set -euo pipefail
+          for var in TORNFCA_FACTION_BACKEND_URL TORNFCA_PREMIUM_BACKEND_URL TORNFCA_COMMUNITY_BACKEND_URL TORNFCA_DEVELOPER_BACKEND_URL TORNFCA_WARPAY_BACKEND_URL; do
+            value="${!var}"
+            test -n "$value" || (echo "Missing $var" && exit 1)
+            case "$value" in https://*) ;; *) echo "$var must be HTTPS"; exit 1;; esac
+          done
           test -n "$TORNFCA_FIREBASE_APP_ID"
           test -n "$TORNFCA_FIREBASE_API_KEY"
           test -n "$TORNFCA_FIREBASE_PROJECT_ID"
           test -n "$TORNFCA_FIREBASE_SENDER_ID"
-          case "$TORNFCA_COMMUNITY_BACKEND_URL" in https://*) ;; *) echo 'Community backend must be HTTPS'; exit 1;; esac
 
       - name: Build cloud-enabled unsigned release
         env:
@@ -54,6 +62,8 @@ jobs:
           TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
           TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
           TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
           TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
           TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
           TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
