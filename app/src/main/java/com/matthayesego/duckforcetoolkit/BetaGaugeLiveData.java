@@ -10,7 +10,6 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -26,7 +25,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Makes the Torn FCA Beta dashboard gauges represent real device/Torn data instead of decorative arcs. */
+/** Makes the canonical TornFCA command dashboard gauges represent real device/Torn data. */
 public final class BetaGaugeLiveData {
     private static final long LIVE_TTL_MS=60_000L;
     private static final long TRAINING_TTL_MS=5L*60L*1000L;
@@ -47,7 +46,7 @@ public final class BetaGaugeLiveData {
     private BetaGaugeLiveData(){}
 
     public static synchronized void install(Application app){
-        if(app==null||installed||!BuildConfig.APPLICATION_ID.endsWith(".beta"))return;
+        if(app==null||installed||!TornFcaCommandRuntime.enabled())return;
         installed=true;
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks(){
             @Override public void onActivityCreated(Activity activity,Bundle state){}
@@ -98,12 +97,12 @@ public final class BetaGaugeLiveData {
 
     private static void scheduleLive(Activity activity,Scope scope){
         if(!LIVE_IN_FLIGHT.compareAndSet(false,true))return;liveAttemptAt=System.currentTimeMillis();
-        new Thread(()->{try{String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return;JSONObject root=TornApiClient.getJson("/user?selections=bars",key);JSONObject bars=root.optJSONObject("bars");JSONObject energy=bars==null?null:bars.optJSONObject("energy");if(energy!=null){energyCurrent=energy.optInt("current",0);energyMax=energy.optInt("maximum",0);}try{WarStatus war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),scope.factionId);warToken=war.warId!=0?war.warId:(war.start>0?war.start:0L);}catch(Exception ignored){}liveFetchedAt=System.currentTimeMillis();}catch(Exception ignored){}finally{LIVE_IN_FLIGHT.set(false);activity.runOnUiThread(()->{ViewGroup root=activity.findViewById(android.R.id.content);if(root!=null)refreshVisible(activity,root);});}},"TornFCA-BetaGaugeLive").start();
+        new Thread(()->{try{String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return;JSONObject root=TornApiClient.getJson("/user?selections=bars",key);JSONObject bars=root.optJSONObject("bars");JSONObject energy=bars==null?null:bars.optJSONObject("energy");if(energy!=null){energyCurrent=energy.optInt("current",0);energyMax=energy.optInt("maximum",0);}try{WarStatus war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),scope.factionId);warToken=war.warId!=0?war.warId:(war.start>0?war.start:0L);}catch(Exception ignored){}liveFetchedAt=System.currentTimeMillis();}catch(Exception ignored){}finally{LIVE_IN_FLIGHT.set(false);activity.runOnUiThread(()->{ViewGroup root=activity.findViewById(android.R.id.content);if(root!=null)refreshVisible(activity,root);});}},"TornFCA-GaugeLive").start();
     }
 
     private static void scheduleTraining(Activity activity,Scope scope){
         if(!TRAINING_IN_FLIGHT.compareAndSet(false,true))return;trainingAttemptAt=System.currentTimeMillis();
-        new Thread(()->{try{String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return;JSONObject root=TornApiClient.getJson("/user/battlestats",key);JSONObject battle=root.optJSONObject("battlestats");if(battle!=null){trainingCurrentTotal=battle.optLong("total",0L);trainingFetchedAt=System.currentTimeMillis();}}catch(Exception ignored){}finally{TRAINING_IN_FLIGHT.set(false);activity.runOnUiThread(()->{ViewGroup root=activity.findViewById(android.R.id.content);if(root!=null)refreshVisible(activity,root);});}},"TornFCA-BetaGaugeTraining").start();
+        new Thread(()->{try{String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return;JSONObject root=TornApiClient.getJson("/user/battlestats",key);JSONObject battle=root.optJSONObject("battlestats");if(battle!=null){trainingCurrentTotal=battle.optLong("total",0L);trainingFetchedAt=System.currentTimeMillis();}}catch(Exception ignored){}finally{TRAINING_IN_FLIGHT.set(false);activity.runOnUiThread(()->{ViewGroup root=activity.findViewById(android.R.id.content);if(root!=null)refreshVisible(activity,root);});}},"TornFCA-GaugeTraining").start();
     }
 
     private static int prepComplete(Activity activity,int p,int f){
