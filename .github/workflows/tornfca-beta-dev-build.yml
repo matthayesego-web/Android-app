@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   beta-build:
@@ -35,6 +35,20 @@ jobs:
           test -n "$VERSION_CODE"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - name: Beta preflight
+        run: |
+          set -euo pipefail
+          grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
+          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          grep -q '#78E9FF' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q '#9A78FF' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q 'confirmClear(rows.length())' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
+          for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs; do
+            cp "$file" "/tmp/$(basename "$file").js"
+            node --check "/tmp/$(basename "$file").js"
+          done
 
       - name: Compile Beta
         env:
@@ -83,7 +97,7 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tornfca-release.jks"
           chmod 600 "$RUNNER_TEMP/tornfca-release.jks"
           ALIGNED="$RUNNER_TEMP/TornFCA-Beta-v${VERSION_NAME}-aligned.apk"
-          OUT="TornFCA-Beta-v${VERSION_NAME}-backend-test.apk"
+          OUT="TornFCA-Beta-v${VERSION_NAME}.apk"
           "$ZIPALIGN" -P 16 -f -v 4 "$INPUT" "$ALIGNED"
           "$ZIPALIGN" -c -P 16 -v 4 "$ALIGNED"
           "$APK_SIGNER" sign \
@@ -100,18 +114,39 @@ jobs:
           grep -qi 'c3ecc35a64f8e7ecedda1ca46d5fe0841b890eed9c78ccb6716d61a9237f0322' signer-verification.txt
           "$AAPT" dump badging "$OUT" | tee apk-badging.txt
           grep -q "package: name='com.matthayesego.duckforcetoolkit.beta'" apk-badging.txt
+          grep -q "versionCode='${VERSION_CODE}'" apk-badging.txt
+          grep -q "versionName='${VERSION_NAME}-beta'" apk-badging.txt
           grep -q "application-label:'Torn FCA Beta'" apk-badging.txt
 
       - name: Upload signed Beta APK
         uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-Beta-v${{ env.VERSION_NAME }}-backend-test
+          name: TornFCA-Beta-v${{ env.VERSION_NAME }}
           path: |
-            TornFCA-Beta-v${{ env.VERSION_NAME }}-backend-test.apk
+            TornFCA-Beta-v${{ env.VERSION_NAME }}.apk
             apk-badging.txt
             signer-verification.txt
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
+
+      - name: Publish latest Beta prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="tornfca-beta-latest"
+          OUT="TornFCA-Beta-v${VERSION_NAME}.apk"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push --force origin "refs/tags/$TAG"
+          NOTES="Signed TornFCA Beta v${VERSION_NAME} (versionCode ${VERSION_CODE}) for device/Google Play testing. This is a prerelease and is not v1.0."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "TornFCA Beta v${VERSION_NAME}" --notes "$NOTES" --prerelease
+          else
+            gh release create "$TAG" --title "TornFCA Beta v${VERSION_NAME}" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
+          fi
+          gh release upload "$TAG" "$OUT" apk-badging.txt signer-verification.txt --clobber
 
       - name: Remove temporary keystore
         if: always()
