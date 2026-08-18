@@ -81,7 +81,6 @@ jobs:
           grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.MEMBER_DOSSIER)' "$DOSSIER"
           grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.FACTION_PULSE)' "$QUICK"
           grep -q 'if(MODE_PULSE.equals(mode))' "$QUICK"
-          # Legacy/basic quick lookup remains independently available and must not be mapped to Dossier Premium.
           grep -q 'MODE_LOOKUP="LOOKUP"' "$QUICK"
 
           # Developer feature switches must still be honored before launch.
@@ -107,10 +106,13 @@ jobs:
           grep -q 'ARMORY("Faction Armory Auditor"' "$TOOLHOST"
           grep -q 'TRAIN("Company Train Calculator"' "$TOOLHOST"
 
-          # Payment backend must honor stacking and be replay/concurrency-safe.
-          grep -q "const TORNFCA_PREMIUM_VERSION='1.1.0'" "$PREMIUM_BACKEND"
+          # Payment backend must honor stacking, be replay/concurrency-safe, and fail closed before approval.
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.2.0'" "$PREMIUM_BACKEND"
           grep -q 'function bootstrapPremiumAdminPassword' "$PREMIUM_BACKEND"
           grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" "$PREMIUM_BACKEND"
+          grep -q "setProperty('MONETIZATION_APPROVED','false')" "$PREMIUM_BACKEND"
+          grep -q 'if(!premiumMonetizationApproved_())throw new Error' "$PREMIUM_BACKEND"
+          grep -q 'function premiumMonetizationApproved_' "$PREMIUM_BACKEND"
           grep -q 'LockService.getScriptLock' "$PREMIUM_BACKEND"
           grep -q "receiptSource='XANAX_LOG_4103:'" "$PREMIUM_BACKEND"
           grep -q 'currentSource===String(source)' "$PREMIUM_BACKEND"
