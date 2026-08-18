@@ -28,6 +28,7 @@ jobs:
           DEV_BACKEND=backend/TornFcaDeveloperBackend.gs
           DEV_CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
           DEV_UI=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendActivity.java
+          DEV_CONSOLE=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperConsoleActivity.java
 
           test -f "$BETA"
           test -f "$UI"
@@ -84,6 +85,7 @@ jobs:
           grep -q "const TD_VERSION='1.2.0'" "$DEV_BACKEND"
           grep -q "const TD_USERS='DeveloperUsers'" "$DEV_BACKEND"
           grep -q 'TD_HEARTBEAT_SECONDS=6\*60\*60' "$DEV_BACKEND"
+          grep -q 'tdTrackUser_(user,body)' "$DEV_BACKEND"
           grep -q 'total_unique' "$DEV_BACKEND"
           grep -q 'current_total' "$DEV_BACKEND"
           grep -q 'TELEMETRY_SALT' "$DEV_BACKEND"
@@ -92,5 +94,9 @@ jobs:
           grep -q 'User tracker' "$DEV_UI"
           grep -q 'Current total' "$DEV_UI"
           grep -q 'Unique users' "$DEV_UI"
+          grep -q 'User tracker' "$DEV_CONSOLE"
+          grep -q 'Refresh User Counts' "$DEV_CONSOLE"
+          grep -q 'current_total' "$DEV_CONSOLE"
+          grep -q 'total_unique' "$DEV_CONSOLE"
 
           echo 'Torn FCA Beta v0.9.38 UX/backend-preservation audit passed.'
