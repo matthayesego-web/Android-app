@@ -3,7 +3,7 @@
 Branch audited: `v0.9-faction-automation`
 Current pre-1.0 app line: **v0.10.1 / versionCode 56**
 
-This audit describes source state. A service is not considered live until its Apps Script deployment passes the live-backend workflow and device smoke test.
+This audit describes source state. A service is not live until its Apps Script deployment passes the live-backend workflow and device smoke test.
 
 ## Architecture now in source
 
@@ -16,8 +16,7 @@ Server-backed:
 - faction-position capability sync/cache
 - rank access rules and per-user overrides
 - faction notices
-- banking requests
-- banking reconciliation
+- banking requests/reconciliation
 - faction-scoped banking listener tokens
 
 Security/state:
@@ -37,49 +36,53 @@ Server-backed:
 - faction chat
 - chat reports
 - community moderation queue/resolution
-- training rules
-- training guides/resources
-- push-device registration
-- push tests
-- announcement pushes
+- training rules/guides/resources
+- push-device registration/tests/announcement pushes
 
 Security/state:
 - all community/training data is faction-scoped
-- moderation defaults to verified TornFCA owner access
-- future faction moderator access is configurable by actual Torn position abilities and/or Leader/Co-leader capability; custom position-name strings are not used as the permission model
+- moderation defaults to verified TornFCA owner recovery/global access
+- future faction moderator access is configurable by actual Torn position abilities and/or Leader/Co-leader capability; custom position-name strings are not the permission model
 - non-owner moderators can only see/resolve reports in their verified faction
-- the exact final moderation permission matrix remains intentionally undecided
-- launch-safe defaults remain `MODERATION_ALLOW_LEADERS=false` and blank `MODERATION_ABILITIES`
+- exact final moderation capability matrix remains intentionally undecided
+- launch-safe defaults: `MODERATION_ALLOW_LEADERS=false`, blank `MODERATION_ABILITIES`
 
 ### 3. Premium backend — `backend/TornFcaPremiumBackend.gs`
-Version: **1.1.0**
+Version: **1.2.0**
 Android client: `PremiumBackendClient`
 Android entitlement gate: `PremiumAccess`
 
 Server-backed:
 - verified Premium entitlement status
-- one-minute Xanax payment scan
+- owner/admin test grants
+- configurable Premium policy
+- optional one-minute Xanax payment scan, but only after explicit monetization approval activation
 - dedupe/idempotency by Torn receipt/log ID
-- Premium configuration
-- owner/admin grants
 
 Security/state:
 - entitlement reads are limited to the verified signed-in Torn player
 - admin changes require verified TornFCA owner ID plus admin password
 - client API keys are never persisted
-- `OWNER_API_KEY` remains a server Script Property used only by the payment scanner
+- `OWNER_API_KEY` is a server Script Property used only by the automatic payment scanner
 - scanner is ScriptLock-protected
-- grant source `XANAX_LOG_4103:<logId>` makes receipt processing idempotent if a run fails after entitlement extension but before the audit/payment row is written
-- `stacking` is actually enforced: enabled extends unexpired time; disabled starts the new grant from the current time
-- safe password bootstrap hashes `PREMIUM_ADMIN_PASSWORD_SETUP` and deletes the plaintext setup property in a `finally` block
+- grant source `XANAX_LOG_4103:<logId>` makes receipt processing idempotent if a run fails after entitlement extension but before the payment/audit row is written
+- `stacking` is enforced: enabled extends unexpired time; disabled starts new paid time from now
+- password bootstrap hashes `PREMIUM_ADMIN_PASSWORD_SETUP` and deletes the plaintext setup property in a `finally` block
+
+Monetization fail-closed gate:
+- setup defaults `MONETIZATION_APPROVED=false`
+- `installPremiumScanTrigger()` refuses while the flag is false
+- `scanPremiumPayments()` also refuses while the flag is false
+- this permits full Free/Premium entitlement testing through owner manual grants without accidentally accepting real paid usage
+- the flag should only be enabled after the Torn charging-approval requirement and the chosen distribution/payment path are settled
 
 Android Premium hardening:
 - `PremiumEntitlementStore` contains backend-verified entitlement state only
 - owner simulation defaults OFF and is accepted only by `PremiumAccess` for the verified developer player ID
 - remote `disable_premium`, maintenance and minimum-version policy override entitlement/simulation
-- Premium target routes use the central gate
-- Member Dossier and Faction Pulse also self-gate so a future internal navigation change cannot bypass the matrix
-- Free leadership keeps a 7-day Activity Tracker; Premium may select the deeper 14/30-day window
+- Premium routes use the central gate
+- Member Dossier and Faction Pulse self-gate before loading data so future internal navigation cannot bypass the matrix
+- Free leadership keeps a 7-day Activity Tracker; Premium may select 14/30-day history
 
 ### 4. Developer control plane — `backend/TornFcaDeveloperBackend.gs`
 Version: **1.3.0**
@@ -107,9 +110,9 @@ Security/state:
 - status/config writes/audit require verified developer Torn ID `3987363`
 - writes additionally require developer password
 - API keys are never persisted
-- remote policy is cached locally and refreshed in the background; networking never blocks app startup
-- developer route remains available as a recovery path if normal features are remotely disabled
-- safe password bootstrap hashes `DEVELOPER_ADMIN_PASSWORD_SETUP` and deletes the plaintext setup property afterward
+- remote policy is cached locally and refreshed in the background; networking does not block app startup
+- developer route remains a recovery path if normal features are remotely disabled
+- password bootstrap hashes `DEVELOPER_ADMIN_PASSWORD_SETUP` and deletes plaintext afterward
 
 ### 5. WarPay persistence backend — `backend/TornFcaWarPayBackend.gs`
 Version: **1.1.0**
@@ -126,42 +129,42 @@ Security/state:
 - receipts are isolated by `faction_id`
 - current access intentionally matches WarPay UI: Leader/Co-leader only
 - receipt payload and row count are validated before storage
-- faction/war upsert reads under ScriptLock, preventing two simultaneous first saves from appending duplicate records
+- faction/war upsert reads under ScriptLock, preventing simultaneous first saves from appending duplicate records
 - local receipt is saved first; cloud upload is best-effort and never breaks payout calculation
 - opening WarPay starts a best-effort faction receipt refresh
 
 ## Local-only by design
 
 These do not need a TornFCA server merely because they use local persistence:
-- developer simulations and diagnostic preferences
+- developer simulations/diagnostic preferences
 - training battle-stat baseline/progress baseline
-- saved notification inbox/history on the device
+- saved notification inbox/history
 - legal acceptance
 - ordinary app preferences
 - caches/session state
 - blocked-user UI state
 - War Prep confirmation checklist
 - faction onboarding checklist
-- banking outage drafts (already synchronize to the shared faction backend when connectivity returns)
+- banking outage drafts that synchronize when connectivity returns
 
 ## Direct Torn data — no TornFCA persistence required
 
-The following tools primarily compute/display current Torn data and should continue using the rate-limited Torn client rather than copying Torn into our own database without a product reason:
+These primarily compute/display current Torn data and should continue using the rate-limited Torn client instead of copying Torn into our database without a product reason:
 - current member/profile/faction views
 - ranked-war and territory status/history
 - OC views
 - faction activity/pulse/strength calculations
 - live bars/cooldowns/refills/travel data
-- Beta live dashboard gauges
+- Beta dashboard gauges
 
-External services such as TornStats/FFScouter remain external integrations, not TornFCA data stores. Basic provider access is not a TornFCA Premium paywall; Premium may add convenience/aggregation around separately authorized provider data.
+FFScouter/TornStats remain optional external integrations, not TornFCA data stores. Basic provider access is not a TornFCA Premium paywall; Premium may add convenience/aggregation around separately authorized provider data.
 
 ## Monetization boundary
 
-The authoritative v0.10.1 matrix is `docs/PREMIUM_MATRIX_0.10.1.md`.
+Authoritative matrix: `docs/PREMIUM_MATRIX_0.10.1.md`.
 
 Free protects:
-- basic WarPay
+- basic WarPay/current receipt persistence
 - current Banking workflow
 - current Armory Auditor
 - Company Train Calculator
@@ -170,21 +173,35 @@ Free protects:
 - safety/moderation and legal/security controls
 - essential permission-aware faction administration
 
-Premium is the convenience/depth tier: longer history, Personal Insights, advanced alert timing, Faction Pulse, all-in-one Member Dossier, and future saved/automated/export workflow.
+Premium is convenience/depth: longer history, Personal Insights, advanced alert timing, Faction Pulse, all-in-one Member Dossier and future saved/automated/export workflow.
 
-## Automated source gates
+## Legal/API disclosure state
+
+Legal acknowledgement version is **`2026-08-17-v4`**.
+
+The API-key entry surface now explicitly discloses:
+- Data Storage
+- Data Sharing
+- Purpose
+- Key Storage & Sharing
+- Key Access Level
+
+The in-app Privacy Policy further documents cloud faction workflow data, aggregate user telemetry, optional providers and the no-client-key-persistence design. Material changes require renewed acknowledgement.
+
+## Automated source/release gates
 
 - `.github/workflows/tornfca-premium-matrix-audit.yml`
 - `.github/workflows/tornfca-pre1-source-audit.yml`
+- `.github/workflows/tornfca-member-core-audit.yml`
 - `.github/workflows/tornfca-beta-overhaul-audit.yml`
 - `.github/workflows/tornfca-backend-live-audit.yml`
 - `.github/workflows/tornfca-cloud-candidate.yml`
 
-The push-triggered audits protect source invariants. The live-backend and cloud-candidate workflows are intentionally blocked until the Google Apps Script deployment URLs/secrets exist and identify themselves at the exact audited backend versions.
+Push-triggered audits protect source invariants. Live-backend/cloud-candidate workflows remain intentionally blocked until Google Apps Script deployment URLs/secrets exist and identify themselves at the exact audited versions.
 
 ## Deployment boundary
 
-Repository source is now separated into deliberate backend services. A backend is not considered live merely because its `.gs` source exists in GitHub. Each Apps Script service must be deployed and its HTTPS URL supplied to the Android build through the matching environment variable:
+Each Apps Script service must be deployed and its HTTPS URL supplied through:
 
 - `TORNFCA_FACTION_BACKEND_URL`
 - `TORNFCA_COMMUNITY_BACKEND_URL`
@@ -192,13 +209,14 @@ Repository source is now separated into deliberate backend services. A backend i
 - `TORNFCA_DEVELOPER_BACKEND_URL`
 - `TORNFCA_WARPAY_BACKEND_URL`
 
-Firebase values remain separate build/deployment configuration. See `docs/V1_BACKEND_GO_LIVE.md` for the exact manual Google sequence.
+Firebase values remain separate configuration. See `docs/V1_BACKEND_GO_LIVE.md`.
 
 ## Still intentionally pending
 
-- final Torn capability matrix for Community Moderation and any wider custom-position leadership policy
+- final Torn capability matrix for Community Moderation/custom-position moderator access
 - any decision to cloud-sync personal checklist/baseline state (currently intentionally local)
-- legacy faction-chat/listener compatibility cleanup if a later breaking release warrants it
+- legacy faction-chat/listener compatibility cleanup if a future breaking release warrants it
 - live deployment of all five Apps Script services
 - signed v0.10.1 Beta + on-device Free/Premium matrix smoke test
+- monetization approval/payment-path decision before enabling automatic paid scanning
 - final promotion decision to v1.0.0/main only after live gates pass
