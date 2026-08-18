@@ -24,6 +24,7 @@ jobs:
 
           # Beta and production candidates must use the same approved command shell while keeping variant branding distinct.
           RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
+          APP=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaApplication.java
           ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           LEGAL_GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
           COMMAND=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
@@ -38,10 +39,16 @@ jobs:
           grep -q 'new Intent(context, BetaCommandActivity.class)' "$RUNTIME"
           grep -q 'return isBetaBuild() ? "TORN FCA BETA" : "TORN FCA"' "$RUNTIME"
           grep -q 'replaceBetaCrest' "$RUNTIME"
+          grep -q 'normalizePreAuth' "$RUNTIME"
+          grep -q 'TornFcaBrand.rebrand(raw)' "$RUNTIME"
+          grep -q 'R.drawable.duckforce_noir_art' "$RUNTIME"
+          grep -q 'TornFcaCommandRuntime.install(this)' "$APP"
           grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$ACCESS"
           grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$LEGAL_GATE"
           grep -q 'TornFcaCommandRuntime.homeIntent(this,"Operations")' "$WARHUB"
           grep -q 'private boolean isCommandActivity(){return this instanceof BetaCommandActivity;}' "$BASE"
+          grep -q 'TornFcaCurrentActivity.class.getName()' "$BASE"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$BASE"
           grep -q '!TornFcaCommandRuntime.enabled()' "$GAUGES"
           grep -q 'return TornFcaCommandRuntime.enabled()' "$SURFACE"
           grep -q 'return TornFcaCommandRuntime.enabled()' "$UX"
@@ -52,6 +59,18 @@ jobs:
           grep -q 'navItem("More"' "$COMMAND"
           grep -q 'BetaCommandActivity" android:exported="false"' "$MANIFEST"
           test "$(grep -c 'android:exported="true"' "$MANIFEST")" -eq 1
+
+          # No user-facing code may directly launch the retired current shell.
+          LEGACY_LAUNCHES="$(grep -R -n -E 'new Intent\([^;]*(TornFcaCurrentActivity|TornFcaActivity|V098CompanionActivity|V095CompanionActivity)\.class' app/src/main/java --include='*.java' || true)"
+          test -z "$LEGACY_LAUNCHES" || { echo "Direct legacy shell launch remains:" >&2; echo "$LEGACY_LAUNCHES" >&2; exit 1; }
+
+          # Runtime package-variant checks belong in the central command runtime, not scattered through helpers.
+          for helper in "$GAUGES" "$SURFACE" "$UX"; do
+            if grep -q 'APPLICATION_ID.*endsWith(".beta")' "$helper"; then
+              echo "Beta-only runtime guard remains in $helper" >&2
+              exit 1
+            fi
+          done
 
           for file in \
             backend/AccessBackend.gs \
