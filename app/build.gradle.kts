@@ -23,11 +23,10 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 58
-        versionName = "0.10.3"
+        versionCode = 59
+        versionName = "0.10.4"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
-        val devHash = "BFB3F43E00B5530E0A2E42343287C792193DB09A9D87515B19A29992E18BAF7D"
         val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL")
         val premiumBackend = localOrEnv("TORNFCA_PREMIUM_BACKEND_URL")
         val communityBackend = localOrEnv("TORNFCA_COMMUNITY_BACKEND_URL")
@@ -37,7 +36,6 @@ android {
         val firebaseApiKey = localOrEnv("TORNFCA_FIREBASE_API_KEY")
         val firebaseProjectId = localOrEnv("TORNFCA_FIREBASE_PROJECT_ID")
         val firebaseSenderId = localOrEnv("TORNFCA_FIREBASE_SENDER_ID")
-        buildConfigField("String", "DEVELOPER_ACCESS_SHA256", quotedBuildValue(devHash))
         buildConfigField("int", "DEVELOPER_PLAYER_ID", "3987363")
         buildConfigField("String", "FACTION_BACKEND_URL", quotedBuildValue(factionBackend))
         buildConfigField("String", "PREMIUM_BACKEND_URL", quotedBuildValue(premiumBackend))
