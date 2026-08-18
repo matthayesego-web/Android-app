@@ -49,18 +49,16 @@ Source:
 Run once:
 - `setupTornFcaCommunityBackend()`
 
-### v1.0 moderation policy
+### Moderation policy at initial launch
 
-Use Torn's actual faction-position capability instead of custom position-name matching.
+Do **not** invent a custom-position permission rule during deployment. The backend is deliberately configurable so TornFCA can adopt the final moderator capability policy later without faction-specific rank names.
 
-Set these Apps Script **Script Properties** after setup:
+Initial safe values are:
 
 - `MODERATION_ALLOW_LEADERS` = `false`
-- `MODERATION_ABILITIES` = `["Forum Management"]`
+- `MODERATION_ABILITIES` = blank
 
-This makes **Forum Management** the v1.0 TornFCA community-moderator capability. The verified TornFCA owner account remains the global recovery moderator. Leader/Co-leader accounts qualify through their actual Torn abilities rather than their displayed rank name, and custom faction positions also qualify when they have Forum Management.
-
-Do not broaden the list casually. Future capability changes can be made in Script Properties without hard-coding faction-specific rank names.
+That leaves the verified TornFCA owner account as the recovery/global moderator until the final leadership/custom-position capability matrix is explicitly approved. When that policy is decided, these Script Properties can be changed without rewriting the backend.
 
 For Firebase Cloud Messaging, add these Apps Script **Script Properties**:
 - `FIREBASE_PROJECT_ID`
@@ -88,20 +86,23 @@ Run once:
 Required Apps Script Script Property:
 - `OWNER_API_KEY` — server-only Torn key used by the payment scanner. Prefer a custom Torn key restricted to the log access actually required by the Premium payment scanner.
 
-Set the Premium admin password without sharing it or committing it. A simple one-time method is to temporarily add this wrapper in the Apps Script editor:
+### Set the Premium admin password safely
 
-```javascript
-function configurePremiumPasswordOnce(){
-  setPremiumAdminPassword('REPLACE_WITH_YOUR_PRIVATE_PASSWORD');
-}
-```
+Do not paste the password into source code. In Apps Script **Project Settings → Script Properties**, temporarily add:
 
-Run `configurePremiumPasswordOnce()`, then delete that temporary wrapper and save the project again. Only the SHA-256 hash remains in Script Properties.
+- `PREMIUM_ADMIN_PASSWORD_SETUP` = your private admin password (minimum 10 characters)
+
+Then run once:
+- `bootstrapPremiumAdminPassword()`
+
+The function hashes the password into `PREMIUM_ADMIN_SHA256` and deletes `PREMIUM_ADMIN_PASSWORD_SETUP` in a `finally` block. Confirm the plaintext setup property is gone afterward.
 
 Then run once:
 - `installPremiumScanTrigger()`
 
 Confirm exactly one time-based `scanPremiumPayments` trigger exists and is scheduled every minute.
+
+Premium payment processing is ScriptLock-protected and receipt-idempotent. The `stacking` setting is enforced: when enabled, new paid time extends current unexpired time; when disabled, a new valid payment starts from the current time.
 
 GitHub Actions secret:
 - `TORNFCA_PREMIUM_BACKEND_URL`
@@ -119,15 +120,16 @@ Source:
 Run once:
 - `setupTornFcaDeveloperBackend()`
 
-Set the remote developer-admin password without sharing or committing it. Temporarily add:
+### Set the remote developer-admin password safely
 
-```javascript
-function configureDeveloperPasswordOnce(){
-  setTornFcaDeveloperAdminPassword('REPLACE_WITH_YOUR_PRIVATE_PASSWORD');
-}
-```
+In Apps Script **Project Settings → Script Properties**, temporarily add:
 
-Run `configureDeveloperPasswordOnce()`, delete the temporary wrapper, and save. Only the SHA-256 hash remains in Script Properties.
+- `DEVELOPER_ADMIN_PASSWORD_SETUP` = your private developer-admin password (minimum 10 characters)
+
+Then run once:
+- `bootstrapTornFcaDeveloperAdminPassword()`
+
+The function stores only `DEVELOPER_ADMIN_SHA256` and deletes the plaintext setup property. Confirm `DEVELOPER_ADMIN_PASSWORD_SETUP` is gone afterward.
 
 GitHub Actions secret:
 - `TORNFCA_DEVELOPER_BACKEND_URL`
@@ -135,7 +137,7 @@ GitHub Actions secret:
 Expected GET identity:
 - `TornFCA Developer Control Plane`
 
-The Android Developer Gate remains a separate local access boundary. The remote control plane is for server-side policy, emergency feature switches, minimum version policy, and audited operator changes.
+The Android Developer Gate remains a separate local access boundary. The remote control plane is for server-side policy, emergency feature switches, minimum version policy, audited operator changes and aggregate user counts.
 
 ## 5. WarPay backend
 
@@ -155,7 +157,7 @@ GitHub Actions secret:
 Expected GET identity:
 - `TornFCA WarPay Backend`
 
-WarPay keeps the local device copy as its offline cache and cloud sync remains faction-scoped.
+WarPay keeps the local device copy as its offline cache and cloud sync remains faction-scoped. Faction membership/Leader/Co-leader status is rechecked from Torn on every backend request, and receipt upserts are protected by ScriptLock.
 
 ## Android/Firebase GitHub Actions secrets
 
@@ -181,8 +183,9 @@ After all five URLs are stored in GitHub Actions Secrets:
 2. The workflow must confirm all five HTTPS deployments respond with the correct backend identity.
 3. It compiles both the side-by-side Beta and release candidate with all backend/Firebase values present.
 4. It verifies the Beta package remains `com.matthayesego.duckforcetoolkit.beta` and the release candidate remains `com.matthayesego.duckforcetoolkit`.
-5. Then run **TornFCA Cloud Candidate**; it now refuses to build a cloud candidate unless all five deployed backends are reachable and identify themselves correctly.
-6. Do not promote to `main` until these audits pass and the signed Beta receives an on-device smoke test.
+5. Run **TornFCA Premium Matrix Audit** and confirm the Free/Premium boundary passes.
+6. Then run **TornFCA Cloud Candidate**; it refuses to build a cloud candidate unless all five deployed backends are reachable and identify themselves correctly.
+7. Do not promote to `main` until these audits pass and the signed Beta receives an on-device smoke test.
 
 ## On-device v1.0 backend smoke test
 
@@ -193,12 +196,14 @@ Minimum pass list:
 - submit/read a banking request
 - open Community chat and send/read a message
 - submit a chat report
-- verify the authorized moderation queue with a Forum Management-capable account
+- verify owner moderation/recovery access; test additional moderator capabilities only after that policy is explicitly configured
 - read/save training content with an authorized account
 - register push token and send personal push test
-- read Premium status
-- verify Developer Control Plane status/config read
+- read Free Premium status, then a test Premium grant/status/expiry path
+- verify Developer Control Plane status/config read and aggregate user counts
 - calculate/save WarPay receipt, restart app, and re-read it from cloud
+- perform two near-simultaneous WarPay saves for one war and confirm only one faction/war row exists
+- disable Premium remotely and verify Premium convenience locks while Free tools remain available
 - disable one non-critical feature remotely, verify the app blocks it, then re-enable it
 - verify airplane/offline behavior still shows local-safe data without corrupting cloud state
 
