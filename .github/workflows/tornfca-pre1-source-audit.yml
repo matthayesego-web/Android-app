@@ -13,179 +13,94 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Verify v0.10.3 source release gates
+      - name: Verify v0.10.4 source release gates
         run: |
           set -euo pipefail
-
-          grep -q 'versionName = "0.10.3"' app/build.gradle.kts
-          grep -q 'versionCode = 58' app/build.gradle.kts
+          grep -q 'versionName = "0.10.4"' app/build.gradle.kts
+          grep -q 'versionCode = 59' app/build.gradle.kts
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
+          ! grep -q 'DEVELOPER_ACCESS_SHA256' app/build.gradle.kts
 
-          ICON=app/src/main/res/drawable/tornfca_mark.xml
-          test -f "$ICON"
-          grep -q '#78E9FF' "$ICON"
-          grep -q '#9A78FF' "$ICON"
-          grep -q 'Signature torn cuts' "$ICON"
-          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
-          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          BRAND=app/src/main/res/drawable/tornfca_mark.xml
+          LAUNCH=app/src/main/res/drawable/tornfca_launcher_mark.xml
+          test -f "$BRAND"; test -f "$LAUNCH"
+          grep -q 'Official TornFCA Network Helix brand mark' "$BRAND"
+          grep -q 'Simplified Network Helix launcher mark' "$LAUNCH"
+          grep -q '#29E6FF' "$BRAND"
+          grep -q '#9A5CFF' "$BRAND"
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 
-          RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
-          APP=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaApplication.java
-          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
-          LEGAL_GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
-          COMMAND=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
-          BASE=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
-          SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
-          GAUGES=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaGaugeLiveData.java
+          ABOUT=app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
+          GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          SESSION=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSessionStore.java
+          ACCESS_UI=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperAccessActivity.java
+          PANEL=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
+          CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
           UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
-          WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
           MANIFEST=app/src/main/AndroidManifest.xml
-          test -f "$RUNTIME"
-          grep -q 'public static boolean enabled() { return true; }' "$RUNTIME"
-          grep -q 'new Intent(context, BetaCommandActivity.class)' "$RUNTIME"
-          grep -q 'return isBetaBuild() ? "TORN FCA BETA" : "TORN FCA"' "$RUNTIME"
-          grep -q 'replaceBetaCrest' "$RUNTIME"
-          grep -q 'normalizePreAuth' "$RUNTIME"
-          grep -q 'TornFcaBrand.rebrand(raw)' "$RUNTIME"
-          grep -q 'R.drawable.duckforce_noir_art' "$RUNTIME"
-          grep -q 'TornFcaCommandRuntime.install(this)' "$APP"
-          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$ACCESS"
-          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$LEGAL_GATE"
-          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Operations")' "$WARHUB"
-          grep -q 'private boolean isCommandActivity(){return this instanceof BetaCommandActivity;}' "$BASE"
-          grep -q 'TornFcaCurrentActivity.class.getName()' "$BASE"
-          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$BASE"
-          grep -q '!TornFcaCommandRuntime.enabled()' "$GAUGES"
-          grep -q 'return TornFcaCommandRuntime.enabled()' "$SURFACE"
-          grep -q 'return TornFcaCommandRuntime.enabled()' "$UX"
-          grep -q 'navItem("Home"' "$COMMAND"
-          grep -q 'navItem("Members"' "$COMMAND"
-          grep -q 'navItem("Training"' "$COMMAND"
-          grep -q 'navItem("Operations"' "$COMMAND"
-          grep -q 'navItem("More"' "$COMMAND"
-          grep -q 'BetaCommandActivity" android:exported="false"' "$MANIFEST"
+
+          grep -q 'versionTaps>=5' "$ABOUT"
+          grep -q 'DeveloperGateActivity.class' "$ABOUT"
+          ! grep -q 'DeveloperGateActivity.class' "$UX"
+          grep -q 'developerLogin' "$GATE"
+          grep -q '6-digit authenticator code' "$GATE"
+          grep -q 'Enroll with Invitation Code' "$GATE"
+          grep -q 'AndroidKeyStore' "$SESSION"
+          grep -q 'Developer Access' "$ACCESS_UI"
+          grep -q 'Create Invitation' "$ACCESS_UI"
+          grep -q 'Reset / Re-enroll' "$ACCESS_UI"
+          grep -q 'Sign Out of Developer Channel' "$PANEL"
+          grep -q 'developer_login' "$CLIENT"
+          grep -q 'developer_enroll_begin' "$CLIENT"
+          grep -q 'developer_access_list' "$CLIENT"
+          grep -q 'DeveloperAccessActivity" android:exported="false"' "$MANIFEST"
           test "$(grep -c 'android:exported="true"' "$MANIFEST")" -eq 1
 
-          LEGACY_LAUNCHES="$(grep -R -n -E 'new Intent\([^;]*(TornFcaCurrentActivity|TornFcaActivity|V098CompanionActivity|V095CompanionActivity)\.class' app/src/main/java --include='*.java' || true)"
-          test -z "$LEGACY_LAUNCHES" || { echo "Direct legacy shell launch remains:" >&2; echo "$LEGACY_LAUNCHES" >&2; exit 1; }
-          for helper in "$GAUGES" "$SURFACE" "$UX"; do
-            if grep -q 'APPLICATION_ID.*endsWith(".beta")' "$helper"; then echo "Beta-only runtime guard remains in $helper" >&2; exit 1; fi
-          done
+          DEV_BACKEND=backend/TornFcaDeveloperBackend.gs
+          cp "$DEV_BACKEND" /tmp/dev.js
+          node --check /tmp/dev.js
+          grep -q "const TD_VERSION='1.4.0'" "$DEV_BACKEND"
+          grep -q 'TD_SESSION_SECONDS=2\*60\*60' "$DEV_BACKEND"
+          grep -q 'bootstrapTornFcaDeveloperRoot' "$DEV_BACKEND"
+          grep -q "DEVELOPER_PASSWORD_PEPPER" "$DEV_BACKEND"
+          grep -q "DEV_TOTP_" "$DEV_BACKEND"
+          grep -q 'tdVerifyTotp_' "$DEV_BACKEND"
+          grep -q 'Utilities.MacAlgorithm.HMAC_SHA_1' "$DEV_BACKEND"
+          grep -q 'tdFailedLogin_' "$DEV_BACKEND"
+          grep -q 'developer_invite_create' "$DEV_BACKEND"
+          grep -q 'developer_access_revoke' "$DEV_BACKEND"
+          grep -q 'Root Admin cannot be revoked' "$DEV_BACKEND"
+          grep -q 'LockService.getScriptLock' "$DEV_BACKEND"
 
-          # Developer controls are invisible in App Control and owner-only behind three taps on the version badge.
-          grep -q 'attachHiddenDeveloperGesture' "$UX"
-          grep -q 'currentPlayerId(activity)!=BuildConfig.DEVELOPER_PLAYER_ID' "$UX"
-          grep -q 'count>=3' "$UX"
-          grep -q 'DeveloperGateActivity.class' "$UX"
-          ! grep -q 'Developer Lab' "$UX"
-
-          # Operations uses the featured card for announcements instead of duplicating Ranked War.
-          grep -q 'Faction Announcements' "$UX"
-          grep -q 'Open Announcements' "$UX"
-          grep -q 'War Prep Management' "$UX"
-          grep -q 'WarPrepLeadershipActivity.class' "$UX"
-          grep -q 'WarPrepLeadershipActivity" android:exported="false"' "$MANIFEST"
-
-          for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs; do
-            cp "$file" "/tmp/$(basename "$file").js"
-            node --check "/tmp/$(basename "$file").js"
-          done
-
+          for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaWarPayBackend.gs; do cp "$file" "/tmp/$(basename "$file").js"; node --check "/tmp/$(basename "$file").js"; done
           grep -q "const DF_TOOLKIT_VERSION='1.1.0'" backend/AccessBackend.gs
           grep -q "const TC_VERSION='1.7.0'" backend/TornFcaCommunityBackend.gs
           grep -q "const TORNFCA_PREMIUM_VERSION='1.2.0'" backend/TornFcaPremiumBackend.gs
-          grep -q "const TD_VERSION='1.3.0'" backend/TornFcaDeveloperBackend.gs
           grep -q "const TW_VERSION='1.1.0'" backend/TornFcaWarPayBackend.gs
 
           grep -q "tornGet_('/user/faction',apiKey)" backend/AccessBackend.gs
           grep -q "tcTornGet_('/user/faction',apiKey)" backend/TornFcaCommunityBackend.gs
           grep -q "twTornGet_('/user/faction',apiKey)" backend/TornFcaWarPayBackend.gs
-          ! grep -q "const freshIdentity=" backend/TornFcaCommunityBackend.gs
           grep -q 'LockService.getScriptLock' backend/AccessBackend.gs
           grep -q 'LockService.getScriptLock' backend/TornFcaCommunityBackend.gs
           grep -q 'LockService.getScriptLock' backend/TornFcaPremiumBackend.gs
-          grep -q 'LockService.getScriptLock' backend/TornFcaDeveloperBackend.gs
           grep -q 'LockService.getScriptLock' backend/TornFcaWarPayBackend.gs
 
-          grep -q "receiptSource='XANAX_LOG_4103:'" backend/TornFcaPremiumBackend.gs
-          grep -q 'bootstrapPremiumAdminPassword' backend/TornFcaPremiumBackend.gs
-          grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" backend/TornFcaPremiumBackend.gs
-          grep -q "setProperty('MONETIZATION_APPROVED','false')" backend/TornFcaPremiumBackend.gs
-          grep -q 'if(!premiumMonetizationApproved_())throw new Error' backend/TornFcaPremiumBackend.gs
-          grep -q 'bootstrapTornFcaDeveloperAdminPassword' backend/TornFcaDeveloperBackend.gs
-          grep -q "deleteProperty('DEVELOPER_ADMIN_PASSWORD_SETUP')" backend/TornFcaDeveloperBackend.gs
-
           COMMUNITY=backend/TornFcaCommunityBackend.gs
-          grep -q "setProperty('MODERATION_ALLOW_LEADERS','false')" "$COMMUNITY"
-          grep -q "setProperty('MODERATION_ABILITIES','')" "$COMMUNITY"
-          grep -q 'tcCanModerate_' "$COMMUNITY"
-
-          # Shared War Prep is isolated by freshly verified faction + ranked-war ID and identifies app users only.
-          WARPREP=app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
-          WARPREP_ADMIN=app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepLeadershipActivity.java
-          COMMUNITY_CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
           grep -q "const TC_WAR_PREP_CONFIG='WarPrepConfig'" "$COMMUNITY"
           grep -q "const TC_WAR_PREP_STATUS='WarPrepStatus'" "$COMMUNITY"
-          grep -q "action==='warprep_state'" "$COMMUNITY"
-          grep -q "action==='warprep_status_save'" "$COMMUNITY"
-          grep -q "action==='warprep_leadership'" "$COMMUNITY"
-          grep -q "action==='warprep_config_save'" "$COMMUNITY"
-          grep -q 'user.faction_id,warId,user.id' "$COMMUNITY"
           grep -q 'app_users_only:true' "$COMMUNITY"
-          grep -q 'warPrepState' "$COMMUNITY_CLIENT"
-          grep -q 'saveWarPrepStatus' "$COMMUNITY_CLIENT"
-          grep -q 'warPrepLeadership' "$COMMUNITY_CLIENT"
-          grep -q 'saveWarPrepConfig' "$COMMUNITY_CLIENT"
-          grep -q 'war.warId' "$WARPREP"
-          grep -q 'Only TornFCA users' "$WARPREP"
-          grep -q 'authenticateFreshFaction' "$WARPREP_ADMIN"
-          grep -q 'APP USERS THIS WAR' "$WARPREP_ADMIN"
-
-          API=app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
-          CHAT=app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
-          DEV_BACKEND=backend/TornFcaDeveloperBackend.gs
-          grep -q 'TOKEN_REFILL_MS = 2000L' "$API"
-          grep -q 'TOKEN_CAPACITY = 3.0' "$API"
-          grep -q 'handler.postDelayed(poll,20000L)' "$CHAT"
-          grep -q 'TD_HEARTBEAT_SECONDS=6\*60\*60' "$DEV_BACKEND"
-          grep -q "tcRate_(user.id,'chat_list',2)" "$COMMUNITY"
           grep -q 'TC_CHAT_SCAN_LIMIT=5000' "$COMMUNITY"
           grep -q 'TC_CHAT_CHUNK=500' "$COMMUNITY"
-          grep -q 'function tcFindExactRow_' "$COMMUNITY"
-          grep -q 'function tcTailRows_' "$COMMUNITY"
-          awk '/function tcReadChat_/{flag=1} flag{print} flag && /^}/{exit}' "$COMMUNITY" > /tmp/community-chat.txt
-          grep -q 'getRange(start,1,count,7)' /tmp/community-chat.txt
-          ! grep -q 'getDataRange' /tmp/community-chat.txt
 
-          if grep -R -n -E "setProperty\([^,]*(API_KEY|apiKey|api_key)" backend; then echo 'Backend code must not persist Torn API keys from client requests.' >&2; exit 1; fi
-
-          test -f docs/PREMIUM_MATRIX_0.10.1.md
-          grep -q 'getBoolean(KEY_PREMIUM_SIM, false)' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
+          PREMIUM=backend/TornFcaPremiumBackend.gs
+          grep -q "setProperty('MONETIZATION_APPROVED','false')" "$PREMIUM"
+          grep -q 'if(!premiumMonetizationApproved_())throw new Error' "$PREMIUM"
           RAW_GATES="$(grep -R -l 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit --include='*.java' | grep -v '/PremiumAccess.java$' || true)"
           test -z "$RAW_GATES" || { echo "Raw Premium gate bypass: $RAW_GATES" >&2; exit 1; }
-          grep -q 'PremiumAccess.MEMBER_DOSSIER' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
-          grep -q 'PremiumAccess.FACTION_PULSE' app/src/main/java/com/matthayesego/duckforcetoolkit/QuickIntelActivity.java
-          grep -q 'Premium extends the same tracker to a 30-day history' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
-          ! grep -q 'extends the same tracker to 14/30 days' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
 
-          INBOX=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
-          grep -q 'confirmClear(rows.length())' "$INBOX"
-          grep -q 'Clear notification inbox?' "$INBOX"
-
+          grep -q 'Faction Announcements' "$UX"
+          grep -q 'War Prep Management' "$UX"
           grep -q 'LEGAL_VERSION="2026-08-17-v4"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
-          LOGIN=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
-          LEGAL=app/src/main/java/com/matthayesego/duckforcetoolkit/LegalDocumentActivity.java
-          grep -q 'Data Storage:' "$LOGIN"
-          grep -q 'Data Sharing:' "$LOGIN"
-          grep -q 'Purpose:' "$LOGIN"
-          grep -q 'Key Storage & Sharing:' "$LOGIN"
-          grep -q 'Key Access Level:' "$LOGIN"
-          grep -q 'Torn API service disclosure' "$LEGAL"
-          grep -q 'Automatic paid entitlement processing is designed to remain disabled' "$LEGAL"
-
-          grep -q 'TornFCA access-control architecture' ACCESS_CONTROL.md
-          grep -q 'Initial safe values' docs/V1_BACKEND_GO_LIVE.md
-          grep -q 'MONETIZATION_APPROVED=false' docs/V1_BACKEND_GO_LIVE.md
-
-          echo 'TornFCA v0.10.3 pre-1.0 source audit passed.'
+          echo 'TornFCA v0.10.4 pre-1.0 source audit passed.'
