@@ -27,6 +27,8 @@ jobs:
           ALERTS=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
           SETTINGS=app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           PREVIEW=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          PREMIUM_BACKEND=backend/TornFcaPremiumBackend.gs
+          WARPAY_BACKEND=backend/TornFcaWarPayBackend.gs
           MATRIX=docs/PREMIUM_MATRIX_0.10.1.md
           PLAN=PREMIUM_PLAN.md
 
@@ -40,8 +42,17 @@ jobs:
           fi
           grep -q 'cached Premium expired' "$STORE"
 
+          # All user-facing Premium decisions must go through PremiumAccess.
+          RAW_GATES="$(grep -R -l 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit --include='*.java' | grep -v '/PremiumAccess.java$' || true)"
+          if [ -n "$RAW_GATES" ]; then
+            echo 'Direct PremiumEntitlementStore gate bypass found:' >&2
+            echo "$RAW_GATES" >&2
+            exit 1
+          fi
+
           # Owner-only simulation defaults OFF and is applied only at the central gate.
           grep -q 'getBoolean(KEY_PREMIUM_SIM, false)' "$DEV"
+          ! grep -q 'getBoolean(KEY_PREMIUM_SIM, true)' "$DEV"
           grep -q 'playerId==BuildConfig.DEVELOPER_PLAYER_ID&&DeveloperSettings.simulatePremium' "$ACCESS"
           grep -q 'RemoteFeaturePolicy.featureDisabled(context,"premium")' "$ACCESS"
           grep -q 'RemoteFeaturePolicy.maintenanceMode(context)' "$ACCESS"
@@ -81,6 +92,22 @@ jobs:
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.ADVANCED_ALERTS)' "$ALERTS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$SETTINGS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$PREVIEW"
+
+          # Payment backend must honor stacking and be replay/concurrency-safe.
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.1.0'" "$PREMIUM_BACKEND"
+          grep -q 'function bootstrapPremiumAdminPassword' "$PREMIUM_BACKEND"
+          grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" "$PREMIUM_BACKEND"
+          grep -q 'LockService.getScriptLock' "$PREMIUM_BACKEND"
+          grep -q "receiptSource='XANAX_LOG_4103:'" "$PREMIUM_BACKEND"
+          grep -q 'currentSource===String(source)' "$PREMIUM_BACKEND"
+          grep -q 'config.stacking' "$PREMIUM_BACKEND"
+          grep -q 'stacking===false?now:Math.max(now,current)' "$PREMIUM_BACKEND"
+
+          # WarPay cloud storage must serialize upserts and freshly verify the faction role.
+          grep -q "const TW_VERSION='1.1.0'" "$WARPAY_BACKEND"
+          grep -q "twTornGet_('/user/faction',apiKey)" "$WARPAY_BACKEND"
+          grep -q 'Read only after acquiring the lock' "$WARPAY_BACKEND"
+          grep -q 'LockService.getScriptLock' "$WARPAY_BACKEND"
 
           # Product copy protects competitive/free fundamentals and provider boundaries.
           grep -q 'Basic WarPay calculator' "$MATRIX"
