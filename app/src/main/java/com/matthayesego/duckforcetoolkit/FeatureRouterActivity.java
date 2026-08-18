@@ -48,16 +48,10 @@ public class FeatureRouterActivity extends Activity {
     }
 
     private boolean blockedByRemotePolicy(String target){
-        if(RemoteFeaturePolicy.versionBlocked(this)){
-            showStatus("This TornFCA build is below the minimum supported version. Update TornFCA before using this tool.",BAD);return true;
-        }
-        if(RemoteFeaturePolicy.maintenanceMode(this)){
-            String message=RemoteFeaturePolicy.betaMessage(this);showStatus(message.isEmpty()?"TornFCA shared tools are temporarily in maintenance mode.":message,BAD);return true;
-        }
+        if(RemoteFeaturePolicy.versionBlocked(this)){showStatus("This TornFCA build is below the minimum supported version. Update TornFCA before using this tool.",BAD);return true;}
+        if(RemoteFeaturePolicy.maintenanceMode(this)){String message=RemoteFeaturePolicy.betaMessage(this);showStatus(message.isEmpty()?"TornFCA shared tools are temporarily in maintenance mode.":message,BAD);return true;}
         String feature=policyFeature(target);
-        if(feature!=null&&RemoteFeaturePolicy.featureDisabled(this,feature)){
-            String message=RemoteFeaturePolicy.betaMessage(this);showStatus(message.isEmpty()?"This TornFCA tool is temporarily unavailable.":message,BAD);return true;
-        }
+        if(feature!=null&&RemoteFeaturePolicy.featureDisabled(this,feature)){String message=RemoteFeaturePolicy.betaMessage(this);showStatus(message.isEmpty()?"This TornFCA tool is temporarily unavailable.":message,BAD);return true;}
         return false;
     }
 
@@ -74,9 +68,8 @@ public class FeatureRouterActivity extends Activity {
     private void launchVerified(String target,AuthSession session){if(TARGET_DEVELOPER.equals(target)){Intent i=new Intent(this,DeveloperGateActivity.class);putScope(i,session.factionId,session.factionName,session.position,session.factionApiAccess);startActivity(i);finish();return;}launchFeature(target,session.factionId,session.factionName,session.position,session.factionApiAccess);}
     private void launchFeature(String target,int factionId,String factionName,String position,boolean factionApiAccess){
         String effectivePosition=DeveloperPreviewStore.isMemberPreview(this)?"Member":position;
-        if(requiresLeadership(target)&&!AccessPolicy.isLeaderPosition(effectivePosition)){
-            showStatus("This tool is restricted to faction leadership. Member Preview uses the same access boundary as a normal member.",BAD);return;
-        }
+        if(requiresLeadership(target)&&!AccessPolicy.isLeaderPosition(effectivePosition)){showStatus("This tool is restricted to faction leadership. Member Preview uses the same access boundary as a normal member.",BAD);return;}
+        if(TARGET_WAR_PAYOUT.equals(target))WarPayoutReceiptStore.refreshFromBackendAsync(this);
         Intent i;if(TARGET_WAR.equals(target)){i=new Intent(this,WarHubActivity.class);}else if(TARGET_WAR_PAYOUT.equals(target)){i=new Intent(this,WarPayoutActivity.class);}else if(TARGET_BANKING.equals(target)){i=new Intent(this,BankingCompanionActivity.class);}else if(TARGET_LOOKUP.equals(target)){i=new Intent(this,MemberDossierActivity.class);}else if(TARGET_STRENGTH.equals(target)){i=new Intent(this,FactionStrengthActivity.class);}else if(TARGET_OC.equals(target)){i=new Intent(this,OcTrackerActivity.class);}else if(TARGET_PULSE.equals(target)){i=new Intent(this,QuickIntelActivity.class);i.putExtra(QuickIntelActivity.EXTRA_MODE,QuickIntelActivity.MODE_PULSE);}else{String mode;if(TARGET_CHAIN.equals(target))mode=FactionOpsActivity.MODE_CHAIN;else mode=FactionOpsActivity.MODE_ACTIVITY;i=new Intent(this,FactionOpsActivity.class);i.putExtra(FactionOpsActivity.EXTRA_MODE,mode);}putScope(i,factionId,factionName,effectivePosition,factionApiAccess);startActivity(i);finish();}
     private boolean requiresLeadership(String target){return TARGET_ACTIVITY.equals(target)||TARGET_PULSE.equals(target)||TARGET_LOOKUP.equals(target)||TARGET_WAR_PAYOUT.equals(target);}
     private boolean isKnownTarget(String target){return TARGET_ACTIVITY.equals(target)||TARGET_WAR.equals(target)||TARGET_WAR_PAYOUT.equals(target)||TARGET_BANKING.equals(target)||TARGET_CHAIN.equals(target)||TARGET_OC.equals(target)||TARGET_PULSE.equals(target)||TARGET_LOOKUP.equals(target)||TARGET_STRENGTH.equals(target)||TARGET_DEVELOPER.equals(target);}
