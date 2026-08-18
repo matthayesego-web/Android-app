@@ -7,10 +7,7 @@ import org.json.JSONObject;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Small fail-open cache for non-secret product policy supplied by the developer backend.
- * Network refresh is asynchronous and never blocks the launcher or feature routing.
- */
+/** Small fail-open cache for non-secret product policy supplied by the developer backend. */
 public final class RemoteFeaturePolicy {
     private static final String PREFS="tornfca_remote_policy_v1";
     private static final String KEY_JSON="config";
@@ -32,13 +29,19 @@ public final class RemoteFeaturePolicy {
                 if(apiKey==null||apiKey.trim().isEmpty())return;
                 JSONObject response=DeveloperBackendClient.publicConfig(apiKey);
                 JSONObject config=response.optJSONObject("config");
-                if(config!=null)p.edit().putString(KEY_JSON,config.toString()).putLong(KEY_FETCHED,System.currentTimeMillis()).apply();
+                if(config!=null)applyVerifiedConfig(app,config);
             }catch(Exception ignored){
-                // Fail open. Keep the last successfully verified policy and retry after the short retry window below.
                 long previous=p.getLong(KEY_FETCHED,0L);
                 if(previous<=0L)p.edit().putLong(KEY_FETCHED,System.currentTimeMillis()-TTL_MS+60_000L).apply();
             }finally{IN_FLIGHT.set(false);}
         },"TornFCA-RemotePolicy").start();
+    }
+
+    /** Store policy only after it has already been returned by an authenticated backend request. */
+    public static void applyVerifiedConfig(Context context,JSONObject config){
+        if(context==null||config==null)return;
+        context.getApplicationContext().getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit()
+                .putString(KEY_JSON,config.toString()).putLong(KEY_FETCHED,System.currentTimeMillis()).apply();
     }
 
     public static boolean maintenanceMode(Context context){return config(context).optBoolean("maintenance_mode",false);}
@@ -58,10 +61,7 @@ public final class RemoteFeaturePolicy {
         return config(context).optBoolean(key,false);
     }
 
-    public static boolean versionBlocked(Context context){
-        int minimum=minimumVersionCode(context);
-        return minimum>0&&BuildConfig.VERSION_CODE<minimum;
-    }
+    public static boolean versionBlocked(Context context){int minimum=minimumVersionCode(context);return minimum>0&&BuildConfig.VERSION_CODE<minimum;}
 
     private static JSONObject config(Context context){
         if(context==null)return new JSONObject();
