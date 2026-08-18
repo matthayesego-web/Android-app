@@ -1,4 +1,4 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/icon_background" />
-    <item android:drawable="@drawable/tornfca_mark" android:gravity="center" />
+    <item android:drawable="@drawable/tornfca_launcher_mark" android:gravity="center" />
 </layer-list>
