@@ -10,7 +10,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** Optional owner-only transport for TornFCA's developer control plane. */
+/** Transport for TornFCA's developer control plane and authenticated public product policy. */
 public final class DeveloperBackendClient {
     private static final String BACKEND_URL=BuildConfig.DEVELOPER_BACKEND_URL==null?"":BuildConfig.DEVELOPER_BACKEND_URL.trim();
     private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android Developer";
@@ -20,6 +20,11 @@ public final class DeveloperBackendClient {
 
     public static boolean isConfigured(){return BACKEND_URL.startsWith("https://")&&!BACKEND_URL.contains("###");}
     public static String configuredUrl(){return BACKEND_URL;}
+
+    /** Non-secret app policy. Any verified Torn user may read it. */
+    public static JSONObject publicConfig(String apiKey)throws IOException{
+        return postChecked(request("public_config",apiKey),"Unable to read TornFCA remote policy.");
+    }
 
     public static JSONObject status(String apiKey)throws IOException{
         return postChecked(request("status",apiKey),"Unable to read developer backend status.");
