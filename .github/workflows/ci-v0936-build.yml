@@ -18,3 +18,10 @@ jobs:
           gradle-version: '8.13'
       - name: Compile beta
         run: gradle --no-daemon :app:assembleBeta
+      - name: Upload beta APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: Torn-FCA-Beta-v0.9.36-unsigned
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 2
