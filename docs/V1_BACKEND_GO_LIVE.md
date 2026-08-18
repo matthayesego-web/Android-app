@@ -49,7 +49,18 @@ Source:
 Run once:
 - `setupTornFcaCommunityBackend()`
 
-Community moderation remains conservative until the capability policy is deliberately enabled. Do not grant moderation by arbitrary custom position-name strings.
+### v1.0 moderation policy
+
+Use Torn's actual faction-position capability instead of custom position-name matching.
+
+Set these Apps Script **Script Properties** after setup:
+
+- `MODERATION_ALLOW_LEADERS` = `false`
+- `MODERATION_ABILITIES` = `["Forum Management"]`
+
+This makes **Forum Management** the v1.0 TornFCA community-moderator capability. The verified TornFCA owner account remains the global recovery moderator. Leader/Co-leader accounts qualify through their actual Torn abilities rather than their displayed rank name, and custom faction positions also qualify when they have Forum Management.
+
+Do not broaden the list casually. Future capability changes can be made in Script Properties without hard-coding faction-specific rank names.
 
 For Firebase Cloud Messaging, add these Apps Script **Script Properties**:
 - `FIREBASE_PROJECT_ID`
@@ -170,7 +181,8 @@ After all five URLs are stored in GitHub Actions Secrets:
 2. The workflow must confirm all five HTTPS deployments respond with the correct backend identity.
 3. It compiles both the side-by-side Beta and release candidate with all backend/Firebase values present.
 4. It verifies the Beta package remains `com.matthayesego.duckforcetoolkit.beta` and the release candidate remains `com.matthayesego.duckforcetoolkit`.
-5. Do not promote to `main` until this audit passes and the signed Beta receives an on-device smoke test.
+5. Then run **TornFCA Cloud Candidate**; it now refuses to build a cloud candidate unless all five deployed backends are reachable and identify themselves correctly.
+6. Do not promote to `main` until these audits pass and the signed Beta receives an on-device smoke test.
 
 ## On-device v1.0 backend smoke test
 
@@ -181,7 +193,7 @@ Minimum pass list:
 - submit/read a banking request
 - open Community chat and send/read a message
 - submit a chat report
-- verify the authorized moderation queue
+- verify the authorized moderation queue with a Forum Management-capable account
 - read/save training content with an authorized account
 - register push token and send personal push test
 - read Premium status
