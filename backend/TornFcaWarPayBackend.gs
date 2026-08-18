@@ -1,13 +1,14 @@
 /**
- * TornFCA WarPay persistence backend v1.0.0.
+ * TornFCA WarPay persistence backend v1.1.0.
  * Deploy as its OWN Google Apps Script web app.
  *
  * Purpose: cross-device/faction-wide persistence for calculated WarPay receipts.
  * Security: every request is verified against Torn; receipts are isolated by verified faction_id.
  * Current access intentionally matches the Android WarPay screen: Leader/Co-leader only.
- * Torn API keys are never persisted. Identity cache keys contain only a SHA-256 key fingerprint.
+ * Torn API keys are never persisted. Basic identity cache keys contain only a SHA-256 key fingerprint.
+ * Faction membership/position is re-read from Torn on every request so a stale leadership role cannot retain access.
  */
-const TW_VERSION='1.0.0';
+const TW_VERSION='1.1.0';
 const TW_SHEET='WarPayoutReceipts';
 
 function setupTornFcaWarPayBackend(){
@@ -37,15 +38,19 @@ function doPost(e){
 }
 
 function twVerifyUser_(apiKey){
-  const fp=twHash_(apiKey),cache=CacheService.getScriptCache(),cacheKey='warpay_identity:'+fp,cached=cache.get(cacheKey);
-  if(cached){try{return JSON.parse(cached);}catch(_){} }
+  // Faction/position is authorization-sensitive and deliberately fresh on every request.
   const factionData=twTornGet_('/user/faction',apiKey),faction=factionData&&factionData.faction;
   if(!faction||!Number(faction.id||0))throw new Error('Torn account is not currently in a faction.');
-  const basic=twTornGet_('/user/basic',apiKey),profile=basic&&basic.profile||{};
-  const user={id:Number(profile.id||0),name:String(profile.name||'Unknown'),faction_id:Number(faction.id||0),faction_name:String(faction.name||''),position:String(faction.position||'')};
-  if(!user.id)throw new Error('Unable to verify Torn player identity.');
-  cache.put(cacheKey,JSON.stringify(user),90);
-  return user;
+
+  // Player identity is stable and may be briefly cached by a non-secret key fingerprint.
+  const fp=twHash_(apiKey),cache=CacheService.getScriptCache(),cacheKey='warpay_basic:'+fp,cached=cache.get(cacheKey);let profile=null;
+  if(cached){try{profile=JSON.parse(cached);}catch(_){} }
+  if(!profile||!Number(profile.id||0)){
+    const basic=twTornGet_('/user/basic',apiKey);profile=basic&&basic.profile||{};
+    if(!Number(profile.id||0))throw new Error('Unable to verify Torn player identity.');
+    cache.put(cacheKey,JSON.stringify({id:Number(profile.id),name:String(profile.name||'Unknown')}),120);
+  }
+  return{id:Number(profile.id||0),name:String(profile.name||'Unknown'),faction_id:Number(faction.id||0),faction_name:String(faction.name||''),position:String(faction.position||'')};
 }
 
 function twTornGet_(path,key){
@@ -70,9 +75,12 @@ function twSave_(user,raw){
     rows:rows.map(twMemberRow_)
   };
   const json=JSON.stringify(normalized);if(json.length>100000)throw new Error('WarPay receipt is too large to store.');
-  const sheet=twDb_().getSheetByName(TW_SHEET),values=sheet.getDataRange().getValues(),now=Math.floor(Date.now()/1000),record=[user.faction_id,warId,json,normalized.created_at,user.id,twSafe_(user.name),now];
+  const sheet=twDb_().getSheetByName(TW_SHEET),now=Math.floor(Date.now()/1000),record=[user.faction_id,warId,json,normalized.created_at,user.id,twSafe_(user.name),now];
   const lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
+    // Read only after acquiring the lock. Two simultaneous saves for a new war can therefore
+    // never both observe an absent row and append duplicate faction/war records.
+    const values=sheet.getDataRange().getValues();
     for(let i=1;i<values.length;i++){
       if(Number(values[i][0])!==user.faction_id||Number(values[i][1])!==warId)continue;
       sheet.getRange(i+1,1,1,7).setValues([record]);return normalized;
