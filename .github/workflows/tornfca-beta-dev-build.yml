@@ -3,6 +3,8 @@ name: TornFCA Beta Dev Build
 on:
   push:
     branches: [ v0.9-faction-automation ]
+  pull_request:
+    branches: [ restore/v0.10.1-source-hardened-2026-08-17 ]
   workflow_dispatch:
 
 permissions:
@@ -65,6 +67,15 @@ jobs:
           TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
           TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
         run: gradle --no-daemon :app:assembleBeta
+
+      - name: Upload unsigned Beta for recovery signing
+        id: unsigned_upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v${{ env.VERSION_NAME }}-unsigned-recovery
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Validate signing secrets
         id: signing_secrets
@@ -139,6 +150,7 @@ jobs:
 
       - name: Publish connector-readable Beta snapshot
         id: snapshot
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -168,6 +180,7 @@ jobs:
 
       - name: Publish latest Beta prerelease
         id: prerelease
+        if: github.event_name != 'pull_request'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -188,11 +201,12 @@ jobs:
           gh release upload "$TAG" "$OUT" apk-badging.txt signer-verification.txt apk-sha256.txt --clobber
 
       - name: Publish pipeline status
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
           COMPILE_OUTCOME: ${{ steps.compile.outcome }}
+          UNSIGNED_OUTCOME: ${{ steps.unsigned_upload.outcome }}
           SIGNING_SECRETS_OUTCOME: ${{ steps.signing_secrets.outcome }}
           SIGN_OUTCOME: ${{ steps.sign.outcome }}
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
@@ -209,7 +223,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          printf 'version_name=%s\nversion_code=%s\nsource_commit=%s\npreflight=%s\ncompile=%s\nsigning_secrets=%s\nsign=%s\nupload=%s\nsnapshot=%s\nprerelease=%s\n' "${VERSION_NAME:-unknown}" "${VERSION_CODE:-unknown}" "$GITHUB_SHA" "${PREFLIGHT_OUTCOME:-unknown}" "${COMPILE_OUTCOME:-unknown}" "${SIGNING_SECRETS_OUTCOME:-unknown}" "${SIGN_OUTCOME:-unknown}" "${UPLOAD_OUTCOME:-unknown}" "${SNAPSHOT_OUTCOME:-unknown}" "${PRERELEASE_OUTCOME:-unknown}" > status.txt
+          printf 'version_name=%s\nversion_code=%s\nsource_commit=%s\npreflight=%s\ncompile=%s\nunsigned_upload=%s\nsigning_secrets=%s\nsign=%s\nupload=%s\nsnapshot=%s\nprerelease=%s\n' "${VERSION_NAME:-unknown}" "${VERSION_CODE:-unknown}" "$GITHUB_SHA" "${PREFLIGHT_OUTCOME:-unknown}" "${COMPILE_OUTCOME:-unknown}" "${UNSIGNED_OUTCOME:-unknown}" "${SIGNING_SECRETS_OUTCOME:-unknown}" "${SIGN_OUTCOME:-unknown}" "${UPLOAD_OUTCOME:-unknown}" "${SNAPSHOT_OUTCOME:-unknown}" "${PRERELEASE_OUTCOME:-unknown}" > status.txt
           git add status.txt
           git commit -m "TornFCA Beta pipeline status"
           git push --force origin HEAD:beta-status
