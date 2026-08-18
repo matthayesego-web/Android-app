@@ -44,7 +44,7 @@ public class SettingsActivity extends Activity {
 
         TornFcaUi.addSection(this,r,"Optional services & plan");
         String key=store.load();boolean ff=key!=null&&FFScouterClient.hasConsent(this,key),ts=TornStatsClient.hasConsent(this);
-        LinearLayout integrations=TornFcaUi.card(this,"OPTIONAL SERVICES","FFScouter & TornStats","FFScouter: "+(ff?"enabled":"disabled")+" • TornStats: "+(ts?"enabled":"disabled")+". TornFCA asks for separate permission before using either service.",TornFcaUi.PURPLE);
+        LinearLayout integrations=TornFcaUi.card(this,"OPTIONAL SERVICES","FFScouter & TornStats","FFScouter: "+(ff?"enabled":"disabled")+" • TornStats: "+(ts?"enabled":"disabled")+". TornFCA asks for separate permission before using either service. Basic provider access is never a TornFCA Premium requirement.",TornFcaUi.PURPLE);
         if(ff||ts){
             Button disable=TornFcaUi.button(this,"Disable FFScouter & TornStats",TornFcaUi.RED);
             disable.setOnClickListener(v->{if(key!=null)FFScouterClient.setConsent(this,key,false);TornStatsClient.setConsent(this,false);Toast.makeText(this,"Optional intelligence services disabled.",Toast.LENGTH_SHORT).show();render();});
@@ -52,8 +52,8 @@ public class SettingsActivity extends Activity {
         }
         TornFcaUi.add(this,r,integrations);
 
-        int player=currentPlayerId();String premium=player>0&&PremiumEntitlementStore.hasPremium(this,player)?"Premium active":"Free plan";
-        LinearLayout plan=TornFcaUi.card(this,"PLAN","TornFCA "+premium,"Core member and leadership tools stay free. Premium adds extra history, automation, alert options and convenience features.",TornFcaUi.GOLD);
+        int player=currentPlayerId();boolean premiumActive=player>0&&PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS);String premium=premiumActive?"Premium active":"Free plan";
+        LinearLayout plan=TornFcaUi.card(this,"PLAN","TornFCA "+premium,"Core member and leadership tools stay free. Premium adds extended history, advanced all-in-one intelligence, alert options and convenience features.",TornFcaUi.GOLD);
         Button planButton=TornFcaUi.button(this,"View Plan",TornFcaUi.GOLD);planButton.setOnClickListener(v->startActivity(new Intent(this,PremiumPreviewActivity.class)));
         LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));pp.topMargin=TornFcaUi.dp(this,10);plan.addView(planButton,pp);TornFcaUi.add(this,r,plan);
 
@@ -72,6 +72,6 @@ public class SettingsActivity extends Activity {
 
     private void addRetentionButton(LinearLayout row,String label,boolean persist,int days,int index){Button b=TornFcaUi.button(this,label,TornFcaUi.BORDER);b.setOnClickListener(v->applyRetention(persist,days));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,TornFcaUi.dp(this,44),1f);if(index>0)p.leftMargin=TornFcaUi.dp(this,6);row.addView(b,p);}
     private void applyRetention(boolean persist,int days){try{SecureApiKeyStore store=new SecureApiKeyStore(this);String key=store.load();if(key==null||key.isBlank()){Toast.makeText(this,"No active API key is available.",Toast.LENGTH_SHORT).show();return;}SecureApiKeyStore.prepareNextSave(persist,days);store.save(key);Toast.makeText(this,persist?("API key encrypted for "+days+" days."):"API key changed to session-only.",Toast.LENGTH_SHORT).show();render();}catch(Exception e){Toast.makeText(this,"Unable to change key storage.",Toast.LENGTH_LONG).show();}}
-    private int currentPlayerId(){String key=new SecureApiKeyStore(this).load();if(key==null)return 0;AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return hot.playerId;FactionScopeCache.Scope sc=FactionScopeCache.load(this,key);return sc==null?0:sc.playerId;}
+    private int currentPlayerId(){return PremiumAccess.currentPlayerId(this);}
     private void logout(){PushNotifications.unregisterAsync(this);new SecureApiKeyStore(this).clear();FactionScopeCache.clear(this);TornApiClient.clearMemoryCache();FactionMemberCache.clear();DeveloperPreviewStore.clear(this);PremiumEntitlementStore.clear(this);NotificationInboxStore.clear(this);Intent i=new Intent(this,AccessGateActivity.class);i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);startActivity(i);finish();}
 }
