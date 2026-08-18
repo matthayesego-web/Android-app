@@ -29,9 +29,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class BetaGaugeLiveData {
     private static final long LIVE_TTL_MS=60_000L;
     private static final long TRAINING_TTL_MS=5L*60L*1000L;
-    private static final String WAR_PREP_PREFS="tornfca_war_prep_v1";
+    private static final String WAR_PREP_PREFS="tornfca_war_prep_v2";
     private static final String TRAINING_PREFS="tornfca_training_progress_v1";
-    private static final String[] PREP_IDS={"timing","travel","cooldowns","resources","instructions"};
     private static final Map<View,Boolean> OBSERVED=Collections.synchronizedMap(new WeakHashMap<>());
     private static final AtomicBoolean LIVE_IN_FLIGHT=new AtomicBoolean(false);
     private static final AtomicBoolean TRAINING_IN_FLIGHT=new AtomicBoolean(false);
@@ -80,7 +79,7 @@ public final class BetaGaugeLiveData {
             else applyGauge(activity,today,"--","Energy","Updating from Torn…",0f,TornFcaCommandUi.GREEN,()->open(activity,MemberDailyActivity.class));
         }
 
-        if(prep!=null){int done=prepComplete(activity,scope.playerId,scope.factionId);applyGauge(activity,prep,done+"/5","War prep",done==5?"Checklist complete":(5-done)+" steps left",done/5f,done==5?TornFcaCommandUi.GREEN:TornFcaCommandUi.GOLD,()->open(activity,WarPrepActivity.class));}
+        if(prep!=null){PrepLocal local=prepLocal(activity,scope.playerId,scope.factionId);int remaining=Math.max(0,local.total-local.done);applyGauge(activity,prep,local.done+"/"+local.total,"War prep",local.done==local.total?"Checklist complete":remaining+" steps left",local.total<=0?0f:local.done/(float)local.total,local.done==local.total?TornFcaCommandUi.GREEN:TornFcaCommandUi.GOLD,()->open(activity,WarPrepActivity.class));}
 
         if(alerts!=null){JSONArray rows=NotificationInboxStore.all(activity);int count=rows==null?0:rows.length();float fill=count<=0?0f:Math.min(1f,count/10f);applyGauge(activity,alerts,String.valueOf(count),"Saved alerts",count==0?"Inbox clear":count+" on this device",fill,count==0?TornFcaCommandUi.GREEN:TornFcaCommandUi.PURPLE,()->open(activity,NotificationInboxActivity.class));}
 
@@ -105,8 +104,8 @@ public final class BetaGaugeLiveData {
         new Thread(()->{try{String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return;JSONObject root=TornApiClient.getJson("/user/battlestats",key);JSONObject battle=root.optJSONObject("battlestats");if(battle!=null){trainingCurrentTotal=battle.optLong("total",0L);trainingFetchedAt=System.currentTimeMillis();}}catch(Exception ignored){}finally{TRAINING_IN_FLIGHT.set(false);activity.runOnUiThread(()->{ViewGroup root=activity.findViewById(android.R.id.content);if(root!=null)refreshVisible(activity,root);});}},"TornFCA-GaugeTraining").start();
     }
 
-    private static int prepComplete(Activity activity,int p,int f){
-        SharedPreferences prefs=activity.getSharedPreferences(WAR_PREP_PREFS,Activity.MODE_PRIVATE);String cycle=warToken==0?"general":"war"+warToken;String prefix="p"+p+"_f"+f+"_"+cycle+"_";int done=0;for(String id:PREP_IDS)if(prefs.getBoolean(prefix+id,false))done++;return done;
+    private static PrepLocal prepLocal(Activity activity,int p,int f){
+        SharedPreferences prefs=activity.getSharedPreferences(WAR_PREP_PREFS,Activity.MODE_PRIVATE);String cycle=warToken==0?"general":"war"+warToken;String prefix="p"+p+"_f"+f+"_"+cycle+"_";int total=Math.max(1,Math.min(8,prefs.getInt(prefix+"item_count",5))),done=0;for(int i=1;i<=total;i++)if(prefs.getBoolean(prefix+"item"+i,false))done++;return new PrepLocal(done,total);
     }
 
     private static TrainingLocal trainingLocal(Activity activity,int p,int f){SharedPreferences prefs=activity.getSharedPreferences(TRAINING_PREFS,Activity.MODE_PRIVATE);String prefix="p"+p+"_f"+f+"_";return new TrainingLocal(prefs.getLong(prefix+"at",0L),prefs.getLong(prefix+"total",0L));}
@@ -125,6 +124,7 @@ public final class BetaGaugeLiveData {
     private static String compact(long value){if(value>=1_000_000_000L)return String.format(Locale.US,"%.1fB",value/1_000_000_000d);if(value>=1_000_000L)return String.format(Locale.US,"%.1fM",value/1_000_000d);if(value>=1_000L)return String.format(Locale.US,"%.1fK",value/1_000d);return NumberFormat.getIntegerInstance(Locale.US).format(value);}
 
     private static final class Scope{final int playerId,factionId;Scope(int playerId,int factionId){this.playerId=playerId;this.factionId=factionId;}}
+    private static final class PrepLocal{final int done,total;PrepLocal(int done,int total){this.done=done;this.total=total;}}
     private static final class TrainingLocal{final long at,baselineTotal;TrainingLocal(long at,long baselineTotal){this.at=at;this.baselineTotal=baselineTotal;}}
 
     private static final class LiveGaugeView extends View{
