@@ -39,7 +39,7 @@ public class TornFcaActivity extends V098CompanionActivity {
 
     @Override public void setContentView(View view){super.setContentView(view);ViewGroup root=findViewById(android.R.id.content);if(root!=null){if(!isCommandActivity())TornFcaBrand.apply(this,root);installIdentityRepair(root);repairFactionIdentity(root);addApiRequirementNotice(root);addKeyRetentionControls(root);retargetBankingCards(root);restoreProfileAvatar(root);}primeProviderConsent();}
     @Override protected void onResume(){super.onResume();ViewGroup root=findViewById(android.R.id.content);if(root!=null){if(!isCommandActivity())TornFcaBrand.apply(this,root);installIdentityRepair(root);repairFactionIdentity(root);addApiRequirementNotice(root);addKeyRetentionControls(root);retargetBankingCards(root);restoreProfileAvatar(root);}primeProviderConsent();refreshPremiumEntitlement();}
-    @Override public void startActivity(Intent intent){super.startActivity(TornFcaBrand.retarget(this,intent));}
+    @Override public void startActivity(Intent intent){Intent routed=TornFcaBrand.retarget(this,intent);if(TornFcaCommandRuntime.enabled()&&routed!=null&&routed.getComponent()!=null){String name=routed.getComponent().getClassName();if(TornFcaActivity.class.getName().equals(name)||TornFcaCurrentActivity.class.getName().equals(name)||V098CompanionActivity.class.getName().equals(name)||V095CompanionActivity.class.getName().equals(name)){Intent home=TornFcaCommandRuntime.homeIntent(this,"Home");home.addFlags(routed.getFlags());routed=home;}}super.startActivity(routed);}
     private boolean isCommandActivity(){return this instanceof BetaCommandActivity;}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
 
