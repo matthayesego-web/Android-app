@@ -1,6 +1,7 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -27,7 +28,7 @@ public class QuickIntelActivity extends Activity {
     private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(14,20,29),PANEL2=Color.rgb(9,14,21),BORDER=Color.rgb(45,55,69),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(154,164,178),GOLD=Color.rgb(241,194,106),BLUE=Color.rgb(88,166,255),GOOD=Color.rgb(63,185,80),BAD=Color.rgb(248,81,73);
     private SecureApiKeyStore keyStore;private String mode;private int factionId;private String factionName;private JSONArray members=new JSONArray();
 
-    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);mode=getIntent().getStringExtra(EXTRA_MODE);factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);if(mode==null)mode=MODE_PULSE;if(factionName==null||factionName.trim().isEmpty())factionName="Faction";JSONArray cached=FactionMemberCache.load(factionId);if(cached!=null){members=cached;if(MODE_LOOKUP.equals(mode))renderLookup(null);else renderPulse();}else{showLoading();load();}}
+    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);mode=getIntent().getStringExtra(EXTRA_MODE);if(mode==null)mode=MODE_PULSE;if(MODE_PULSE.equals(mode)){int playerId=PremiumAccess.currentPlayerId(this);PremiumAccess.refresh(this,playerId);if(!PremiumAccess.has(this,playerId,PremiumAccess.FACTION_PULSE)){startActivity(new Intent(this,PremiumPreviewActivity.class));finish();return;}}factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);if(factionName==null||factionName.trim().isEmpty())factionName="Faction";JSONArray cached=FactionMemberCache.load(factionId);if(cached!=null){members=cached;if(MODE_LOOKUP.equals(mode))renderLookup(null);else renderPulse();}else{showLoading();load();}}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private GradientDrawable gradient(int a,int b,int stroke,int radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{a,b});d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
