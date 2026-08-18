@@ -44,10 +44,17 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
-          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
-          grep -q '@drawable/tornfca_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-          grep -q '#78E9FF' app/src/main/res/drawable/tornfca_mark.xml
-          grep -q '#9A78FF' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q 'versionName = "0.10.4"' app/build.gradle.kts
+          grep -q 'versionCode = 59' app/build.gradle.kts
+          ! grep -q 'DEVELOPER_ACCESS_SHA256' app/build.gradle.kts
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          grep -q 'Official TornFCA Network Helix brand mark' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q 'Simplified Network Helix launcher mark' app/src/main/res/drawable/tornfca_launcher_mark.xml
+          grep -q '#29E6FF' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q '#9A5CFF' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q 'versionTaps>=5' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
+          grep -q '6-digit authenticator code' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
           grep -q 'confirmClear(rows.length())' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
           for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs; do
             cp "$file" "/tmp/$(basename "$file").js"
