@@ -23,8 +23,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 59
-        versionName = "0.10.4"
+        versionCode = 60
+        versionName = "0.10.5"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
         val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL")
