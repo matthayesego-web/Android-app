@@ -10,21 +10,24 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** Free personal war-prep dashboard using only the signed-in member's Torn data plus current faction war state. */
+/** Free personal War Prep. Local state is immediate; shared state is faction+war scoped when Community is live. */
 public class WarPrepActivity extends Activity {
-    private static final String PREFS="tornfca_war_prep_v1";
+    private static final String PREFS="tornfca_war_prep_v2";
     private SecureApiKeyStore keyStore;
     private AuthSession session;
     private WarStatus war=WarStatus.none();
     private JSONObject self=new JSONObject();
+    private JSONArray checklistItems=defaultItems();
+    private boolean sharedConfigured;
 
     @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);keyStore=new SecureApiKeyStore(this);showLoading();load();}
 
-    private void showLoading(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"War Center","My War Prep","Checking your personal readiness and current ranked-war timing…");TornFcaUi.add(this,r,TornFcaUi.card(this,"PERSONAL","Building your war-prep snapshot","This screen uses only your own Torn bars, cooldowns, travel, refills and OC context plus current ranked-war timing. Territory activity is available from War Center → Territories.",TornFcaUi.RED));setContentView(s);s.requestApplyInsets();}
+    private void showLoading(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"War Center","My War Prep","Checking your personal readiness, faction checklist and current ranked-war timing…");TornFcaUi.add(this,r,TornFcaUi.card(this,"PERSONAL","Building your war-prep snapshot","Every ranked war receives its own checklist state. When the faction Community backend is connected, leadership can see readiness submitted by TornFCA users only.",TornFcaUi.RED));setContentView(s);s.requestApplyInsets();}
 
-    private void load(){String key=keyStore.load();if(key==null||key.isBlank()){renderError("Reconnect your Torn API key to use My War Prep.");return;}new Thread(()->{try{AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);session=verified;war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),verified.factionId);self=loadSelf(key);runOnUiThread(this::render);}catch(Exception e){renderError(e.getMessage()==null?"Unable to build your war-prep snapshot.":e.getMessage());}},"TornFCA-WarPrep").start();}
+    private void load(){String key=keyStore.load();if(key==null||key.isBlank()){renderError("Reconnect your Torn API key to use My War Prep.");return;}new Thread(()->{try{AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);session=verified;war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),verified.factionId);self=loadSelf(key);loadShared(key);runOnUiThread(this::render);syncSharedAsync();}catch(Exception e){renderError(e.getMessage()==null?"Unable to build your war-prep snapshot.":e.getMessage());}},"TornFCA-WarPrep").start();}
 
     private JSONObject loadSelf(String key)throws Exception{
         try{return TornApiClient.getJson("/user?selections=bars,cooldowns,travel,refills,organizedcrime",key);}
@@ -33,11 +36,24 @@ public class WarPrepActivity extends Activity {
     private JSONObject safe(String path,String key){try{return TornApiClient.getJson(path,key);}catch(Exception ignored){return new JSONObject();}}
     private int copy(JSONObject into,JSONObject from,String key){JSONObject value=from==null?null:from.optJSONObject(key);if(value==null)return 0;try{into.put(key,value);return 1;}catch(Exception ignored){return 0;}}
 
+    private void loadShared(String key){
+        sharedConfigured=CommunityBackendClient.isConfigured()&&war.warId>0;
+        if(!sharedConfigured)return;
+        try{
+            JSONObject state=CommunityBackendClient.warPrepState(key,war.warId);if(state==null)return;
+            JSONArray items=state.optJSONArray("items");if(items!=null&&items.length()>0)checklistItems=items;
+            JSONObject status=state.optJSONObject("status"),completed=status==null?null:status.optJSONObject("completed");
+            if(completed!=null){for(int i=0;i<checklistItems.length();i++){JSONObject item=checklistItems.optJSONObject(i);if(item==null)continue;String id=item.optString("id","item"+(i+1));if(completed.optBoolean(id,false))prefs().edit().putBoolean(prefix()+id,true).apply();}}
+        }catch(Exception ignored){sharedConfigured=false;}
+    }
+
+    private JSONArray defaultItems(){JSONArray a=new JSONArray();addDefault(a,"item1","Reviewed current war mode and timing");addDefault(a,"item2","Checked travel");addDefault(a,"item3","Checked cooldowns & refills");addDefault(a,"item4","Reviewed faction resources");addDefault(a,"item5","Reviewed current instructions");return a;}
+    private void addDefault(JSONArray a,String id,String title){JSONObject o=new JSONObject();try{o.put("id",id);o.put("title",title);a.put(o);}catch(Exception ignored){}}
     private String cycle(){long token=war.warId!=0?war.warId:(war.start>0?war.start:0);return token==0?"general":"war"+token;}
     private String prefix(){return"p"+session.playerId+"_f"+session.factionId+"_"+cycle()+"_";}
     private SharedPreferences prefs(){return getSharedPreferences(PREFS,MODE_PRIVATE);}
     private boolean done(String id){return prefs().getBoolean(prefix()+id,false);}
-    private void toggle(String id){prefs().edit().putBoolean(prefix()+id,!done(id)).apply();render();}
+    private void toggle(String id){prefs().edit().putBoolean(prefix()+id,!done(id)).apply();render();syncSharedAsync();}
 
     private void render(){long now=System.currentTimeMillis()/1000L;ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"War Center","My War Prep",session.factionName+" • "+session.playerName+" • personal readiness");
 
@@ -51,14 +67,19 @@ public class WarPrepActivity extends Activity {
         if(refills!=null){TornFcaUi.add(this,r,TornFcaUi.card(this,"REFILLS","Available refills","Energy: "+available(refills.optBoolean("energy",false))+"\nNerve: "+available(refills.optBoolean("nerve",false))+"\nToken: "+available(refills.optBoolean("token",false)),TornFcaUi.BLUE));}
         if(oc!=null&&oc.length()>0){String name=oc.optString("name","Organized Crime"),status=oc.optString("status","Current assignment");TornFcaUi.add(this,r,TornFcaUi.card(this,"MY OC",name,status+"\nCheck My Day/OC before changing your normal routine around faction warfare.",TornFcaUi.PURPLE));}
 
-        TornFcaUi.addSection(this,r,"MY PREP CHECKLIST");addCheck(r,"timing","Reviewed current war mode and timing","I checked War Center to see whether my faction is using Ranked War, Territories, or both, and I know when I need to be available.");addCheck(r,"travel","Checked travel","I checked my travel state and faction instructions so I am not unexpectedly unavailable.");addCheck(r,"cooldowns","Checked cooldowns & refills","I reviewed my personal cooldowns, bars and refill availability before the event.");addCheck(r,"resources","Reviewed faction resources","I checked my faction's War Prep/onboarding guides for its specific expectations.");addCheck(r,"instructions","Reviewed current instructions","I checked faction announcements/chat/leadership instructions instead of assuming a universal war routine.");
-        String[] ids={"timing","travel","cooldowns","resources","instructions"};int complete=0;for(String id:ids)if(done(id))complete++;TornFcaUi.add(this,r,TornFcaUi.card(this,"PREP STATUS",complete+" / 5 complete",complete==5?"Your personal checklist for this war cycle is complete.":"These are confirmation steps, not proof of faction compliance. Your faction's live instructions always take priority.",complete==5?TornFcaUi.GREEN:TornFcaUi.GOLD));
+        TornFcaUi.addSection(this,r,"MY PREP CHECKLIST");int complete=0;
+        for(int i=0;i<checklistItems.length();i++){JSONObject item=checklistItems.optJSONObject(i);if(item==null)continue;String id=item.optString("id","item"+(i+1)),title=item.optString("title","Faction War Prep item");if(done(id))complete++;addCheck(r,id,title,"Confirm this requirement for the current ranked-war cycle. Faction leadership can customize these checklist items when shared War Prep is connected.");}
+        int total=Math.max(1,checklistItems.length());String sync=sharedConfigured?"Shared with faction leadership for this war. Only TornFCA users who open/sync War Prep appear in leadership status.":"Stored locally on this device. Shared leadership status activates when the Community backend is connected.";TornFcaUi.add(this,r,TornFcaUi.card(this,"PREP STATUS",complete+" / "+total+" complete",(complete==total?"Your checklist for this ranked-war cycle is complete.\n":"")+sync,complete==total?TornFcaUi.GREEN:TornFcaUi.GOLD));
+
+        if(AccessPolicy.isLeaderPosition(session.position)){LinearLayout manage=TornFcaUi.card(this,"LEADERSHIP","Faction War Prep Management","Customize this faction's checklist and review readiness submitted by TornFCA users for the current/upcoming war.",TornFcaUi.PURPLE);addLaunch(manage,"Open War Prep Management",WarPrepLeadershipActivity.class,TornFcaUi.PURPLE);TornFcaUi.add(this,r,manage);}
 
         TornFcaUi.addSection(this,r,"WAR SHORTCUTS");LinearLayout quick=TornFcaUi.card(this,"MEMBER TOOLS","Continue from here","Open the detailed member tools without exposing leadership-only data.",TornFcaUi.BLUE);addLaunch(quick,"Open War Center",WarHubActivity.class,TornFcaUi.RED);addLaunch(quick,"Open My Day",MemberDailyActivity.class,TornFcaUi.GREEN);addLaunch(quick,"Open Faction Resources",FactionResourcesActivity.class,TornFcaUi.GOLD);addLaunch(quick,"Open Faction Chat",FactionChatActivity.class,TornFcaUi.BLUE);TornFcaUi.add(this,r,quick);
 
-        TornFcaUi.add(this,r,TornFcaUi.card(this,"SCOPE","No universal war requirements invented","TornFCA reports your current data and gives you a checklist, but it does not assume how much energy, medical cooldown, Xanax, travel or equipment your faction requires for Ranked War or Territories. Put faction-specific requirements in Faction Resources and current leadership notices.",TornFcaUi.BORDER));
-        r.addView(TornFcaUi.footer(this,"Checklist state is stored locally for this player + faction + ranked-war cycle/general prep state."));setContentView(s);s.requestApplyInsets();}
+        TornFcaUi.add(this,r,TornFcaUi.card(this,"SCOPE","Per-war and per-faction","Checklist state is isolated by player + verified faction + ranked-war cycle. A new ranked war automatically starts a fresh checklist. Faction-specific checklist options never carry into another faction.",TornFcaUi.BORDER));
+        r.addView(TornFcaUi.footer(this,"War Prep resets by ranked-war ID. Shared status represents TornFCA users only, not the faction's full roster."));setContentView(s);s.requestApplyInsets();}
 
+    private void syncSharedAsync(){if(!sharedConfigured||session==null||war.warId<=0)return;String key=keyStore.load();if(key==null||key.isBlank())return;JSONObject completed=completedJson();new Thread(()->{try{CommunityBackendClient.saveWarPrepStatus(key,war.warId,completed);}catch(Exception ignored){}},"TornFCA-WarPrepSync").start();}
+    private JSONObject completedJson(){JSONObject out=new JSONObject();for(int i=0;i<checklistItems.length();i++){JSONObject item=checklistItems.optJSONObject(i);if(item==null)continue;String id=item.optString("id","item"+(i+1));try{out.put(id,done(id));}catch(Exception ignored){}}return out;}
     private void addCheck(LinearLayout r,String id,String title,String body){boolean complete=done(id);LinearLayout c=TornFcaUi.card(this,complete?"COMPLETE":"TO DO",title,body,complete?TornFcaUi.GREEN:TornFcaUi.BORDER);Button b=TornFcaUi.button(this,complete?"Mark not complete":"Mark complete",complete?TornFcaUi.BORDER:TornFcaUi.GREEN);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,42));p.topMargin=TornFcaUi.dp(this,9);c.addView(b,p);b.setOnClickListener(v->{toggle(id);Toast.makeText(this,complete?"Prep item reopened.":"Prep item completed.",Toast.LENGTH_SHORT).show();});TornFcaUi.add(this,r,c);}
     private void addLaunch(LinearLayout c,String label,Class<?> activity,int accent){Button b=TornFcaUi.button(this,label,accent);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,43));p.topMargin=TornFcaUi.dp(this,8);c.addView(b,p);b.setOnClickListener(v->startActivity(new Intent(this,activity)));}
     private String bar(JSONObject bars,String key,String label){JSONObject b=bars.optJSONObject(key);if(b==null)return label+": unavailable";return label+": "+b.optInt("current",0)+" / "+b.optInt("maximum",0);}
