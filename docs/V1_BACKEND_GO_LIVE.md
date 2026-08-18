@@ -35,13 +35,15 @@ Expected GET identity: `TornFCA Faction Backend`, version `1.1.0`.
 
 New deployments are multi-faction by default. Existing legacy restriction settings remain compatible.
 
-## 2. Community backend — v1.4.0
+## 2. Community backend — v1.5.0
 
 Sheet: `TornFCA - Community Backend`
 
 Source: `backend/TornFcaCommunityBackend.gs`
 
 Run once: `setupTornFcaCommunityBackend()`
+
+Every Community request re-reads current faction membership/position from Torn, so changing factions or losing a leadership role does not retain stale tenant access. Stable player identity may be cached briefly without caching faction authorization. Duplicate-sensitive shared writes are ScriptLock-protected.
 
 ### Initial moderation policy
 
@@ -62,7 +64,7 @@ For Firebase Cloud Messaging, add Apps Script Script Properties:
 
 GitHub Actions secret: `TORNFCA_COMMUNITY_BACKEND_URL`
 
-Expected GET identity: `TornFCA Community Backend`, version `1.4.0`.
+Expected GET identity: `TornFCA Community Backend`, version `1.5.0`.
 
 ## 3. Premium backend — v1.2.0
 
@@ -184,7 +186,7 @@ Permanent Android signing secrets remain separate and must not be rotated during
 After all five URLs are configured:
 
 1. Run **TornFCA Backend Live Audit**.
-2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.4.0, Premium 1.2.0, Developer 1.3.0, WarPay 1.1.0.
+2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.5.0, Premium 1.2.0, Developer 1.3.0, WarPay 1.1.0.
 3. It compiles both side-by-side Beta and release candidates.
 4. It verifies Beta package `com.matthayesego.duckforcetoolkit.beta` and release package `com.matthayesego.duckforcetoolkit`.
 5. Run **TornFCA Premium Matrix Audit**.
@@ -200,6 +202,7 @@ Minimum pass list:
 - read faction notices
 - submit/read a banking request
 - open Community chat and send/read a message
+- switch/change faction scope during testing and confirm old Community tenant data is not retained
 - submit a chat report
 - verify owner moderation/recovery; test wider moderator capabilities only after policy is explicitly configured
 - read/save training content with an authorized account
