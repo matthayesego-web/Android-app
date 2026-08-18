@@ -20,7 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/** Small beta-only UX repairs layered over the command-console shell while the overhaul stabilizes. */
+/** Small command-shell UX repairs shared by Beta and the production candidate. */
 public final class BetaUxRepair {
     private static final String DEV_TAG="tornfca-beta-developer-panel";
     private static final String RAIL_TAG="tornfca-beta-context-rail";
@@ -47,7 +47,8 @@ public final class BetaUxRepair {
         });
     }
 
-    private static boolean isBeta(){return BuildConfig.APPLICATION_ID!=null&&BuildConfig.APPLICATION_ID.endsWith(".beta");}
+    /** Historical name retained to avoid churn; now means the canonical command runtime is enabled. */
+    private static boolean isBeta(){return TornFcaCommandRuntime.enabled();}
 
     private static void attach(Activity activity){
         if(activity==null||!isBeta())return;
@@ -97,7 +98,7 @@ public final class BetaUxRepair {
 
     private static void ensureDeveloperPanel(Activity activity,View root){
         if(currentPlayerId(activity)!=BuildConfig.DEVELOPER_PLAYER_ID||!containsText(root,"App Control"))return;
-        TextView footer=findTextStarting(root,"Torn FCA Beta v");if(footer==null||!(footer.getParent() instanceof LinearLayout))return;
+        TextView footer=findTextStarting(root,TornFcaCommandRuntime.footerPrefix());if(footer==null||!(footer.getParent() instanceof LinearLayout))return;
         LinearLayout host=(LinearLayout)footer.getParent();if(findTag(host,DEV_TAG)!=null)return;
 
         LinearLayout panel=TornFcaCommandUi.panel(activity);panel.setTag(DEV_TAG);
@@ -118,7 +119,7 @@ public final class BetaUxRepair {
         View found=findTag(root,RAIL_TAG);if(!(found instanceof LinearLayout))return;LinearLayout rail=(LinearLayout)found;
         if(RAIL_COMPACT.equals(String.valueOf(rail.getContentDescription())))return;
         String section=sectionFor(activity);rail.removeAllViews();rail.setContentDescription(RAIL_COMPACT);rail.setOrientation(LinearLayout.HORIZONTAL);rail.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);rail.setPadding(0,0,0,0);rail.setBackground(null);rail.setElevation(0f);
-        TextView back=TornFcaCommandUi.text(activity,"←  "+section,10.8f,TornFcaCommandUi.MUTED,true);back.setPadding(TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6),TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6));back.setBackground(TornFcaCommandUi.solid(activity,Color.argb(95,18,26,39),9,TornFcaCommandUi.LINE_SOFT,1));back.setClickable(true);back.setFocusable(true);back.setForeground(TornFcaCommandUi.ripple(activity,TornFcaCommandUi.GOLD,9));back.setOnClickListener(v->{Intent i=new Intent(activity,BetaCommandActivity.class);i.putExtra(BetaCommandActivity.EXTRA_SECTION,section);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);});rail.addView(back,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        TextView back=TornFcaCommandUi.text(activity,"←  "+section,10.8f,TornFcaCommandUi.MUTED,true);back.setPadding(TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6),TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6));back.setBackground(TornFcaCommandUi.solid(activity,Color.argb(95,18,26,39),9,TornFcaCommandUi.LINE_SOFT,1));back.setClickable(true);back.setFocusable(true);back.setForeground(TornFcaCommandUi.ripple(activity,TornFcaCommandUi.GOLD,9));back.setOnClickListener(v->{Intent i=TornFcaCommandRuntime.homeIntent(activity,section);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);});rail.addView(back,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
     }
 
     private static String sectionFor(Activity activity){
@@ -147,7 +148,7 @@ public final class BetaUxRepair {
                 final JSONObject value=refills;activity.runOnUiThread(()->applyRefills(activity,value));
             }catch(Exception ignored){activity.runOnUiThread(()->applyRefillUnavailable(activity));}
             finally{REFILL_IN_FLIGHT.remove(activity);}
-        },"TornFCA-BetaRefillRepair").start();
+        },"TornFCA-RefillRepair").start();
     }
 
     private static void applyRefills(Activity activity,JSONObject refills){
