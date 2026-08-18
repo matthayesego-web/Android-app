@@ -51,6 +51,8 @@ public final class DeveloperBackendClient {
         JSONObject body=new JSONObject();
         put(body,"action",action);
         put(body,"apiKey",apiKey==null?"":apiKey);
+        put(body,"version_code",BuildConfig.VERSION_CODE);
+        put(body,"version_name",BuildConfig.VERSION_NAME);
         return body;
     }
 
