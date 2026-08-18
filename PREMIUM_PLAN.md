@@ -61,7 +61,8 @@ Premium can sell saved views, aggregation, history, comparisons and workflow aro
 
 ### Extended Activity Tracker
 - Free leadership view: 7 days.
-- Premium leadership view: selectable 14/30-day review.
+- Premium leadership view: 30-day review.
+- The internal Developer test control may still exercise shorter windows for QA, but the customer-facing Premium product is the deeper 30-day history.
 - This makes Premium the deeper-history option while preserving a useful Free participation tool.
 
 ### Faction Pulse
