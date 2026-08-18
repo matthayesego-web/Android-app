@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 
 /** Device-local record that the current TornFCA legal documents and data-use acknowledgement were accepted. */
 public final class LegalAcceptanceStore {
-    public static final String LEGAL_VERSION="2026-08-17-v3";
+    public static final String LEGAL_VERSION="2026-08-17-v4";
     private static final String PREFS="tornfca_legal";
     private static final String KEY_VERSION="accepted_version";
     private static final String KEY_AT="accepted_at";
