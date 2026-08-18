@@ -22,6 +22,37 @@ jobs:
           grep -q 'versionCode = 56' app/build.gradle.kts
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
 
+          # Beta and production candidates must use the same approved command shell while keeping variant branding distinct.
+          RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
+          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          LEGAL_GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          COMMAND=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          BASE=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
+          SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
+          GAUGES=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaGaugeLiveData.java
+          UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
+          WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+          MANIFEST=app/src/main/AndroidManifest.xml
+          test -f "$RUNTIME"
+          grep -q 'public static boolean enabled() { return true; }' "$RUNTIME"
+          grep -q 'new Intent(context, BetaCommandActivity.class)' "$RUNTIME"
+          grep -q 'return isBetaBuild() ? "TORN FCA BETA" : "TORN FCA"' "$RUNTIME"
+          grep -q 'replaceBetaCrest' "$RUNTIME"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$ACCESS"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$LEGAL_GATE"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Operations")' "$WARHUB"
+          grep -q 'private boolean isCommandActivity(){return this instanceof BetaCommandActivity;}' "$BASE"
+          grep -q '!TornFcaCommandRuntime.enabled()' "$GAUGES"
+          grep -q 'return TornFcaCommandRuntime.enabled()' "$SURFACE"
+          grep -q 'return TornFcaCommandRuntime.enabled()' "$UX"
+          grep -q 'navItem("Home"' "$COMMAND"
+          grep -q 'navItem("Members"' "$COMMAND"
+          grep -q 'navItem("Training"' "$COMMAND"
+          grep -q 'navItem("Operations"' "$COMMAND"
+          grep -q 'navItem("More"' "$COMMAND"
+          grep -q 'BetaCommandActivity" android:exported="false"' "$MANIFEST"
+          test "$(grep -c 'android:exported="true"' "$MANIFEST")" -eq 1
+
           for file in \
             backend/AccessBackend.gs \
             backend/TornFcaCommunityBackend.gs \
