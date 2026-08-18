@@ -7,9 +7,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * App-private receipt persistence for leadership WarPay calculations.
- * Android backup is disabled for TornFCA, so these records remain on this device until app data is cleared.
- * Cross-device/faction-wide receipt sync belongs in the shared backend once it is deployed.
+ * App-private WarPay receipt cache. The authoritative shared copy may live in WarPayBackendClient,
+ * while this store keeps calculations available offline and avoids unnecessary backend reads.
  */
 public final class WarPayoutReceiptStore {
     private static final String PREFS = "tornfca_warpay_receipts_v1";
@@ -26,6 +25,21 @@ public final class WarPayoutReceiptStore {
         int warId = receipt.optInt("war_id", 0);
         if (warId <= 0) return;
         prefs(context).edit().putString(PREFIX + warId, receipt.toString()).apply();
+    }
+
+    /** Merge faction-scoped server receipts into the offline cache without replacing a newer local calculation. */
+    public static void mergeFromBackend(Context context, JSONArray receipts) {
+        if (context == null || receipts == null) return;
+        for (int i = 0; i < receipts.length(); i++) {
+            JSONObject remote = receipts.optJSONObject(i);
+            if (remote == null) continue;
+            int warId = remote.optInt("war_id", 0);
+            if (warId <= 0) continue;
+            JSONObject local = load(context, warId);
+            long remoteAt = remote.optLong("created_at", 0L);
+            long localAt = local == null ? 0L : local.optLong("created_at", 0L);
+            if (local == null || remoteAt >= localAt) save(context, remote);
+        }
     }
 
     public static JSONObject load(Context context, int warId) {
