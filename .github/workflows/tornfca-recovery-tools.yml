@@ -1,0 +1,33 @@
+name: TornFCA Recovery Signing Tools
+
+on:
+  pull_request:
+    branches: [ restore/v0.10.1-source-hardened-2026-08-17 ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect Android signing tools
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          BUILD_TOOLS="$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          mkdir -p recovery-tools/lib
+          cp "$BUILD_TOOLS/apksigner" recovery-tools/apksigner
+          cp "$BUILD_TOOLS/lib/apksigner.jar" recovery-tools/lib/apksigner.jar
+          cp "$BUILD_TOOLS/zipalign" recovery-tools/zipalign
+          cp "$BUILD_TOOLS/aapt" recovery-tools/aapt
+          chmod +x recovery-tools/apksigner recovery-tools/zipalign recovery-tools/aapt
+          printf '%s\n' "$BUILD_TOOLS" > recovery-tools/build-tools-path.txt
+      - name: Upload recovery tools
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Android-signing-tools
+          path: recovery-tools
+          if-no-files-found: error
+          retention-days: 1
