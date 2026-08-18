@@ -1,14 +1,15 @@
 /**
- * TornFCA Developer Control Plane v1.0.0.
+ * TornFCA Developer Control Plane v1.1.0.
  * Deploy as its OWN Google Apps Script web app.
  *
  * Security boundaries:
- * - Every API action requires a Torn API key and verifies the caller is the configured TornFCA owner.
+ * - public_config requires a valid Torn API key, but returns only non-secret app policy.
+ * - Developer status/audit/write actions additionally require the verified TornFCA owner account.
  * - Mutating actions additionally require the developer password hash stored in Script Properties.
- * - Torn API keys are never persisted. Only a SHA-256 key fingerprint may be used in short-lived CacheService entries.
+ * - Torn API keys are never persisted. Only SHA-256 key fingerprints may be used in short-lived CacheService entries.
  * - All successful mutations are written to an append-only audit sheet.
  */
-const TD_VERSION='1.0.0';
+const TD_VERSION='1.1.0';
 const TD_DEVELOPER_PLAYER_ID=3987363;
 const TD_CONFIG='DeveloperConfig';
 const TD_AUDIT='DeveloperAudit';
@@ -45,9 +46,7 @@ function setTornFcaDeveloperAdminPassword(password){
   return 'TornFCA developer admin password updated.';
 }
 
-function doGet(){
-  return tdJson_({ok:true,app:'TornFCA Developer Control Plane',version:TD_VERSION,authenticated_actions:'POST only'});
-}
+function doGet(){return tdJson_({ok:true,app:'TornFCA Developer Control Plane',version:TD_VERSION,authenticated_actions:'POST only'});}
 
 function doPost(e){
   try{
@@ -55,11 +54,14 @@ function doPost(e){
     const action=String(body.action||'').trim();
     const apiKey=String(body.apiKey||'').trim();
     if(!apiKey)throw new Error('API key required.');
-    const user=tdVerifyDeveloper_(apiKey);
 
-    if(action==='status'||action==='config_read'){
+    if(action==='public_config'){
+      const user=tdVerifyUser_(apiKey);
       return tdJson_({ok:true,user:tdPublicUser_(user),version:TD_VERSION,config:tdReadConfig_()});
     }
+
+    const user=tdVerifyDeveloper_(apiKey);
+    if(action==='status'||action==='config_read')return tdJson_({ok:true,user:tdPublicUser_(user),version:TD_VERSION,config:tdReadConfig_()});
 
     if(action==='audit_list'){
       tdRequireAdmin_(String(body.admin_password||''));
@@ -75,21 +77,22 @@ function doPost(e){
     }
 
     throw new Error('Unknown action.');
-  }catch(err){
-    return tdJson_({ok:false,error:String(err&&err.message||err)});
-  }
+  }catch(err){return tdJson_({ok:false,error:String(err&&err.message||err)});}
+}
+
+function tdVerifyUser_(apiKey){
+  const fp=tdSha256_(apiKey),cache=CacheService.getScriptCache(),cacheKey='developer_identity:'+fp;
+  const cached=cache.get(cacheKey);
+  if(cached){try{const u=JSON.parse(cached);if(Number(u.id||0)>0)return u;}catch(_){} }
+  const root=tdTornGet_('/user/basic',apiKey),profile=root&&root.profile||{},user={id:Number(profile.id||0),name:String(profile.name||'Unknown')};
+  if(!user.id)throw new Error('Unable to verify Torn player identity.');
+  cache.put(cacheKey,JSON.stringify(user),90);
+  return user;
 }
 
 function tdVerifyDeveloper_(apiKey){
-  const fp=tdSha256_(apiKey),cache=CacheService.getScriptCache(),cacheKey='developer_identity:'+fp;
-  const cached=cache.get(cacheKey);
-  if(cached){
-    try{const u=JSON.parse(cached);if(Number(u.id)===TD_DEVELOPER_PLAYER_ID)return u;}catch(_){}
-  }
-  const root=tdTornGet_('/user/basic',apiKey),profile=root&&root.profile||{};
-  const user={id:Number(profile.id||0),name:String(profile.name||'Unknown')};
+  const user=tdVerifyUser_(apiKey);
   if(user.id!==TD_DEVELOPER_PLAYER_ID)throw new Error('Verified TornFCA developer account required.');
-  cache.put(cacheKey,JSON.stringify(user),90);
   return user;
 }
 
@@ -106,8 +109,7 @@ function tdWriteConfig_(updates,user){
     if(key==='maintenance_mode'||key.indexOf('disable_')===0)value=tdBool_(updates[key])?'true':'false';
     else if(key==='minimum_version_code')value=String(Math.max(0,Math.floor(Number(updates[key])||0)));
     else if(key==='beta_message')value=value.slice(0,1000);
-    tdSet_(sheet,key,value,user.id,user.name);
-    applied[key]=value;
+    tdSet_(sheet,key,value,user.id,user.name);applied[key]=value;
   });
   if(!Object.keys(applied).length)throw new Error('No supported developer configuration keys were supplied.');
   return applied;
@@ -116,8 +118,7 @@ function tdWriteConfig_(updates,user){
 function tdReadConfig_(){
   const sheet=tdDb_().getSheetByName(TD_CONFIG),values=sheet.getDataRange().getValues(),out={};
   for(let i=1;i<values.length;i++){
-    const key=String(values[i][0]||'');
-    if(TD_ALLOWED_CONFIG.indexOf(key)<0)continue;
+    const key=String(values[i][0]||'');if(TD_ALLOWED_CONFIG.indexOf(key)<0)continue;
     const raw=String(values[i][1]==null?'':values[i][1]);
     if(key==='maintenance_mode'||key.indexOf('disable_')===0)out[key]=tdBool_(raw);
     else if(key==='minimum_version_code')out[key]=Math.max(0,Number(raw)||0);
@@ -126,31 +127,10 @@ function tdReadConfig_(){
   return out;
 }
 
-function tdAudit_(user,action,details){
-  tdDb_().getSheetByName(TD_AUDIT).appendRow([
-    Utilities.getUuid(),Math.floor(Date.now()/1000),user.id,tdSafe_(user.name),tdSafe_(action),tdSafe_(JSON.stringify(details||{}))
-  ]);
-}
-
-function tdReadAudit_(){
-  const values=tdDb_().getSheetByName(TD_AUDIT).getDataRange().getValues(),out=[];
-  for(let i=Math.max(1,values.length-200);i<values.length;i++)out.push({
-    id:String(values[i][0]||''),timestamp:Number(values[i][1]||0),actor_id:Number(values[i][2]||0),actor_name:String(values[i][3]||''),action:String(values[i][4]||''),details_json:String(values[i][5]||'{}')
-  });
-  out.sort((a,b)=>b.timestamp-a.timestamp);
-  return out;
-}
-
-function tdSetIfMissing_(sheet,key,value,id,name){
-  const values=sheet.getDataRange().getValues();
-  for(let i=1;i<values.length;i++)if(String(values[i][0])===key)return;
-  sheet.appendRow([key,value,Math.floor(Date.now()/1000),id,tdSafe_(name)]);
-}
-function tdSet_(sheet,key,value,id,name){
-  const values=sheet.getDataRange().getValues(),now=Math.floor(Date.now()/1000),row=[key,tdSafe_(value),now,id,tdSafe_(name)];
-  for(let i=1;i<values.length;i++)if(String(values[i][0])===key){sheet.getRange(i+1,1,1,5).setValues([row]);return;}
-  sheet.appendRow(row);
-}
+function tdAudit_(user,action,details){tdDb_().getSheetByName(TD_AUDIT).appendRow([Utilities.getUuid(),Math.floor(Date.now()/1000),user.id,tdSafe_(user.name),tdSafe_(action),tdSafe_(JSON.stringify(details||{}))]);}
+function tdReadAudit_(){const values=tdDb_().getSheetByName(TD_AUDIT).getDataRange().getValues(),out=[];for(let i=Math.max(1,values.length-200);i<values.length;i++)out.push({id:String(values[i][0]||''),timestamp:Number(values[i][1]||0),actor_id:Number(values[i][2]||0),actor_name:String(values[i][3]||''),action:String(values[i][4]||''),details_json:String(values[i][5]||'{}')});out.sort((a,b)=>b.timestamp-a.timestamp);return out;}
+function tdSetIfMissing_(sheet,key,value,id,name){const values=sheet.getDataRange().getValues();for(let i=1;i<values.length;i++)if(String(values[i][0])===key)return;sheet.appendRow([key,value,Math.floor(Date.now()/1000),id,tdSafe_(name)]);}
+function tdSet_(sheet,key,value,id,name){const values=sheet.getDataRange().getValues(),now=Math.floor(Date.now()/1000),row=[key,tdSafe_(value),now,id,tdSafe_(name)];for(let i=1;i<values.length;i++)if(String(values[i][0])===key){sheet.getRange(i+1,1,1,5).setValues([row]);return;}sheet.appendRow(row);}
 function tdDb_(){const id=PropertiesService.getScriptProperties().getProperty('DEVELOPER_SHEET_ID');if(!id)throw new Error('Developer backend is not configured. Run setupTornFcaDeveloperBackend() first.');return SpreadsheetApp.openById(id);}
 function tdEnsureSheet_(ss,name,headers){let s=ss.getSheetByName(name);if(!s)s=ss.insertSheet(name);if(s.getLastRow()===0)s.appendRow(headers);return s;}
 function tdTornGet_(path,key){const joiner=String(path).indexOf('?')>=0?'&':'?';const r=UrlFetchApp.fetch('https://api.torn.com/v2'+path+joiner+'key='+encodeURIComponent(key),{method:'get',muteHttpExceptions:true,headers:{'User-Agent':'TornFCA-Developer/'+TD_VERSION}});let root;try{root=JSON.parse(r.getContentText());}catch(_){throw new Error('Unreadable Torn API response.');}if(root&&root.error)throw new Error(root.error.error||('Torn API error '+root.error.code));if(r.getResponseCode()<200||r.getResponseCode()>=300)throw new Error('Torn API HTTP '+r.getResponseCode());return root;}
