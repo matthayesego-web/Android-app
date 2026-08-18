@@ -1,5 +1,5 @@
 /**
- * TornFCA Community Backend v1.5.0.
+ * TornFCA Community Backend v1.6.0.
  * Deploy this file as its OWN Google Apps Script web app, separate from faction, premium and developer backends.
  * Torn API keys are used only to verify the current request and are never written to Sheets/Properties/Cache.
  * Faction membership/position is read fresh from Torn on every request; only stable basic player identity may be
@@ -8,8 +8,11 @@
  * Moderation policy is configurable. Until the final capability matrix is approved, the default is owner-only.
  * Later, Script Properties can enable Leader/Co-leader access and/or qualifying Torn abilities without hard-coding
  * custom faction position names.
+ *
+ * Scale note: chat polling reads bounded recent chunks rather than the entire historical chat sheet. Exact message
+ * and report lookups use TextFinder so old history does not make each active poll progressively more expensive.
  */
-const TC_VERSION='1.5.0';
+const TC_VERSION='1.6.0';
 const TC_CHAT='ChatMessages';
 const TC_REPORTS='ChatReports';
 const TC_DEVICES='PushDevices';
@@ -17,6 +20,8 @@ const TC_TRAINING_RULES='TrainingRules';
 const TC_TRAINING_GUIDES='TrainingGuides';
 const TC_CHANNELS=['general','war','oc','leadership'];
 const TC_MODERATOR_PLAYER_ID=3987363;
+const TC_CHAT_SCAN_LIMIT=5000;
+const TC_CHAT_CHUNK=500;
 
 function setupTornFcaCommunityBackend(){
   const ss=SpreadsheetApp.getActiveSpreadsheet(),props=PropertiesService.getScriptProperties();
@@ -28,7 +33,7 @@ function setupTornFcaCommunityBackend(){
   tcEnsureSheet_(ss,TC_DEVICES,['token_hash','faction_id','player_id','token','preferences_json','platform','updated_at','active']);
   tcEnsureSheet_(ss,TC_TRAINING_RULES,['faction_id','stat_gain_target','xanax_target','notes','updated_by_id','updated_by_name','updated_at']);
   tcEnsureSheet_(ss,TC_TRAINING_GUIDES,['id','faction_id','title','category','body','author_id','author_name','updated_at','active']);
-  return{ok:true,sheet_id:ss.getId(),schema_version:5,next:'Deploy this Apps Script as a web app. Moderation remains owner-only until MODERATION_ALLOW_LEADERS and/or MODERATION_ABILITIES are deliberately configured. Store Firebase service-account values only in Script Properties if cloud push is desired.'};
+  return{ok:true,sheet_id:ss.getId(),schema_version:6,next:'Deploy this Apps Script as a web app. Moderation remains owner-only until MODERATION_ALLOW_LEADERS and/or MODERATION_ABILITIES are deliberately configured. Store Firebase service-account values only in Script Properties if cloud push is desired.'};
 }
 
 function doGet(){return tcJson_({ok:true,app:'TornFCA Community Backend',version:TC_VERSION,authenticated_actions:'POST only'});}
@@ -148,12 +153,17 @@ function tcChannel_(user,raw){
 
 function tcReadChat_(user,body){
   tcRate_(user.id,'chat_list',2);
-  const channel=tcChannel_(user,body.channel),sheet=tcDb_().getSheetByName(TC_CHAT),values=sheet.getDataRange().getValues(),out=[];
-  for(let i=Math.max(1,values.length-600);i<values.length;i++){
-    if(Number(values[i][1])!==user.faction_id||String(values[i][2])!==channel)continue;
-    out.push({id:String(values[i][0]||''),faction_id:Number(values[i][1]||0),channel:String(values[i][2]||'general'),author_id:Number(values[i][3]||0),author_name:String(values[i][4]||'Member'),message:String(values[i][5]||''),created_at:Number(values[i][6]||0)});
+  const channel=tcChannel_(user,body.channel),sheet=tcDb_().getSheetByName(TC_CHAT),out=[];
+  let end=sheet.getLastRow(),scanned=0;
+  while(end>=2&&scanned<TC_CHAT_SCAN_LIMIT&&out.length<75){
+    const count=Math.min(TC_CHAT_CHUNK,end-1,TC_CHAT_SCAN_LIMIT-scanned),start=end-count+1,values=sheet.getRange(start,1,count,7).getValues();
+    for(let i=values.length-1;i>=0&&out.length<75;i--){
+      if(Number(values[i][1])!==user.faction_id||String(values[i][2])!==channel)continue;
+      out.push({id:String(values[i][0]||''),faction_id:Number(values[i][1]||0),channel:String(values[i][2]||'general'),author_id:Number(values[i][3]||0),author_name:String(values[i][4]||'Member'),message:String(values[i][5]||''),created_at:Number(values[i][6]||0)});
+    }
+    scanned+=count;end=start-1;
   }
-  out.sort((a,b)=>a.created_at-b.created_at);return out.slice(-75);
+  out.reverse();return out;
 }
 
 function tcSendChat_(user,body){
@@ -171,19 +181,19 @@ function tcReportChat_(user,body){
   tcRate_(user.id,'chat_report',5);
   const messageId=String(body.messageId||'').trim(),reason=String(body.reason||'').trim().slice(0,1000);
   if(!messageId)throw new Error('Message ID required.');
-  const ss=tcDb_(),chat=ss.getSheetByName(TC_CHAT),chatValues=chat.getDataRange().getValues();let target=null;
-  for(let i=chatValues.length-1;i>=1;i--){
-    if(String(chatValues[i][0]||'')!==messageId)continue;
-    if(Number(chatValues[i][1]||0)!==user.faction_id)throw new Error('Message does not belong to your current faction.');
-    target={id:String(chatValues[i][0]||''),channel:String(chatValues[i][2]||'general'),author_id:Number(chatValues[i][3]||0),author_name:String(chatValues[i][4]||'Member'),message:String(chatValues[i][5]||''),created_at:Number(chatValues[i][6]||0)};break;
+  const ss=tcDb_(),chat=ss.getSheetByName(TC_CHAT),chatRow=tcFindExactRow_(chat,1,messageId);let target=null;
+  if(chatRow>0){
+    const row=chat.getRange(chatRow,1,1,7).getValues()[0];
+    if(Number(row[1]||0)!==user.faction_id)throw new Error('Message does not belong to your current faction.');
+    target={id:String(row[0]||''),channel:String(row[2]||'general'),author_id:Number(row[3]||0),author_name:String(row[4]||'Member'),message:String(row[5]||''),created_at:Number(row[6]||0)};
   }
   if(!target)throw new Error('Message not found.');
   if(target.author_id===user.id)throw new Error('You cannot report your own message.');
   const reports=tcEnsureSheet_(ss,TC_REPORTS,['id','faction_id','reporter_id','reporter_name','message_id','author_id','author_name','channel','reason','message_snapshot','created_at','status','resolved_by_id','resolved_by_name','resolved_at','resolution']);
   const lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
-    const existing=reports.getDataRange().getValues();
-    for(let i=existing.length-1;i>=1&&i>existing.length-500;i--){
+    const existing=tcTailRows_(reports,500,16);
+    for(let i=existing.length-1;i>=0;i--){
       if(Number(existing[i][1])===user.faction_id&&Number(existing[i][2])===user.id&&String(existing[i][4])===messageId&&String(existing[i][11])==='open')return{id:String(existing[i][0]||''),status:'open',duplicate:true};
     }
     const id=Utilities.getUuid(),now=Math.floor(Date.now()/1000);
@@ -209,24 +219,22 @@ function tcModerationResolve_(user,body,globalScope){
   if(['dismiss','remove_message'].indexOf(resolution)<0)throw new Error('Unknown moderation resolution.');
   const lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
-    const ss=tcDb_(),reports=tcEnsureSheet_(ss,TC_REPORTS,['id','faction_id','reporter_id','reporter_name','message_id','author_id','author_name','channel','reason','message_snapshot','created_at','status','resolved_by_id','resolved_by_name','resolved_at','resolution']),values=reports.getDataRange().getValues();
-    let targetIndex=-1,targetFaction=0,messageId='';
-    for(let i=1;i<values.length;i++){
-      if(String(values[i][0]||'')!==reportId)continue;
-      targetIndex=i;targetFaction=Number(values[i][1]||0);messageId=String(values[i][4]||'');
-      if(String(values[i][11]||'open')!=='open')throw new Error('Report is already resolved.');break;
-    }
-    if(targetIndex<1)throw new Error('Report not found.');
+    const ss=tcDb_(),reports=tcEnsureSheet_(ss,TC_REPORTS,['id','faction_id','reporter_id','reporter_name','message_id','author_id','author_name','channel','reason','message_snapshot','created_at','status','resolved_by_id','resolved_by_name','resolved_at','resolution']),reportRow=tcFindExactRow_(reports,1,reportId);
+    if(reportRow<2)throw new Error('Report not found.');
+    const target=reports.getRange(reportRow,1,1,16).getValues()[0],targetFaction=Number(target[1]||0),messageId=String(target[4]||'');
+    if(String(target[11]||'open')!=='open')throw new Error('Report is already resolved.');
     if(!globalScope&&targetFaction!==Number(user.faction_id))throw new Error('Moderation report belongs to another faction.');
     const now=Math.floor(Date.now()/1000),label=resolution==='remove_message'?'message_removed':'dismissed';let closed=0;
     if(resolution==='remove_message'){
-      const chat=ss.getSheetByName(TC_CHAT),chatValues=chat.getDataRange().getValues();
-      for(let i=1;i<chatValues.length;i++)if(String(chatValues[i][0]||'')===messageId&&Number(chatValues[i][1]||0)===targetFaction){chat.getRange(i+1,6).setValue('[Removed by TornFCA moderation]');break;}
-      for(let i=1;i<values.length;i++){
-        if(String(values[i][4]||'')!==messageId||Number(values[i][1]||0)!==targetFaction||String(values[i][11]||'open')!=='open')continue;
-        reports.getRange(i+1,12,1,5).setValues([['resolved',user.id,tcSafe_(user.name),now,label]]);closed++;
-      }
-    }else{reports.getRange(targetIndex+1,12,1,5).setValues([['resolved',user.id,tcSafe_(user.name),now,label]]);closed=1;}
+      const chat=ss.getSheetByName(TC_CHAT),chatRow=tcFindExactRow_(chat,1,messageId);
+      if(chatRow>0){const chatMeta=chat.getRange(chatRow,1,1,2).getValues()[0];if(Number(chatMeta[1]||0)===targetFaction)chat.getRange(chatRow,6).setValue('[Removed by TornFCA moderation]');}
+      const reportRows=tcFindAllExactRows_(reports,5,messageId);
+      reportRows.forEach(row=>{
+        const meta=reports.getRange(row,2,1,11).getValues()[0];
+        if(Number(meta[0]||0)!==targetFaction||String(meta[10]||'open')!=='open')return;
+        reports.getRange(row,12,1,5).setValues([['resolved',user.id,tcSafe_(user.name),now,label]]);closed++;
+      });
+    }else{reports.getRange(reportRow,12,1,5).setValues([['resolved',user.id,tcSafe_(user.name),now,label]]);closed=1;}
     return{report_id:reportId,resolution:label,closed_reports:closed,message_id:messageId,faction_id:targetFaction};
   }finally{lock.releaseLock();}
 }
@@ -367,6 +375,9 @@ function tcFirebaseAccessToken_(){
 function tcB64_(value){return Utilities.base64EncodeWebSafe(value,Utilities.Charset.UTF_8).replace(/=+$/,'');}
 function tcRate_(playerId,action,seconds){const cache=CacheService.getScriptCache(),key='rate:'+playerId+':'+action;if(cache.get(key))throw new Error('Please wait a moment before trying again.');cache.put(key,'1',Math.max(1,seconds));}
 function tcHash_(value){const bytes=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value||''),Utilities.Charset.UTF_8);return bytes.map(b=>('0'+((b<0?b+256:b)&255).toString(16)).slice(-2)).join('');}
+function tcFindExactRow_(sheet,column,value){const last=sheet?sheet.getLastRow():0;if(last<2)return 0;const found=sheet.getRange(2,column,last-1,1).createTextFinder(String(value)).matchEntireCell(true).findNext();return found?found.getRow():0;}
+function tcFindAllExactRows_(sheet,column,value){const last=sheet?sheet.getLastRow():0;if(last<2)return[];return sheet.getRange(2,column,last-1,1).createTextFinder(String(value)).matchEntireCell(true).findAll().map(r=>r.getRow());}
+function tcTailRows_(sheet,maxRows,width){const last=sheet?sheet.getLastRow():0;if(last<2)return[];const count=Math.min(Math.max(1,maxRows),last-1),start=last-count+1;return sheet.getRange(start,1,count,width).getValues();}
 function tcDb_(){const id=PropertiesService.getScriptProperties().getProperty('COMMUNITY_SHEET_ID');if(!id)throw new Error('Community backend is not configured. Run setupTornFcaCommunityBackend() first.');return SpreadsheetApp.openById(id);}
 function tcEnsureSheet_(ss,name,headers){let sheet=ss.getSheetByName(name);if(!sheet)sheet=ss.insertSheet(name);if(sheet.getLastRow()===0)sheet.appendRow(headers);return sheet;}
 function tcSafe_(value){const text=String(value==null?'':value);return/^[=+\-@]/.test(text)?"'"+text:text;}
