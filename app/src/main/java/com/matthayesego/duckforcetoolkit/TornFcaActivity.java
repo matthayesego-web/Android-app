@@ -37,10 +37,10 @@ public class TornFcaActivity extends V098CompanionActivity {
     private volatile boolean avatarRefreshInFlight=false;
     private View observedIdentityRoot;
 
-    @Override public void setContentView(View view){super.setContentView(view);ViewGroup root=findViewById(android.R.id.content);if(root!=null){if(!isBetaCommandActivity())TornFcaBrand.apply(this,root);installIdentityRepair(root);repairFactionIdentity(root);addApiRequirementNotice(root);addKeyRetentionControls(root);retargetBankingCards(root);restoreProfileAvatar(root);}primeProviderConsent();}
-    @Override protected void onResume(){super.onResume();ViewGroup root=findViewById(android.R.id.content);if(root!=null){if(!isBetaCommandActivity())TornFcaBrand.apply(this,root);installIdentityRepair(root);repairFactionIdentity(root);addApiRequirementNotice(root);addKeyRetentionControls(root);retargetBankingCards(root);restoreProfileAvatar(root);}primeProviderConsent();refreshPremiumEntitlement();}
+    @Override public void setContentView(View view){super.setContentView(view);ViewGroup root=findViewById(android.R.id.content);if(root!=null){if(!isCommandActivity())TornFcaBrand.apply(this,root);installIdentityRepair(root);repairFactionIdentity(root);addApiRequirementNotice(root);addKeyRetentionControls(root);retargetBankingCards(root);restoreProfileAvatar(root);}primeProviderConsent();}
+    @Override protected void onResume(){super.onResume();ViewGroup root=findViewById(android.R.id.content);if(root!=null){if(!isCommandActivity())TornFcaBrand.apply(this,root);installIdentityRepair(root);repairFactionIdentity(root);addApiRequirementNotice(root);addKeyRetentionControls(root);retargetBankingCards(root);restoreProfileAvatar(root);}primeProviderConsent();refreshPremiumEntitlement();}
     @Override public void startActivity(Intent intent){super.startActivity(TornFcaBrand.retarget(this,intent));}
-    private boolean isBetaCommandActivity(){return BuildConfig.APPLICATION_ID.endsWith(".beta")&&this instanceof BetaCommandActivity;}
+    private boolean isCommandActivity(){return this instanceof BetaCommandActivity;}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
 
     private TextView findLoginTitle(View root){TextView title=findText(root,"Sign in to TornFCA");if(title==null)title=findText(root,"Sign in to Duck Force");if(title==null)title=findText(root,"Connect your Torn account");return title;}
