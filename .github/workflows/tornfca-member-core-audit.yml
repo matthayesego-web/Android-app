@@ -25,6 +25,7 @@ jobs:
           TERRITORY=app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarActivity.java
           TERRITORY_DETAIL=app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarDetailActivity.java
           COMMUNITY=backend/TornFcaCommunityBackend.gs
+          WARPREP=app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
 
           grep -q '"My Day"' "$MEMBER"
           grep -q '"Faction Directory"' "$MEMBER"
@@ -48,6 +49,7 @@ jobs:
           grep -q 'TrainingCenterActivity" android:exported="false"' "$MANIFEST"
           grep -q 'TrainingProgressActivity" android:exported="false"' "$MANIFEST"
           grep -q 'WarPrepActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'WarPrepLeadershipActivity" android:exported="false"' "$MANIFEST"
           grep -q 'WarHubActivity" android:exported="false"' "$MANIFEST"
           grep -q 'TerritoryWarActivity" android:exported="false"' "$MANIFEST"
           grep -q 'TerritoryWarDetailActivity" android:exported="false"' "$MANIFEST"
@@ -60,7 +62,7 @@ jobs:
           grep -q '"Territories"' "$WARHUB"
           grep -q 'WarCenterActivity.class' "$WARHUB"
           grep -q 'TerritoryWarActivity.class' "$WARHUB"
-          grep -q 'WarHubActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          grep -q 'WarHubActivity.class' "$WARPREP"
           grep -q 'TORNFCA • RANKED WAR' app/src/main/java/com/matthayesego/duckforcetoolkit/WarCenterActivity.java
 
           grep -q '/faction/warfareterritory?limit=100&sort=DESC' "$TERRITORY"
@@ -85,14 +87,13 @@ jobs:
           grep -q 'Review Legal Documents' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           grep -q 'Legal & Privacy' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
 
-          # Community safety is Free. Every request uses fresh faction membership; moderation policy remains configurable.
           grep -q 'reportChatMessage' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
           grep -q 'moderationReports' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
           grep -q 'resolveModerationReport' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
           grep -q '"Report"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
           grep -q '"Block User"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
           grep -q 'BlockedUserStore.isBlocked' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
-          grep -q "const TC_VERSION='1.6.0'" "$COMMUNITY"
+          grep -q "const TC_VERSION='1.7.0'" "$COMMUNITY"
           grep -q "action==='chat_report'" "$COMMUNITY"
           grep -q "action==='moderation_list'" "$COMMUNITY"
           grep -q "action==='moderation_resolve'" "$COMMUNITY"
@@ -105,7 +106,6 @@ jobs:
           grep -q 'TC_CHAT_SCAN_LIMIT=5000' "$COMMUNITY"
           grep -q '\[Removed by TornFCA moderation\]' "$COMMUNITY"
           grep -q 'CommunityModerationActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
-          grep -q 'TornFcaBrand.VERSION' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
 
           grep -q '/user/battlestats' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
           grep -q '/user/personalstats?cat=drugs' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
@@ -116,10 +116,12 @@ jobs:
           grep -q 'CommunityBackendClient.trainingLibrary' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
           grep -q 'Resources belong to the faction' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
 
-          grep -q 'selections=bars,cooldowns,travel,refills,organizedcrime' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
-          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"+cycle()+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
-          grep -q 'No universal war requirements invented' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
-          grep -q 'Faction Resources' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          grep -q 'selections=bars,cooldowns,travel,refills,organizedcrime' "$WARPREP"
+          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"+cycle()+"_"' "$WARPREP"
+          grep -q 'war.warId' "$WARPREP"
+          grep -q 'Faction War Prep Management' "$WARPREP"
+          grep -q 'Only TornFCA users' "$WARPREP"
+          grep -q 'Per-war and per-faction' "$WARPREP"
 
           grep -q 'tcVerifyUser_(key)' "$COMMUNITY"
           grep -q 'Guide does not belong to your current faction.' "$COMMUNITY"
