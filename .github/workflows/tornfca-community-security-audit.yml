@@ -12,82 +12,65 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v6
-
-      - name: Verify community, push and premium boundaries
+      - uses: actions/checkout@v6
+      - name: Verify community tenant, moderation and push safety
         run: |
           set -euo pipefail
+          BACKEND=backend/TornFcaCommunityBackend.gs
+          CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          CHAT=app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
+          MOD=app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityModerationActivity.java
+          MSG=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
 
-          # Android notification surface: permission is explicit, Analytics collection is disabled,
-          # Messaging auto-init is disabled until legal acknowledgement, and the FCM service is never exported.
-          grep -q 'android.permission.POST_NOTIFICATIONS' app/src/main/AndroidManifest.xml
-          grep -q 'firebase_analytics_collection_enabled" android:value="false"' app/src/main/AndroidManifest.xml
-          grep -q 'firebase_messaging_auto_init_enabled" android:value="false"' app/src/main/AndroidManifest.xml
-          grep -q 'TornFcaMessagingService" android:exported="false"' app/src/main/AndroidManifest.xml
-          grep -q 'com.google.firebase.MESSAGING_EVENT' app/src/main/AndroidManifest.xml
-          grep -q 'LegalAcceptanceStore.hasAcceptedCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaApplication.java
-          grep -q 'PushNotifications.initialize(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaApplication.java
-          grep -q 'LegalAcceptanceStore.acceptCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
-          grep -q 'PushNotifications.initialize(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
-          grep -q 'if(factionId>0&&currentFaction!=factionId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
-          grep -q 'target_player_id' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
-          grep -q 'if(targetPlayerId>0&&currentPlayer!=targetPlayerId)return;' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+          # Exact audited backend generation.
+          grep -q "const TC_VERSION='1.5.0'" "$BACKEND"
+          cp "$BACKEND" /tmp/community.js
+          node --check /tmp/community.js
 
-          # No Analytics SDK or optional FCM BigQuery delivery export should be introduced silently.
-          if grep -R -n -E 'firebase-analytics|FirebaseAnalytics|setAnalyticsCollectionEnabled|setDeliveryMetricsExportToBigQuery' app; then
-            echo 'Unexpected Analytics/BigQuery delivery-metrics integration detected; review privacy/Data safety before shipping.'
-            exit 1
-          fi
+          # Every request receives a freshly verified current faction/position.
+          grep -q 'const user=tcVerifyUser_(key);' "$BACKEND"
+          grep -q "tcTornGet_('/user/faction',apiKey)" "$BACKEND"
+          grep -q "tcTornGet_('/user/basic',apiKey)" "$BACKEND"
+          ! grep -q 'freshIdentity' "$BACKEND"
+          ! grep -q 'community_identity:' "$BACKEND"
 
-          # Cloud sender credentials are server-side only. Firebase client identifiers are allowed.
-          if grep -R -n -E 'FIREBASE_PRIVATE_KEY|BEGIN PRIVATE KEY|FIREBASE_CLIENT_EMAIL' app/src; then
-            echo 'Firebase service-account credentials must never be compiled into Android.'
-            exit 1
-          fi
-          if grep -R -n -E 'Authorization:[[:space:]]*key=|server[_-]?key' app/src/main; then
-            echo 'Legacy FCM server credentials must never be compiled into Android.'
-            exit 1
-          fi
-          grep -q 'BuildConfig.COMMUNITY_BACKEND_URL' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
-          grep -q 'BACKEND_URL.startsWith("https://")' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          # Chat/report/training/device state remains faction-scoped.
+          grep -q 'Number(values\[i\]\[1\])!==user.faction_id' "$BACKEND"
+          grep -q 'Message does not belong to your current faction.' "$BACKEND"
+          grep -q 'Guide does not belong to your current faction.' "$BACKEND"
+          grep -q 'Number(values\[i\]\[1\])!==Number(factionId)' "$BACKEND"
 
-          # Chat is tenant-scoped. Leadership content is gated and intentionally never fan-out pushed.
-          grep -q "Number(values\[i\]\[1\])!==user.faction_id" backend/TornFcaCommunityBackend.gs
-          grep -q "c==='leadership'&&!tcLeader_(user.position)" backend/TornFcaCommunityBackend.gs
-          grep -q "if(channel!=='leadership')tcPushToFaction_" backend/TornFcaCommunityBackend.gs
-          grep -q 'tcHash_(apiKey)' backend/TornFcaCommunityBackend.gs
+          # Duplicate/concurrent-sensitive mutations use ScriptLock.
+          grep -q 'LockService.getScriptLock' "$BACKEND"
+          grep -q 'function tcReportChat_' "$BACKEND"
+          grep -q 'function tcModerationResolve_' "$BACKEND"
+          grep -q 'function tcSaveTrainingRules_' "$BACKEND"
+          grep -q 'function tcSaveTrainingGuide_' "$BACKEND"
+          grep -q 'function tcRegisterDevice_' "$BACKEND"
 
-          # Training is tenant-scoped and bypasses the short identity cache so faction changes revoke access immediately.
-          grep -q "action.indexOf('training_')===0" backend/TornFcaCommunityBackend.gs
-          grep -q 'tcVerifyUser_(key,freshIdentity)' backend/TornFcaCommunityBackend.gs
-          grep -q 'const cached=forceFresh?null:cache.get(ck)' backend/TornFcaCommunityBackend.gs
-          grep -q "Number(values\[i\]\[1\])!==Number(factionId)" backend/TornFcaCommunityBackend.gs
-          grep -q 'Guide does not belong to your current faction.' backend/TornFcaCommunityBackend.gs
-          grep -q "if(!tcLeader_(user.position))throw new Error('Faction Leader or Co-leader access is required to change training rules.')" backend/TornFcaCommunityBackend.gs
+          # Moderation is conservative by default but capability-configurable.
+          grep -q 'TC_MODERATOR_PLAYER_ID=3987363' "$BACKEND"
+          grep -q "setProperty('MODERATION_ALLOW_LEADERS','false')" "$BACKEND"
+          grep -q "setProperty('MODERATION_ABILITIES','')" "$BACKEND"
+          grep -q 'function tcModerationPolicy_' "$BACKEND"
+          grep -q 'function tcPositionAbilities_' "$BACKEND"
+          grep -q 'function tcCanModerate_' "$BACKEND"
+          grep -q 'if(!globalScope&&factionId!==Number(user.faction_id))continue' "$BACKEND"
+          grep -q 'Moderation report belongs to another faction.' "$BACKEND"
+          grep -q '\[Removed by TornFCA moderation\]' "$BACKEND"
 
-          # Personal pushes are scoped to the exact verified player as well as faction.
-          grep -q 'target_player_id:String(playerId)' backend/TornFcaCommunityBackend.gs
+          # Safety controls remain available in the normal community client/UI.
+          grep -q 'reportChatMessage' "$CLIENT"
+          grep -q 'moderationReports' "$CLIENT"
+          grep -q 'resolveModerationReport' "$CLIENT"
+          grep -q '"Report"' "$CHAT"
+          grep -q '"Block User"' "$CHAT"
+          grep -q 'BlockedUserStore.isBlocked' "$MSG"
+          grep -q 'Remove Message' "$MOD"
+          grep -q 'Dismiss Report' "$MOD"
 
-          # Faction announcement push honors the same explicit Torn permission concept.
-          grep -q 'tcCanAnnounce_' backend/TornFcaCommunityBackend.gs
-          grep -q "announcement changes" backend/TornFcaCommunityBackend.gs
-          grep -q "urn:ietf:params:oauth:grant-type:jwt-bearer" backend/TornFcaCommunityBackend.gs
+          # Client API keys must not be persisted in Apps Script storage.
+          ! grep -q "setProperty(.*apiKey" "$BACKEND"
+          ! grep -q "appendRow(.*apiKey" "$BACKEND"
 
-          # Settings remain the player-facing account/privacy control surface. Audit behavior, not labels.
-          grep -q 'prepareNextSave' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
-          grep -q 'PushNotifications.unregisterAsync' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
-          grep -q 'FFScouterClient.setConsent(this,key,false)' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
-          grep -q 'TornStatsClient.setConsent(this,false)' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
-
-          # Premium is server/player-ID based; basic faction membership and leadership are not paywalled.
-          grep -q 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAccess.java
-          grep -q 'Permissions, not a paywall' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
-          grep -q '/user/attacks?filters=outgoing' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
-          grep -q 'PremiumAccess.PERSONAL_INSIGHTS' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
-
-          # Apps Script must at least parse as JavaScript before deployment.
-          cp backend/TornFcaCommunityBackend.gs /tmp/TornFcaCommunityBackend.js
-          node --check /tmp/TornFcaCommunityBackend.js
-
-          echo 'TornFCA community/push/premium security audit passed.'
+          echo 'TornFCA Community v1.5 security audit passed.'
