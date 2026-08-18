@@ -23,7 +23,7 @@ jobs:
           WARPAY=backend/TornFcaWarPayBackend.gs
 
           grep -q "const DF_TOOLKIT_VERSION='1.1.0'" "$FACTION"
-          grep -q "const TC_VERSION='1.6.0'" "$COMMUNITY"
+          grep -q "const TC_VERSION='1.7.0'" "$COMMUNITY"
           grep -q "const TORNFCA_PREMIUM_VERSION='1.2.0'" "$PREMIUM"
           grep -q "const TD_VERSION='1.3.0'" "$DEVELOPER"
           grep -q "const TW_VERSION='1.1.0'" "$WARPAY"
@@ -37,26 +37,31 @@ jobs:
           grep -q 'function bootstrapPremiumAdminPassword' "$PREMIUM"
           grep -q 'function bootstrapTornFcaDeveloperAdminPassword' "$DEVELOPER"
 
-          # Shared services must authorize against current faction state.
           grep -q "tornGet_('/user/faction',apiKey)" "$FACTION"
           grep -q "tcTornGet_('/user/faction',apiKey)" "$COMMUNITY"
           grep -q "twTornGet_('/user/faction',apiKey)" "$WARPAY"
 
-          # Shared writes are serialized where duplicate/concurrent state matters.
           grep -q 'LockService.getScriptLock' "$FACTION"
           grep -q 'LockService.getScriptLock' "$COMMUNITY"
           grep -q 'LockService.getScriptLock' "$PREMIUM"
           grep -q 'LockService.getScriptLock' "$DEVELOPER"
           grep -q 'LockService.getScriptLock' "$WARPAY"
 
-          # Community hot-path history reads remain bounded as chat history grows.
           grep -q 'TC_CHAT_SCAN_LIMIT=5000' "$COMMUNITY"
           grep -q 'TC_CHAT_CHUNK=500' "$COMMUNITY"
           grep -q 'function tcFindExactRow_' "$COMMUNITY"
           awk '/function tcReadChat_/{flag=1} flag{print} flag && /^}/{exit}' "$COMMUNITY" > /tmp/community-chat.txt
           ! grep -q 'getDataRange' /tmp/community-chat.txt
 
-          # Premium payment processing is replay-safe and fails closed before monetization approval.
+          # Shared War Prep is faction+war scoped and reports app users only.
+          grep -q "const TC_WAR_PREP_CONFIG='WarPrepConfig'" "$COMMUNITY"
+          grep -q "const TC_WAR_PREP_STATUS='WarPrepStatus'" "$COMMUNITY"
+          grep -q "action==='warprep_state'" "$COMMUNITY"
+          grep -q "action==='warprep_status_save'" "$COMMUNITY"
+          grep -q "action==='warprep_leadership'" "$COMMUNITY"
+          grep -q "action==='warprep_config_save'" "$COMMUNITY"
+          grep -q 'app_users_only:true' "$COMMUNITY"
+
           grep -q "receiptSource='XANAX_LOG_4103:'" "$PREMIUM"
           grep -q "setProperty('MONETIZATION_APPROVED','false')" "$PREMIUM"
           grep -q 'if(!premiumMonetizationApproved_())throw new Error' "$PREMIUM"
@@ -79,12 +84,7 @@ jobs:
           TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
         run: |
           set -euo pipefail
-          for var in \
-            TORNFCA_FACTION_BACKEND_URL \
-            TORNFCA_COMMUNITY_BACKEND_URL \
-            TORNFCA_PREMIUM_BACKEND_URL \
-            TORNFCA_DEVELOPER_BACKEND_URL \
-            TORNFCA_WARPAY_BACKEND_URL; do
+          for var in TORNFCA_FACTION_BACKEND_URL TORNFCA_COMMUNITY_BACKEND_URL TORNFCA_PREMIUM_BACKEND_URL TORNFCA_DEVELOPER_BACKEND_URL TORNFCA_WARPAY_BACKEND_URL; do
             value="${!var:-}"
             test -n "$value" || { echo "Missing $var"; exit 1; }
             case "$value" in https://*) ;; *) echo "$var must use HTTPS"; exit 1;; esac
@@ -104,16 +104,14 @@ jobs:
         run: |
           set -euo pipefail
           check_backend() {
-            url="$1"
-            expected="$2"
-            version="$3"
+            url="$1"; expected="$2"; version="$3"
             body="$(curl --fail --silent --show-error --location --max-time 25 "$url")"
             printf '%s\n' "$body" | grep -F '"ok":true' >/dev/null
             printf '%s\n' "$body" | grep -F "$expected" >/dev/null
             printf '%s\n' "$body" | grep -F '"version":"'"$version"'"' >/dev/null
           }
           check_backend "$TORNFCA_FACTION_BACKEND_URL" 'TornFCA Faction Backend' '1.1.0'
-          check_backend "$TORNFCA_COMMUNITY_BACKEND_URL" 'TornFCA Community Backend' '1.6.0'
+          check_backend "$TORNFCA_COMMUNITY_BACKEND_URL" 'TornFCA Community Backend' '1.7.0'
           check_backend "$TORNFCA_PREMIUM_BACKEND_URL" 'TornFCA Premium Entitlements' '1.2.0'
           check_backend "$TORNFCA_DEVELOPER_BACKEND_URL" 'TornFCA Developer Control Plane' '1.3.0'
           check_backend "$TORNFCA_WARPAY_BACKEND_URL" 'TornFCA WarPay Backend' '1.1.0'
