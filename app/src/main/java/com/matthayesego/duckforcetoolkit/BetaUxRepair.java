@@ -9,6 +9,8 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -22,11 +24,15 @@ import java.util.WeakHashMap;
 
 /** Small command-shell UX repairs shared by Beta and the production candidate. */
 public final class BetaUxRepair {
-    private static final String DEV_TAG="tornfca-beta-developer-panel";
     private static final String RAIL_TAG="tornfca-beta-context-rail";
     private static final String RAIL_COMPACT="tornfca-beta-context-rail-compact";
+    private static final String ANNOUNCEMENT_ACTION_TAG="tornfca-command-announcements";
+    private static final String WAR_PREP_ADMIN_ACTION_TAG="tornfca-command-warprep-admin";
     private static final long REFILL_TTL_MS=60_000L;
+    private static final long DEV_TAP_WINDOW_MS=1_800L;
     private static final Map<View,Boolean> OBSERVED=Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<View,Integer> DEV_TAP_COUNT=Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<View,Long> DEV_TAP_AT=Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Activity,Long> REFILL_AT=Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Activity,Boolean> REFILL_IN_FLIGHT=Collections.synchronizedMap(new WeakHashMap<>());
     private static boolean installed;
@@ -66,7 +72,9 @@ public final class BetaUxRepair {
 
     private static void repairCommand(Activity activity,View root){
         replaceMoreIcons(activity,root);
-        ensureDeveloperPanel(activity,root);
+        attachHiddenDeveloperGesture(activity,root);
+        repairOperationsFeatured(activity,root);
+        ensureLeadershipShortcuts(activity,root);
     }
 
     private static void replaceMoreIcons(Activity activity,View root){
@@ -85,6 +93,58 @@ public final class BetaUxRepair {
         if(root instanceof ViewGroup){ViewGroup g=(ViewGroup)root;for(int i=0;i<g.getChildCount();i++)replaceMoreIcons(activity,g.getChildAt(i));}
     }
 
+    /** Developer controls are deliberately invisible. Three taps on the version badge is the only command-shell entry. */
+    private static void attachHiddenDeveloperGesture(Activity activity,View root){
+        if(currentPlayerId(activity)!=BuildConfig.DEVELOPER_PLAYER_ID)return;
+        TextView version=findExactText(root,TornFcaCommandRuntime.versionBadge());
+        if(version==null||Boolean.TRUE.equals(version.getTag(R.id.tornfca_hidden_dev_gesture)))return;
+        version.setTag(R.id.tornfca_hidden_dev_gesture,Boolean.TRUE);
+        version.setClickable(true);version.setFocusable(true);
+        version.setOnClickListener(v->{
+            long now=System.currentTimeMillis(),last=DEV_TAP_AT.getOrDefault(v,0L);int count=(now-last<=DEV_TAP_WINDOW_MS)?DEV_TAP_COUNT.getOrDefault(v,0)+1:1;
+            DEV_TAP_AT.put(v,now);DEV_TAP_COUNT.put(v,count);
+            if(count>=3){DEV_TAP_COUNT.put(v,0);DEV_TAP_AT.put(v,0L);activity.startActivity(new Intent(activity,DeveloperGateActivity.class));}
+        });
+    }
+
+    /** Operations' large hero is now the faction notice surface instead of a third Ranked War shortcut. */
+    private static void repairOperationsFeatured(Activity activity,View root){
+        if(!containsText(root,"Operations Command"))return;
+        TextView title=findExactText(root,"Ranked War Command");if(title==null)return;
+        ViewParent parent=title.getParent();if(!(parent instanceof LinearLayout))return;LinearLayout copy=(LinearLayout)parent;
+        if(copy.getChildCount()<4)return;
+        View badge=copy.getChildAt(0),body=copy.getChildAt(2),cta=copy.getChildAt(3);
+        if(badge instanceof TextView)((TextView)badge).setText("FACTION NOTICE");
+        title.setText("Faction Announcements");
+        if(body instanceof TextView){((TextView)body).setText("Leadership notices, war instructions and faction updates in one place.");((TextView)body).setMaxLines(4);}
+        if(cta instanceof TextView){((TextView)cta).setText("Open Announcements   →");cta.setOnClickListener(v->openAnnouncements(activity));}
+        FrameLayout frame=ancestorFrame(copy);if(frame!=null){ViewGroup.LayoutParams lp=frame.getLayoutParams();if(lp!=null){lp.height=ViewGroup.LayoutParams.WRAP_CONTENT;frame.setLayoutParams(lp);}frame.setMinimumHeight(TornFcaCommandUi.dp(activity,230));frame.setOnClickListener(v->openAnnouncements(activity));}
+    }
+
+    private static FrameLayout ancestorFrame(View view){ViewParent p=view.getParent();while(p instanceof View){if(p instanceof FrameLayout)return(FrameLayout)p;p=p.getParent();}return null;}
+
+    /** Make the two faction-wide leadership workflows discoverable without adding another main navigation tab. */
+    private static void ensureLeadershipShortcuts(Activity activity,View root){
+        SessionInfo info=sessionInfo(activity);if(!info.leader||!containsText(root,"Leadership Command"))return;
+        LinearLayout panel=findLeadershipPanel(root);if(panel==null)return;
+        if(findTag(panel,ANNOUNCEMENT_ACTION_TAG)==null){
+            LinearLayout row=TornFcaCommandUi.actionRow(activity,R.drawable.ic_nav_more,"Faction Announcements","Post and review faction notices and push updates","Announce",TornFcaCommandUi.GOLD,()->openAnnouncements(activity));row.setTag(ANNOUNCEMENT_ACTION_TAG);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);lp.topMargin=TornFcaCommandUi.dp(activity,7);panel.addView(row,lp);
+        }
+        if(findTag(panel,WAR_PREP_ADMIN_ACTION_TAG)==null){
+            LinearLayout row=TornFcaCommandUi.actionRow(activity,R.drawable.ic_nav_training,"War Prep Management","Customize your faction checklist and review TornFCA member readiness","Manage",TornFcaCommandUi.GREEN,()->activity.startActivity(new Intent(activity,WarPrepLeadershipActivity.class)));row.setTag(WAR_PREP_ADMIN_ACTION_TAG);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);lp.topMargin=TornFcaCommandUi.dp(activity,7);panel.addView(row,lp);
+        }
+    }
+
+    private static LinearLayout findLeadershipPanel(View root){
+        TextView title=findExactText(root,"Leadership Command");if(title==null)return null;ViewParent p=title.getParent();
+        while(p instanceof View){if(p instanceof LinearLayout){LinearLayout row=(LinearLayout)p;if(containsText(row,"Leadership Command")&&containsText(row,"Activity Tracker"))return row;}p=p.getParent();}
+        return null;
+    }
+
+    private static void openAnnouncements(Activity activity){
+        SessionInfo info=sessionInfo(activity);Intent i=new Intent(activity,WarNoticeActivity.class);i.putExtra(WarNoticeActivity.EXTRA_FACTION_ID,info.factionId);i.putExtra(WarNoticeActivity.EXTRA_FACTION_NAME,info.factionName);i.putExtra(WarNoticeActivity.EXTRA_CAN_PUBLISH,info.leader);activity.startActivity(i);
+    }
+
     private static int selectedNavColor(LinearLayout row){
         for(int i=0;i<row.getChildCount();i++)if(row.getChildAt(i) instanceof TextView)return((TextView)row.getChildAt(i)).getCurrentTextColor();
         return TornFcaCommandUi.STEEL;
@@ -96,23 +156,11 @@ public final class BetaUxRepair {
         }
     }
 
-    private static void ensureDeveloperPanel(Activity activity,View root){
-        if(currentPlayerId(activity)!=BuildConfig.DEVELOPER_PLAYER_ID||!containsText(root,"App Control"))return;
-        TextView footer=findTextStarting(root,TornFcaCommandRuntime.footerPrefix());if(footer==null||!(footer.getParent() instanceof LinearLayout))return;
-        LinearLayout host=(LinearLayout)footer.getParent();if(findTag(host,DEV_TAG)!=null)return;
-
-        LinearLayout panel=TornFcaCommandUi.panel(activity);panel.setTag(DEV_TAG);
-        TextView eye=TornFcaCommandUi.text(activity,"DEVELOPER ONLY",9.2f,TornFcaCommandUi.GOLD,true);eye.setLetterSpacing(.12f);panel.addView(eye);
-        TextView title=TornFcaCommandUi.text(activity,"Developer Lab",18,TornFcaCommandUi.TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=TornFcaCommandUi.dp(activity,6);panel.addView(title,tp);
-        TextView sub=TornFcaCommandUi.text(activity,"Testing, diagnostics, feature switches and developer-only controls.",10.8f,TornFcaCommandUi.MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=TornFcaCommandUi.dp(activity,4);sp.bottomMargin=TornFcaCommandUi.dp(activity,10);panel.addView(sub,sp);
-        panel.addView(TornFcaCommandUi.actionRow(activity,R.drawable.ic_beta_developer,"Open Developer Panel","Password and verified owner identity are still required","Open",TornFcaCommandUi.GOLD,()->activity.startActivity(new Intent(activity,DeveloperGateActivity.class))),new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-        LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);pp.bottomMargin=TornFcaCommandUi.dp(activity,15);host.addView(panel,host.indexOfChild(footer),pp);
-    }
-
-    private static int currentPlayerId(Activity activity){
-        String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return 0;
-        AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return hot.playerId;
-        FactionScopeCache.Scope scope=FactionScopeCache.load(activity,key);return scope==null?0:scope.playerId;
+    private static int currentPlayerId(Activity activity){return sessionInfo(activity).playerId;}
+    private static SessionInfo sessionInfo(Activity activity){
+        String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return new SessionInfo(0,0,"Faction",false);
+        AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return new SessionInfo(hot.playerId,hot.factionId,hot.factionName,AccessPolicy.isLeaderPosition(hot.position));
+        FactionScopeCache.Scope scope=FactionScopeCache.load(activity,key);return scope==null?new SessionInfo(0,0,"Faction",false):new SessionInfo(scope.playerId,scope.factionId,scope.factionName,AccessPolicy.isLeaderPosition(scope.position));
     }
 
     private static void compactReturnRail(Activity activity,View root){
@@ -161,9 +209,9 @@ public final class BetaUxRepair {
 
     private static TextView findBody(LinearLayout card){for(int i=0;i<card.getChildCount();i++)if(card.getChildAt(i) instanceof TextView){TextView t=(TextView)card.getChildAt(i);String s=t.getText()==null?"":t.getText().toString();if(s.contains("Energy:")||s.contains("Energy point refill:"))return t;}return null;}
     private static TextView findExactText(View view,String text){if(view instanceof TextView&&text.contentEquals(((TextView)view).getText()))return(TextView)view;if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView t=findExactText(g.getChildAt(i),text);if(t!=null)return t;}}return null;}
-    private static TextView findTextStarting(View view,String prefix){if(view instanceof TextView){String s=((TextView)view).getText()==null?"":((TextView)view).getText().toString();if(s.startsWith(prefix))return(TextView)view;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){TextView t=findTextStarting(g.getChildAt(i),prefix);if(t!=null)return t;}}return null;}
     private static View findTag(View view,String tag){if(view!=null&&tag.equals(String.valueOf(view.getTag())))return view;if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++){View f=findTag(g.getChildAt(i),tag);if(f!=null)return f;}}return null;}
     private static boolean containsText(View view,String needle){if(view instanceof TextView){String s=((TextView)view).getText()==null?"":((TextView)view).getText().toString();if(s.contains(needle))return true;}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)if(containsText(g.getChildAt(i),needle))return true;}return false;}
     private static String flatten(View view){StringBuilder out=new StringBuilder();flatten(view,out);return out.toString();}
     private static void flatten(View view,StringBuilder out){if(view instanceof TextView){CharSequence t=((TextView)view).getText();if(t!=null)out.append(t).append(' ');}if(view instanceof ViewGroup){ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)flatten(g.getChildAt(i),out);}}
+    private static final class SessionInfo{final int playerId,factionId;final String factionName;final boolean leader;SessionInfo(int p,int f,String n,boolean l){playerId=p;factionId=f;factionName=n==null||n.isBlank()?"Faction":n;leader=l;}}
 }
