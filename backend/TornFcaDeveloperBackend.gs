@@ -1,5 +1,5 @@
 /**
- * TornFCA Developer Control Plane v1.2.0.
+ * TornFCA Developer Control Plane v1.3.0.
  * Deploy as its OWN Google Apps Script web app.
  *
  * Security boundaries:
@@ -10,7 +10,7 @@
  * - User telemetry stores only a salted hash of the verified Torn player ID plus first/last seen timestamps and app version.
  * - All successful mutations are written to an append-only audit sheet.
  */
-const TD_VERSION='1.2.0';
+const TD_VERSION='1.3.0';
 const TD_DEVELOPER_PLAYER_ID=3987363;
 const TD_CONFIG='DeveloperConfig';
 const TD_AUDIT='DeveloperAudit';
@@ -42,7 +42,7 @@ function setupTornFcaDeveloperBackend(){
   ['activity','war','chain','oc','pulse','lookup','premium'].forEach(v=>tdSetIfMissing_(config,'disable_'+v,'false',0,'setup'));
   tdEnsureSheet_(ss,TD_AUDIT,['id','timestamp','actor_id','actor_name','action','details_json']);
   tdEnsureSheet_(ss,TD_USERS,['user_hash','first_seen','last_seen','last_version_code','last_version_name']);
-  return {ok:true,version:TD_VERSION,sheet_id:ss.getId(),next:'Run setTornFcaDeveloperAdminPassword(), then deploy this project as a web app.'};
+  return {ok:true,version:TD_VERSION,sheet_id:ss.getId(),next:'Set a one-time DEVELOPER_ADMIN_PASSWORD_SETUP Script Property, run bootstrapTornFcaDeveloperAdminPassword(), confirm the plaintext property was deleted, then deploy this project as a web app.'};
 }
 
 function setTornFcaDeveloperAdminPassword(password){
@@ -50,6 +50,17 @@ function setTornFcaDeveloperAdminPassword(password){
   if(value.length<10)throw new Error('Use a developer password of at least 10 characters.');
   PropertiesService.getScriptProperties().setProperty('DEVELOPER_ADMIN_SHA256',tdSha256_(value).toUpperCase());
   return 'TornFCA developer admin password updated.';
+}
+
+/**
+ * Safe Apps Script UI bootstrap. Put the plaintext password temporarily in the Script Property
+ * DEVELOPER_ADMIN_PASSWORD_SETUP, run this function once, and the plaintext property is deleted
+ * immediately after the password hash is stored.
+ */
+function bootstrapTornFcaDeveloperAdminPassword(){
+  const props=PropertiesService.getScriptProperties(),plain=String(props.getProperty('DEVELOPER_ADMIN_PASSWORD_SETUP')||'');
+  if(plain.length<10)throw new Error('Set DEVELOPER_ADMIN_PASSWORD_SETUP in Script Properties to a password of at least 10 characters first.');
+  try{return setTornFcaDeveloperAdminPassword(plain);}finally{props.deleteProperty('DEVELOPER_ADMIN_PASSWORD_SETUP');}
 }
 
 function doGet(){return tdJson_({ok:true,app:'TornFCA Developer Control Plane',version:TD_VERSION,authenticated_actions:'POST only'});}
