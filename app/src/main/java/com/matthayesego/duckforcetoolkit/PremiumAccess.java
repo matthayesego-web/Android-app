@@ -20,10 +20,11 @@ public final class PremiumAccess {
                 ||RemoteFeaturePolicy.versionBlocked(context)
                 ||playerId<=0)return false;
 
-        // Developer simulation is deliberately owner-only and lives here rather than in the
-        // entitlement cache. This keeps production entitlement state impossible to spoof locally
-        // while still allowing the hidden owner console to exercise both sides of the matrix.
-        if(playerId==BuildConfig.DEVELOPER_PLAYER_ID&&DeveloperSettings.simulatePremium(context))return true;
+        // Premium simulation never mutates the entitlement cache. It is accepted only while an
+        // authenticated short-lived Developer Channel session exists on this device, allowing a
+        // delegated Developer to exercise both sides of the matrix without creating real Premium.
+        DeveloperSessionStore.Session developer=new DeveloperSessionStore(context).load();
+        if(developer!=null&&DeveloperSettings.simulatePremium(context))return true;
         return PremiumEntitlementStore.hasPremium(context,playerId);
     }
 
