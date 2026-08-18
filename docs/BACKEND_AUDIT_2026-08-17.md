@@ -29,7 +29,7 @@ Security/state:
 - legacy single-faction settings/listener token remain for migration compatibility
 
 ### 2. Community backend — `backend/TornFcaCommunityBackend.gs`
-Version: **1.4.0**
+Version: **1.5.0**
 Android client: `CommunityBackendClient`
 
 Server-backed:
@@ -40,7 +40,10 @@ Server-backed:
 - push-device registration/tests/announcement pushes
 
 Security/state:
+- every authenticated request re-reads current Torn faction membership/position before selecting tenant data
+- only stable basic player identity may be cached briefly by SHA-256 API-key fingerprint
 - all community/training data is faction-scoped
+- report dedupe, moderation resolution, training writes and device registration are ScriptLock-protected
 - moderation defaults to verified TornFCA owner recovery/global access
 - future faction moderator access is configurable by actual Torn position abilities and/or Leader/Co-leader capability; custom position-name strings are not the permission model
 - non-owner moderators can only see/resolve reports in their verified faction
@@ -82,7 +85,7 @@ Android Premium hardening:
 - remote `disable_premium`, maintenance and minimum-version policy override entitlement/simulation
 - Premium routes use the central gate
 - Member Dossier and Faction Pulse self-gate before loading data so future internal navigation cannot bypass the matrix
-- Free leadership keeps a 7-day Activity Tracker; Premium may select 14/30-day history
+- Free leadership keeps a 7-day Activity Tracker; Premium receives the deeper 30-day history view
 
 ### 4. Developer control plane — `backend/TornFcaDeveloperBackend.gs`
 Version: **1.3.0**
@@ -179,7 +182,7 @@ Premium is convenience/depth: longer history, Personal Insights, advanced alert 
 
 Legal acknowledgement version is **`2026-08-17-v4`**.
 
-The API-key entry surface now explicitly discloses:
+The API-key entry surface explicitly discloses:
 - Data Storage
 - Data Sharing
 - Purpose
@@ -193,6 +196,7 @@ The in-app Privacy Policy further documents cloud faction workflow data, aggrega
 - `.github/workflows/tornfca-premium-matrix-audit.yml`
 - `.github/workflows/tornfca-pre1-source-audit.yml`
 - `.github/workflows/tornfca-member-core-audit.yml`
+- `.github/workflows/tornfca-community-security-audit.yml`
 - `.github/workflows/tornfca-beta-overhaul-audit.yml`
 - `.github/workflows/tornfca-backend-live-audit.yml`
 - `.github/workflows/tornfca-cloud-candidate.yml`
