@@ -49,7 +49,8 @@ jobs:
 
           grep -q 'getBoolean(KEY_PREMIUM_SIM, false)' "$DEV"
           ! grep -q 'getBoolean(KEY_PREMIUM_SIM, true)' "$DEV"
-          grep -q 'playerId==BuildConfig.DEVELOPER_PLAYER_ID&&DeveloperSettings.simulatePremium' "$ACCESS"
+          grep -q 'DeveloperSessionStore.Session developer=new DeveloperSessionStore(context).load()' "$ACCESS"
+          grep -q 'developer!=null&&DeveloperSettings.simulatePremium(context)' "$ACCESS"
           grep -q 'RemoteFeaturePolicy.featureDisabled(context,"premium")' "$ACCESS"
           grep -q 'RemoteFeaturePolicy.maintenanceMode(context)' "$ACCESS"
           grep -q 'RemoteFeaturePolicy.versionBlocked(context)' "$ACCESS"
