@@ -29,10 +29,7 @@ public final class BetaUxRepair {
     private static final String ANNOUNCEMENT_ACTION_TAG="tornfca-command-announcements";
     private static final String WAR_PREP_ADMIN_ACTION_TAG="tornfca-command-warprep-admin";
     private static final long REFILL_TTL_MS=60_000L;
-    private static final long DEV_TAP_WINDOW_MS=1_800L;
     private static final Map<View,Boolean> OBSERVED=Collections.synchronizedMap(new WeakHashMap<>());
-    private static final Map<View,Integer> DEV_TAP_COUNT=Collections.synchronizedMap(new WeakHashMap<>());
-    private static final Map<View,Long> DEV_TAP_AT=Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Activity,Long> REFILL_AT=Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Activity,Boolean> REFILL_IN_FLIGHT=Collections.synchronizedMap(new WeakHashMap<>());
     private static boolean installed;
@@ -72,7 +69,6 @@ public final class BetaUxRepair {
 
     private static void repairCommand(Activity activity,View root){
         replaceMoreIcons(activity,root);
-        attachHiddenDeveloperGesture(activity,root);
         repairOperationsFeatured(activity,root);
         ensureLeadershipShortcuts(activity,root);
     }
@@ -91,20 +87,6 @@ public final class BetaUxRepair {
             }
         }
         if(root instanceof ViewGroup){ViewGroup g=(ViewGroup)root;for(int i=0;i<g.getChildCount();i++)replaceMoreIcons(activity,g.getChildAt(i));}
-    }
-
-    /** Developer controls are deliberately invisible. Three taps on the version badge is the only command-shell entry. */
-    private static void attachHiddenDeveloperGesture(Activity activity,View root){
-        if(currentPlayerId(activity)!=BuildConfig.DEVELOPER_PLAYER_ID)return;
-        TextView version=findExactText(root,TornFcaCommandRuntime.versionBadge());
-        if(version==null||Boolean.TRUE.equals(version.getTag(R.id.tornfca_hidden_dev_gesture)))return;
-        version.setTag(R.id.tornfca_hidden_dev_gesture,Boolean.TRUE);
-        version.setClickable(true);version.setFocusable(true);
-        version.setOnClickListener(v->{
-            long now=System.currentTimeMillis(),last=DEV_TAP_AT.getOrDefault(v,0L);int count=(now-last<=DEV_TAP_WINDOW_MS)?DEV_TAP_COUNT.getOrDefault(v,0)+1:1;
-            DEV_TAP_AT.put(v,now);DEV_TAP_COUNT.put(v,count);
-            if(count>=3){DEV_TAP_COUNT.put(v,0);DEV_TAP_AT.put(v,0L);activity.startActivity(new Intent(activity,DeveloperGateActivity.class));}
-        });
     }
 
     /** Operations' large hero is now the faction notice surface instead of a third Ranked War shortcut. */
@@ -145,65 +127,16 @@ public final class BetaUxRepair {
         SessionInfo info=sessionInfo(activity);Intent i=new Intent(activity,WarNoticeActivity.class);i.putExtra(WarNoticeActivity.EXTRA_FACTION_ID,info.factionId);i.putExtra(WarNoticeActivity.EXTRA_FACTION_NAME,info.factionName);i.putExtra(WarNoticeActivity.EXTRA_CAN_PUBLISH,info.leader);activity.startActivity(i);
     }
 
-    private static int selectedNavColor(LinearLayout row){
-        for(int i=0;i<row.getChildCount();i++)if(row.getChildAt(i) instanceof TextView)return((TextView)row.getChildAt(i)).getCurrentTextColor();
-        return TornFcaCommandUi.STEEL;
-    }
+    private static int selectedNavColor(LinearLayout row){for(int i=0;i<row.getChildCount();i++)if(row.getChildAt(i) instanceof TextView)return((TextView)row.getChildAt(i)).getCurrentTextColor();return TornFcaCommandUi.STEEL;}
+    private static void setDirectIcon(Activity activity,LinearLayout row,int drawableId,int tint){for(int i=0;i<row.getChildCount();i++)if(row.getChildAt(i) instanceof ImageView){ImageView iv=(ImageView)row.getChildAt(i);Drawable d=activity.getDrawable(drawableId);if(d!=null){d=d.mutate();d.setTint(tint);iv.setImageDrawable(d);}return;}}
 
-    private static void setDirectIcon(Activity activity,LinearLayout row,int drawableId,int tint){
-        for(int i=0;i<row.getChildCount();i++)if(row.getChildAt(i) instanceof ImageView){
-            ImageView iv=(ImageView)row.getChildAt(i);Drawable d=activity.getDrawable(drawableId);if(d!=null){d=d.mutate();d.setTint(tint);iv.setImageDrawable(d);}return;
-        }
-    }
+    private static SessionInfo sessionInfo(Activity activity){String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return new SessionInfo(0,0,"Faction",false);AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return new SessionInfo(hot.playerId,hot.factionId,hot.factionName,AccessPolicy.isLeaderPosition(hot.position));FactionScopeCache.Scope scope=FactionScopeCache.load(activity,key);return scope==null?new SessionInfo(0,0,"Faction",false):new SessionInfo(scope.playerId,scope.factionId,scope.factionName,AccessPolicy.isLeaderPosition(scope.position));}
 
-    private static int currentPlayerId(Activity activity){return sessionInfo(activity).playerId;}
-    private static SessionInfo sessionInfo(Activity activity){
-        String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())return new SessionInfo(0,0,"Faction",false);
-        AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return new SessionInfo(hot.playerId,hot.factionId,hot.factionName,AccessPolicy.isLeaderPosition(hot.position));
-        FactionScopeCache.Scope scope=FactionScopeCache.load(activity,key);return scope==null?new SessionInfo(0,0,"Faction",false):new SessionInfo(scope.playerId,scope.factionId,scope.factionName,AccessPolicy.isLeaderPosition(scope.position));
-    }
+    private static void compactReturnRail(Activity activity,View root){View found=findTag(root,RAIL_TAG);if(!(found instanceof LinearLayout))return;LinearLayout rail=(LinearLayout)found;if(RAIL_COMPACT.equals(String.valueOf(rail.getContentDescription())))return;String section=sectionFor(activity);rail.removeAllViews();rail.setContentDescription(RAIL_COMPACT);rail.setOrientation(LinearLayout.HORIZONTAL);rail.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);rail.setPadding(0,0,0,0);rail.setBackground(null);rail.setElevation(0f);TextView back=TornFcaCommandUi.text(activity,"←  "+section,10.8f,TornFcaCommandUi.MUTED,true);back.setPadding(TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6),TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6));back.setBackground(TornFcaCommandUi.solid(activity,Color.argb(95,18,26,39),9,TornFcaCommandUi.LINE_SOFT,1));back.setClickable(true);back.setFocusable(true);back.setForeground(TornFcaCommandUi.ripple(activity,TornFcaCommandUi.GOLD,9));back.setOnClickListener(v->{Intent i=TornFcaCommandRuntime.homeIntent(activity,section);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);});rail.addView(back,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));}
+    private static String sectionFor(Activity activity){String n=activity.getClass().getName().toLowerCase(Locale.US);if(n.contains("training"))return"Training";if(n.contains("settings")||n.contains("legal")||n.contains("about")||n.contains("premium")||n.contains("notification")||n.contains("developer"))return"More";if(n.contains("war")||n.contains("territory")||n.contains("bank")||n.contains("leadership")||n.contains("factionops")||n.contains("quickintel"))return"Operations";if(n.contains("member")||n.contains("faction")||n.contains("oc")||n.contains("chat")||n.contains("resource")||n.contains("dossier"))return"Members";return"Home";}
 
-    private static void compactReturnRail(Activity activity,View root){
-        View found=findTag(root,RAIL_TAG);if(!(found instanceof LinearLayout))return;LinearLayout rail=(LinearLayout)found;
-        if(RAIL_COMPACT.equals(String.valueOf(rail.getContentDescription())))return;
-        String section=sectionFor(activity);rail.removeAllViews();rail.setContentDescription(RAIL_COMPACT);rail.setOrientation(LinearLayout.HORIZONTAL);rail.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);rail.setPadding(0,0,0,0);rail.setBackground(null);rail.setElevation(0f);
-        TextView back=TornFcaCommandUi.text(activity,"←  "+section,10.8f,TornFcaCommandUi.MUTED,true);back.setPadding(TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6),TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6));back.setBackground(TornFcaCommandUi.solid(activity,Color.argb(95,18,26,39),9,TornFcaCommandUi.LINE_SOFT,1));back.setClickable(true);back.setFocusable(true);back.setForeground(TornFcaCommandUi.ripple(activity,TornFcaCommandUi.GOLD,9));back.setOnClickListener(v->{Intent i=TornFcaCommandRuntime.homeIntent(activity,section);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);});rail.addView(back,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-    }
-
-    private static String sectionFor(Activity activity){
-        String n=activity.getClass().getName().toLowerCase(Locale.US);
-        if(n.contains("training"))return"Training";
-        if(n.contains("settings")||n.contains("legal")||n.contains("about")||n.contains("premium")||n.contains("notification")||n.contains("developer"))return"More";
-        if(n.contains("war")||n.contains("territory")||n.contains("bank")||n.contains("leadership")||n.contains("factionops")||n.contains("quickintel"))return"Operations";
-        if(n.contains("member")||n.contains("faction")||n.contains("oc")||n.contains("chat")||n.contains("resource")||n.contains("dossier"))return"Members";
-        return"Home";
-    }
-
-    private static void repairRefills(Activity activity,View root){
-        TextView title=findExactText(root,"Available refills");if(title==null)title=findExactText(root,"Daily & special refills");if(title==null||!(title.getParent() instanceof LinearLayout))return;
-        LinearLayout card=(LinearLayout)title.getParent();TextView body=findBody(card);if(body==null)return;
-        if("Available refills".contentEquals(title.getText())){
-            title.setText("Daily & special refills");
-            String provisional=body.getText()==null?"":body.getText().toString();provisional=provisional.replace("Used / unavailable","__AVAILABLE__").replace("Available","Used today").replace("__AVAILABLE__","Available");
-            if(!provisional.contains("Special refills:"))provisional+="\nSpecial refills: Checking…";body.setText(provisional);
-        }
-        long now=System.currentTimeMillis();Long last=REFILL_AT.get(activity);if(last!=null&&now-last<REFILL_TTL_MS)return;if(Boolean.TRUE.equals(REFILL_IN_FLIGHT.get(activity)))return;
-        REFILL_IN_FLIGHT.put(activity,Boolean.TRUE);REFILL_AT.put(activity,now);
-        new Thread(()->{
-            try{
-                String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())throw new Exception("No API key");
-                JSONObject response=TornApiClient.getJson("/user/refills",key);JSONObject refills=response.optJSONObject("refills");if(refills==null&&response.has("energy"))refills=response;if(refills==null)throw new Exception("Refills unavailable");
-                final JSONObject value=refills;activity.runOnUiThread(()->applyRefills(activity,value));
-            }catch(Exception ignored){activity.runOnUiThread(()->applyRefillUnavailable(activity));}
-            finally{REFILL_IN_FLIGHT.remove(activity);}
-        },"TornFCA-RefillRepair").start();
-    }
-
-    private static void applyRefills(Activity activity,JSONObject refills){
-        View root=activity.findViewById(android.R.id.content);TextView title=findExactText(root,"Daily & special refills");if(title==null||!(title.getParent() instanceof LinearLayout))return;TextView body=findBody((LinearLayout)title.getParent());if(body==null)return;
-        String text="Energy point refill: "+refillState(refills,"energy")+"\nNerve point refill: "+refillState(refills,"nerve")+"\nToken refill: "+refillState(refills,"token")+"\nSpecial refills: "+(refills.has("special_count")?String.valueOf(Math.max(0,refills.optInt("special_count",0))):"Not reported");body.setText(text);
-    }
-
+    private static void repairRefills(Activity activity,View root){TextView title=findExactText(root,"Available refills");if(title==null)title=findExactText(root,"Daily & special refills");if(title==null||!(title.getParent() instanceof LinearLayout))return;LinearLayout card=(LinearLayout)title.getParent();TextView body=findBody(card);if(body==null)return;if("Available refills".contentEquals(title.getText())){title.setText("Daily & special refills");String provisional=body.getText()==null?"":body.getText().toString();provisional=provisional.replace("Used / unavailable","__AVAILABLE__").replace("Available","Used today").replace("__AVAILABLE__","Available");if(!provisional.contains("Special refills:"))provisional+="\nSpecial refills: Checking…";body.setText(provisional);}long now=System.currentTimeMillis();Long last=REFILL_AT.get(activity);if(last!=null&&now-last<REFILL_TTL_MS)return;if(Boolean.TRUE.equals(REFILL_IN_FLIGHT.get(activity)))return;REFILL_IN_FLIGHT.put(activity,Boolean.TRUE);REFILL_AT.put(activity,now);new Thread(()->{try{String key=new SecureApiKeyStore(activity).load();if(key==null||key.isBlank())throw new Exception("No API key");JSONObject response=TornApiClient.getJson("/user/refills",key);JSONObject refills=response.optJSONObject("refills");if(refills==null&&response.has("energy"))refills=response;if(refills==null)throw new Exception("Refills unavailable");final JSONObject value=refills;activity.runOnUiThread(()->applyRefills(activity,value));}catch(Exception ignored){activity.runOnUiThread(()->applyRefillUnavailable(activity));}finally{REFILL_IN_FLIGHT.remove(activity);}},"TornFCA-RefillRepair").start();}
+    private static void applyRefills(Activity activity,JSONObject refills){View root=activity.findViewById(android.R.id.content);TextView title=findExactText(root,"Daily & special refills");if(title==null||!(title.getParent() instanceof LinearLayout))return;TextView body=findBody((LinearLayout)title.getParent());if(body==null)return;String text="Energy point refill: "+refillState(refills,"energy")+"\nNerve point refill: "+refillState(refills,"nerve")+"\nToken refill: "+refillState(refills,"token")+"\nSpecial refills: "+(refills.has("special_count")?String.valueOf(Math.max(0,refills.optInt("special_count",0))):"Not reported");body.setText(text);}
     private static String refillState(JSONObject refills,String key){if(!refills.has(key))return"Not reported";return refills.optBoolean(key,false)?"Used today":"Available";}
     private static void applyRefillUnavailable(Activity activity){View root=activity.findViewById(android.R.id.content);TextView title=findExactText(root,"Daily & special refills");if(title==null||!(title.getParent() instanceof LinearLayout))return;TextView body=findBody((LinearLayout)title.getParent());if(body!=null&&body.getText()!=null&&body.getText().toString().contains("Checking…"))body.setText(body.getText().toString().replace("Special refills: Checking…","Special refills: Not reported"));}
 
