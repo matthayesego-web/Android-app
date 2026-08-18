@@ -1,5 +1,5 @@
 /**
- * TornFCA global premium entitlement backend v1.1.0.
+ * TornFCA global premium entitlement backend v1.2.0.
  * Deploy as a SEPARATE Apps Script web app from faction/community/developer backends.
  *
  * Security:
@@ -9,30 +9,33 @@
  * - The owner Torn key used by the payment scanner lives only in Script Properties as OWNER_API_KEY.
  * - Incoming payments are deduped by Torn log id under ScriptLock.
  * - Payment grants are receipt-idempotent so a failure between grant and audit-row write cannot double-credit Premium.
+ * - Automatic paid entitlement processing fails closed until MONETIZATION_APPROVED=true is explicitly set after the operator has handled Torn/payment-distribution approval requirements.
  *
  * API load:
- * - scanPremiumPayments() is intended to run once per minute: one Torn /user log request/minute.
+ * - scanPremiumPayments() is intended to run once per minute only after monetization approval: one Torn /user log request/minute.
  * - entitlement identity verification is cached briefly by API-key fingerprint.
  */
-const TORNFCA_PREMIUM_VERSION='1.1.0';
+const TORNFCA_PREMIUM_VERSION='1.2.0';
 const TORNFCA_PREMIUM_DEVELOPER_ID=3987363;
 const TORNFCA_XANAX_ITEM_ID=206;
 const TORNFCA_ITEM_RECEIVE_LOG=4103;
 const P_SHEETS=Object.freeze({SETTINGS:'PremiumSettings',ENTITLEMENTS:'PremiumEntitlements',PAYMENTS:'PremiumPayments'});
 
 function setupTornFcaPremiumBackend(){
-  const ss=SpreadsheetApp.getActiveSpreadsheet();
-  PropertiesService.getScriptProperties().setProperty('PREMIUM_SHEET_ID',ss.getId());
+  const ss=SpreadsheetApp.getActiveSpreadsheet(),props=PropertiesService.getScriptProperties();
+  props.setProperty('PREMIUM_SHEET_ID',ss.getId());
+  if(!props.getProperty('MONETIZATION_APPROVED'))props.setProperty('MONETIZATION_APPROVED','false');
   const settings=ensurePremiumSheet_(ss,P_SHEETS.SETTINGS,['key','value']);
   setPremiumSettingIfMissing_(settings,'days_per_xanax','15');
   setPremiumSettingIfMissing_(settings,'required_message','TORNFCA');
   setPremiumSettingIfMissing_(settings,'stacking','true');
   ensurePremiumSheet_(ss,P_SHEETS.ENTITLEMENTS,['player_id','tier','expires_at','updated_at','source','total_xanax']);
   ensurePremiumSheet_(ss,P_SHEETS.PAYMENTS,['log_id','timestamp','sender_id','xanax_qty','days_added','message','processed_at']);
-  return {ok:true,version:TORNFCA_PREMIUM_VERSION,next:'Set OWNER_API_KEY and a one-time PREMIUM_ADMIN_PASSWORD_SETUP Script Property, run bootstrapPremiumAdminPassword(), delete/confirm the setup property is gone, then run installPremiumScanTrigger().'};
+  return {ok:true,version:TORNFCA_PREMIUM_VERSION,monetization_approved:premiumMonetizationApproved_(),next:'Set the one-time PREMIUM_ADMIN_PASSWORD_SETUP property and bootstrap the admin password. Automatic payment scanning remains disabled until MONETIZATION_APPROVED=true is deliberately set after required Torn/distribution approval.'};
 }
 
 function installPremiumScanTrigger(){
+  if(!premiumMonetizationApproved_())throw new Error('Automatic Premium payment scanning is disabled. Obtain/handle the required Torn and distribution payment approval first, then explicitly set MONETIZATION_APPROVED=true in Script Properties.');
   ScriptApp.getProjectTriggers().forEach(t=>{if(t.getHandlerFunction()==='scanPremiumPayments')ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('scanPremiumPayments').timeBased().everyMinutes(1).create();
   return 'Installed one-minute TornFCA premium scan trigger.';
@@ -54,7 +57,7 @@ function bootstrapPremiumAdminPassword(){
   try{return setPremiumAdminPassword(plain);}finally{props.deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP');}
 }
 
-function doGet(){return premiumJson_({ok:true,app:'TornFCA Premium Entitlements',version:TORNFCA_PREMIUM_VERSION,authenticated_actions:'POST only'});}
+function doGet(){return premiumJson_({ok:true,app:'TornFCA Premium Entitlements',version:TORNFCA_PREMIUM_VERSION,monetization_approved:premiumMonetizationApproved_(),authenticated_actions:'POST only'});}
 
 function doPost(e){
   try{
@@ -80,7 +83,7 @@ function doPost(e){
       setPremiumSetting_(settings,'days_per_xanax',String(days));
       setPremiumSetting_(settings,'required_message',required);
       setPremiumSetting_(settings,'stacking',stacking?'true':'false');
-      return premiumJson_({ok:true,config:readPremiumConfig_()});
+      return premiumJson_({ok:true,config:readPremiumConfig_(),monetization_approved:premiumMonetizationApproved_()});
     }
     if(action==='admin_grant'){
       requirePremiumDeveloper_(user);
@@ -116,6 +119,7 @@ function premiumTornGet_(path,key){
 }
 
 function scanPremiumPayments(){
+  if(!premiumMonetizationApproved_())throw new Error('Automatic Premium payment processing is disabled until MONETIZATION_APPROVED=true is explicitly configured after required approval.');
   const props=PropertiesService.getScriptProperties();
   const key=String(props.getProperty('OWNER_API_KEY')||'').trim();
   if(!key)throw new Error('OWNER_API_KEY Script Property is not configured.');
@@ -197,6 +201,7 @@ function setPremiumSettingIfMissing_(sheet,key,value){const values=sheet.getData
 function ensurePremiumSheet_(ss,name,headers){let s=ss.getSheetByName(name);if(!s)s=ss.insertSheet(name);if(s.getLastRow()===0)s.appendRow(headers);return s;}
 function premiumDb_(){const id=PropertiesService.getScriptProperties().getProperty('PREMIUM_SHEET_ID');if(!id)throw new Error('Run setupTornFcaPremiumBackend() first.');return SpreadsheetApp.openById(id);}
 function requirePremiumAdmin_(password){const expected=String(PropertiesService.getScriptProperties().getProperty('PREMIUM_ADMIN_SHA256')||'');if(!expected||sha256_(password)!==expected)throw new Error('Developer authorization failed.');}
+function premiumMonetizationApproved_(){return premiumBool_(PropertiesService.getScriptProperties().getProperty('MONETIZATION_APPROVED')||'false');}
 function premiumBool_(v){if(typeof v==='boolean')return v;const n=String(v==null?'':v).trim().toLowerCase();return n==='true'||n==='1'||n==='yes'||n==='on';}
 function sha256_(value){const bytes=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value),Utilities.Charset.UTF_8);return bytes.map(b=>('0'+((b<0?b+256:b).toString(16))).slice(-2)).join('').toUpperCase();}
 function safePremiumText_(v){const t=String(v==null?'':v);return /^[=+\-@]/.test(t)?"'"+t:t;}
