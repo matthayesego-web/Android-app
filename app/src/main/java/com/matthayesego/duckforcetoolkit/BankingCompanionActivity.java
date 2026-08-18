@@ -59,7 +59,7 @@ public class BankingCompanionActivity extends Activity {
     private LinearLayout card(int accent){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(18),dp(16),dp(18),dp(16));c.setBackground(gradient(PANEL,PANEL2,accent==Color.TRANSPARENT?BORDER:accent,19));return c;}
     private void add(LinearLayout r,View v){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.bottomMargin=dp(11);r.addView(v,p);}
 
-    private void header(LinearLayout r){Button back=button("← Faction",BORDER);back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(125),dp(44)));TextView e=eyebrow("FACTION OPERATIONS • BANKING",BLUE);LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);ep.topMargin=dp(18);r.addView(e,ep);r.addView(text("Banking Companion",30,TEXT,true));TextView sub=text("One shared request queue from TornFCA and active faction chat. Leadership can open the exact payout in Torn and then confirm it here.",13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(5);sp.bottomMargin=dp(16);r.addView(sub,sp);}
+    private void header(LinearLayout r){Button back=button("← Faction",BORDER);back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(125),dp(44)));TextView e=eyebrow("FACTION OPERATIONS • BANKING",BLUE);LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);ep.topMargin=dp(18);r.addView(e,ep);r.addView(text("Banking Companion",30,TEXT,true));TextView sub=text("Submit and track faction banking requests. Authorized faction bankers receive the management controls required to process the shared queue.",13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(5);sp.bottomMargin=dp(16);r.addView(sub,sp);}
 
     private void showLoading(String message){ScrollView s=shell();LinearLayout r=root(s);header(r);LinearLayout c=card(BORDER);c.addView(eyebrow("LOADING",GOLD));TextView m=text(message,18,TEXT,true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(6);c.addView(m,p);add(r,c);setContentView(s);s.requestApplyInsets();}
 
@@ -68,14 +68,20 @@ public class BankingCompanionActivity extends Activity {
         String key=keyStore.load();if(key==null||key.isBlank()){renderUnavailable("Reconnect your Torn API key first.");return;}
         showLoading("Loading the shared banking queue…");
         new Thread(()->{try{
+            boolean memberPreview=MemberPresentationPolicy.memberPreview(this);int playerId=0;
+            if(memberPreview){AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);playerId=verified.playerId;}
             JSONObject response=CompanionBackendClient.getBankingRequests(key,false);
-            canManage=response.optBoolean("can_manage",false);
-            JSONArray rows=response.optJSONArray("requests");requests=rows==null?new JSONArray():rows;
+            boolean backendCanManage=response.optBoolean("can_manage",false);
+            JSONArray rows=response.optJSONArray("requests");rows=rows==null?new JSONArray():rows;
+            canManage=!memberPreview&&backendCanManage;
+            requests=memberPreview?memberRequestsOnly(rows,playerId):rows;
             balances.clear();balanceError="";
             if(canManage)loadBalances(key);
             runOnUiThread(this::render);
         }catch(Exception e){String m=e.getMessage()==null?"Unable to load the banking queue.":e.getMessage();runOnUiThread(()->renderUnavailable(m));}}).start();
     }
+
+    private JSONArray memberRequestsOnly(JSONArray rows,int playerId){JSONArray out=new JSONArray();if(playerId<=0)return out;for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&row.optInt("requester_id",0)==playerId)out.put(row);}return out;}
 
     private void loadBalances(String key){
         if(!factionApiAccess){balanceError="Your key is verified, but this faction position/key does not expose Faction API Access. Amount requests still work; full-balance requests cannot be resolved automatically.";return;}
@@ -89,9 +95,9 @@ public class BankingCompanionActivity extends Activity {
     private void render(){
         ScrollView s=shell();LinearLayout r=root(s);header(r);
         addRequestCard(r);
-        LinearLayout status=card(canManage?GREEN:BLUE);status.addView(eyebrow(canManage?"BANKER ACCESS":"MEMBER VIEW",canManage?GREEN:BLUE));status.addView(text(canManage?"Shared queue + payout controls":"Your banking requests",19,TEXT,true));status.addView(text(canManage?"TornFCA loads the current faction balance once for the queue so full-balance requests can be paid without one API request per member.":"You can submit a request here. Leadership sees it in the same central queue as supported faction-chat requests.",12.5f,MUTED,false));if(!balanceError.isEmpty())status.addView(text(balanceError,11.5f,RED,false));Button refresh=button("Refresh Queue",BORDER);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));rp.topMargin=dp(10);status.addView(refresh,rp);refresh.setOnClickListener(v->loadQueue());add(r,status);
+        LinearLayout status=card(canManage?GREEN:BLUE);status.addView(eyebrow(canManage?"BANKER ACCESS":"MEMBER VIEW",canManage?GREEN:BLUE));status.addView(text(canManage?"Shared queue + payout controls":"Your banking requests",19,TEXT,true));status.addView(text(canManage?"TornFCA loads the current faction balance once for the queue so full-balance requests can be paid without one API request per member.":"You can submit a request here. Authorized faction bankers see it in the central queue.",12.5f,MUTED,false));if(!balanceError.isEmpty())status.addView(text(balanceError,11.5f,RED,false));Button refresh=button("Refresh Queue",BORDER);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));rp.topMargin=dp(10);status.addView(refresh,rp);refresh.setOnClickListener(v->loadQueue());add(r,status);
 
-        if(requests.length()==0){LinearLayout none=card(BORDER);none.addView(text("No banking requests yet.",17,TEXT,true));none.addView(text("Requests submitted in TornFCA or captured by the active-session TornFCA Banking Companion will appear here.",12,MUTED,false));add(r,none);}else{
+        if(requests.length()==0){LinearLayout none=card(BORDER);none.addView(text("No banking requests yet.",17,TEXT,true));none.addView(text("Requests you submit in TornFCA will appear here.",12,MUTED,false));add(r,none);}else{
             for(int i=0;i<requests.length();i++){JSONObject row=requests.optJSONObject(i);if(row!=null)add(r,requestCard(row));}
         }
         TextView foot=text("TornFCA never moves faction money through the API. The actual transfer is confirmed by an authorized faction user inside Torn.",10.5f,MUTED,false);foot.setGravity(Gravity.CENTER);r.addView(foot);
