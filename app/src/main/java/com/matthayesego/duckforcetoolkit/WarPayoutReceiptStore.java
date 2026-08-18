@@ -6,13 +6,13 @@ import android.content.SharedPreferences;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/**
- * App-private WarPay receipt cache. The authoritative shared copy may live in WarPayBackendClient,
- * while this store keeps calculations available offline and avoids unnecessary backend reads.
- */
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/** Local/offline cache backed by faction-scoped WarPay cloud persistence when configured. */
 public final class WarPayoutReceiptStore {
     private static final String PREFS = "tornfca_warpay_receipts_v1";
     private static final String PREFIX = "war_";
+    private static final AtomicBoolean REFRESHING = new AtomicBoolean(false);
 
     private WarPayoutReceiptStore() {}
 
@@ -20,14 +20,37 @@ public final class WarPayoutReceiptStore {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+    /** Save locally immediately, then upload best-effort without blocking the payout workflow. */
     public static void save(Context context, JSONObject receipt) {
         if (context == null || receipt == null) return;
+        saveLocal(context, receipt);
+        scheduleUpload(context.getApplicationContext(), receipt);
+    }
+
+    private static void saveLocal(Context context, JSONObject receipt) {
         int warId = receipt.optInt("war_id", 0);
         if (warId <= 0) return;
         prefs(context).edit().putString(PREFIX + warId, receipt.toString()).apply();
     }
 
-    /** Merge faction-scoped server receipts into the offline cache without replacing a newer local calculation. */
+    /** Refresh the offline cache from the current verified faction. Non-leaders simply receive no update. */
+    public static void refreshFromBackendAsync(Context context) {
+        if (context == null || !WarPayBackendClient.isConfigured() || !REFRESHING.compareAndSet(false, true)) return;
+        Context app = context.getApplicationContext();
+        new Thread(() -> {
+            try {
+                String key = new SecureApiKeyStore(app).load();
+                if (key == null || key.trim().isEmpty()) return;
+                mergeFromBackend(app, WarPayBackendClient.list(key));
+            } catch (Exception ignored) {
+                // Local receipts remain usable when the backend is unavailable or the user lacks leadership access.
+            } finally {
+                REFRESHING.set(false);
+            }
+        }, "TornFCA-WarPayRefresh").start();
+    }
+
+    /** Merge faction-scoped server receipts without replacing a newer local calculation. */
     public static void mergeFromBackend(Context context, JSONArray receipts) {
         if (context == null || receipts == null) return;
         for (int i = 0; i < receipts.length(); i++) {
@@ -38,8 +61,22 @@ public final class WarPayoutReceiptStore {
             JSONObject local = load(context, warId);
             long remoteAt = remote.optLong("created_at", 0L);
             long localAt = local == null ? 0L : local.optLong("created_at", 0L);
-            if (local == null || remoteAt >= localAt) save(context, remote);
+            if (local == null || remoteAt >= localAt) saveLocal(context, remote);
         }
+    }
+
+    private static void scheduleUpload(Context context, JSONObject receipt) {
+        if (!WarPayBackendClient.isConfigured()) return;
+        final String copy = receipt.toString();
+        new Thread(() -> {
+            try {
+                String key = new SecureApiKeyStore(context).load();
+                if (key == null || key.trim().isEmpty()) return;
+                WarPayBackendClient.save(key, new JSONObject(copy));
+            } catch (Exception ignored) {
+                // Offline-first: never roll back the local receipt when cloud persistence fails.
+            }
+        }, "TornFCA-WarPayUpload").start();
     }
 
     public static JSONObject load(Context context, int warId) {
