@@ -25,14 +25,17 @@ jobs:
           GAUGES=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaGaugeLiveData.java
           UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
           WRAPPERS=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaScreens.java
+          DEV_BACKEND=backend/TornFcaDeveloperBackend.gs
+          DEV_CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
+          DEV_UI=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendActivity.java
 
           test -f "$BETA"
           test -f "$UI"
           test -f "$SURFACE"
           test -f "$GAUGES"
           test -f "$UX"
-          grep -q 'versionName = "0.9.37"' "$GRADLE"
-          grep -q 'versionCode = 54' "$GRADLE"
+          grep -q 'versionName = "0.9.38"' "$GRADLE"
+          grep -q 'versionCode = 55' "$GRADLE"
           grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
           grep -q 'BetaSurfacePolish.install' "$GATE"
           grep -q 'BetaGaugeLiveData.install' "$GATE"
@@ -77,4 +80,17 @@ jobs:
           test -f app/src/main/res/drawable/ic_beta_developer.xml
           test -f app/src/main/res/drawable/ic_beta_more.xml
 
-          echo 'Torn FCA Beta v0.9.37 UX/backend-preservation audit passed.'
+          # v0.9.38 developer telemetry remains aggregate, low-write and owner-visible only.
+          grep -q "const TD_VERSION='1.2.0'" "$DEV_BACKEND"
+          grep -q "const TD_USERS='DeveloperUsers'" "$DEV_BACKEND"
+          grep -q 'TD_HEARTBEAT_SECONDS=6\*60\*60' "$DEV_BACKEND"
+          grep -q 'total_unique' "$DEV_BACKEND"
+          grep -q 'current_total' "$DEV_BACKEND"
+          grep -q 'TELEMETRY_SALT' "$DEV_BACKEND"
+          grep -q 'version_code' "$DEV_CLIENT"
+          grep -q 'version_name' "$DEV_CLIENT"
+          grep -q 'User tracker' "$DEV_UI"
+          grep -q 'Current total' "$DEV_UI"
+          grep -q 'Unique users' "$DEV_UI"
+
+          echo 'Torn FCA Beta v0.9.38 UX/backend-preservation audit passed.'
