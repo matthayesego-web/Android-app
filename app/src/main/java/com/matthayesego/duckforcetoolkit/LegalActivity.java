@@ -95,7 +95,7 @@ public class LegalActivity extends Activity {
                 }
                 LegalAcceptanceStore.acceptCurrent(this);
                 PushNotifications.initialize(this);
-                Intent i=new Intent(this,TornFcaCurrentActivity.class);
+                Intent i=TornFcaCommandRuntime.homeIntent(this,"Home");
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 startActivity(i);
                 finish();
