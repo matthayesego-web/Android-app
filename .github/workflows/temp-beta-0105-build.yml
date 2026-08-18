@@ -1,4 +1,4 @@
-name: TEMP TornFCA v0.10.5 Beta Build
+name: TEMP TornFCA v0.10.6 Member Boundary Build
 
 on:
   pull_request:
@@ -19,19 +19,30 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.13'
-      - name: Verify Beta test fallback and version
+      - name: Verify member boundary and version
         run: |
           set -euo pipefail
-          grep -q 'versionName = "0.10.5"' app/build.gradle.kts
-          grep -q 'versionCode = 60' app/build.gradle.kts
-          grep -q 'localBetaFallbackAvailable' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
-          grep -q 'BuildConfig.DEVELOPER_PLAYER_ID' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
-          grep -q 'local-beta-owner:' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
+          grep -q 'versionName = "0.10.6"' app/build.gradle.kts
+          grep -q 'versionCode = 61' app/build.gradle.kts
+          grep -q 'leadershipVisible' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberPresentationPolicy.java
+          grep -q 'MemberPresentationPolicy.leadershipVisible(activity,hot.position)' app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
+          grep -q 'MemberPresentationPolicy.leadershipVisible(this,session.position)' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          grep -q 'MemberPresentationPolicy.leadershipVisible(this,session.position)' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingCenterActivity.java
+          grep -q 'Training management is hidden in Standard Member Preview' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingAdminActivity.java
+          grep -q 'War Prep Management is hidden in Standard Member Preview' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepLeadershipActivity.java
+          grep -q 'Faction Notices' app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java
+          grep -q 'MemberPresentationPolicy.memberPreview(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java
+          grep -q 'memberRequestsOnly' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
+          grep -q 'requiresLeadership(target)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q "c==='leadership'&&!tcLeader_(user.position)" backend/TornFcaCommunityBackend.gs
+          grep -q "action==='training_rules_save'" backend/TornFcaCommunityBackend.gs
+          grep -q "action==='warprep_leadership'" backend/TornFcaCommunityBackend.gs
+          grep -q "action==='post_notice'" backend/AccessBackend.gs
       - name: Compile Beta
         run: gradle --no-daemon :app:assembleBeta
       - uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-Beta-v0.10.5-unsigned
+          name: TornFCA-Beta-v0.10.6-member-boundary-unsigned
           path: app/build/outputs/apk/beta/app-beta-unsigned.apk
           if-no-files-found: error
           retention-days: 2
