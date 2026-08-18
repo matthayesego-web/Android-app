@@ -2,7 +2,7 @@
 
 Branch: `v0.9-faction-automation`
 
-This is the final deployment path for the five TornFCA backend services. Source existence is not live deployment. v1.0 is gated on deployed URLs, automated audits and an on-device smoke test.
+This is the final deployment path for the five TornFCA backend services. Source existence is not live deployment. v1.0 is gated on deployed URLs, automated audits, Google Play testing and an on-device smoke test.
 
 ## Deployment rule for every Apps Script service
 
@@ -35,7 +35,7 @@ Expected GET identity: `TornFCA Faction Backend`, version `1.1.0`.
 
 New deployments are multi-faction by default. Existing legacy restriction settings remain compatible.
 
-## 2. Community backend — v1.6.0
+## 2. Community backend — v1.7.0
 
 Sheet: `TornFCA - Community Backend`
 
@@ -45,7 +45,14 @@ Run once: `setupTornFcaCommunityBackend()`
 
 Every Community request re-reads current faction membership/position from Torn, so changing factions or losing a leadership role does not retain stale tenant access. Stable player identity may be cached briefly without caching faction authorization. Duplicate-sensitive shared writes are ScriptLock-protected.
 
-v1.6.0 also hardens the hot chat path for growth: chat polling scans bounded recent chunks rather than loading the full historical `ChatMessages` sheet on every poll, while exact message/report lookups use server-side TextFinder-style row searches. This avoids history growth progressively slowing every active chat user.
+v1.6.0 hardened the hot chat path for growth: chat polling scans bounded recent chunks rather than loading the full historical `ChatMessages` sheet on every poll, while exact message/report lookups use server-side TextFinder-style row searches.
+
+v1.7.0 adds faction-scoped shared War Prep:
+- `WarPrepConfig` is keyed by freshly verified `faction_id`.
+- `WarPrepStatus` is keyed by verified `faction_id + war_id + player_id`.
+- a new ranked-war ID starts a clean member checklist automatically.
+- leadership status includes only faction members who actually opened/synced War Prep in TornFCA; it never treats non-users as incomplete.
+- each faction can define up to eight checklist items without leaking configuration into another faction.
 
 ### Initial moderation policy
 
@@ -66,7 +73,7 @@ For Firebase Cloud Messaging, add Apps Script Script Properties:
 
 GitHub Actions secret: `TORNFCA_COMMUNITY_BACKEND_URL`
 
-Expected GET identity: `TornFCA Community Backend`, version `1.6.0`.
+Expected GET identity: `TornFCA Community Backend`, version `1.7.0`.
 
 ## 3. Premium backend — v1.2.0
 
@@ -82,7 +89,7 @@ The backend deliberately creates/retains:
 
 - `MONETIZATION_APPROVED=false`
 
-**Leave this false for the v0.10.1/backend test phase.** Deploying the Premium backend does not authorize paid usage. Both `installPremiumScanTrigger()` and `scanPremiumPayments()` fail closed while this flag is false.
+**Leave this false throughout the v0.10.x/backend/Google Play test phase.** Deploying the Premium backend does not authorize paid usage. Both `installPremiumScanTrigger()` and `scanPremiumPayments()` fail closed while this flag is false.
 
 Do **not** install the automatic payment trigger merely to complete backend deployment.
 
@@ -188,13 +195,14 @@ Permanent Android signing secrets remain separate and must not be rotated during
 After all five URLs are configured:
 
 1. Run **TornFCA Backend Live Audit**.
-2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.6.0, Premium 1.2.0, Developer 1.3.0, WarPay 1.1.0.
+2. It must identify exact audited backend versions: Faction 1.1.0, Community 1.7.0, Premium 1.2.0, Developer 1.3.0, WarPay 1.1.0.
 3. It compiles both side-by-side Beta and release candidates.
 4. It verifies Beta package `com.matthayesego.duckforcetoolkit.beta` and release package `com.matthayesego.duckforcetoolkit`.
 5. Run **TornFCA Premium Matrix Audit**.
 6. Run **TornFCA Permission Freshness Audit**.
 7. Run **TornFCA Cloud Candidate**; it refuses to build against missing/stale backends.
-8. Do not promote to `main` until the signed Beta receives an on-device smoke test.
+8. Keep the app on the v0.10.x line through Google Play testing.
+9. Do not promote to `main` or v1.0 until Google Play/device testing passes.
 
 ## On-device v1.0 backend smoke test
 
@@ -202,11 +210,14 @@ Minimum pass list:
 
 - sign in and reload faction scope
 - re-acknowledge legal version v4 and verify the API-key disclosure is visible at key entry
-- read faction notices
+- read/publish faction notices with an authorized leadership account
 - submit/read a banking request
 - open Community chat and send/read a message
 - repeatedly refresh chat after building some history and confirm recent messages remain responsive/correct
 - switch/change faction scope during testing and confirm old Community tenant data is not retained
+- verify War Prep resets on a different ranked-war ID
+- customize War Prep in one faction and confirm another faction receives its own independent configuration
+- verify leadership War Prep shows only TornFCA users who synced the current war, never the whole roster as incomplete
 - submit a chat report
 - verify owner moderation/recovery; test wider moderator capabilities only after policy is explicitly configured
 - read/save training content with an authorized account
