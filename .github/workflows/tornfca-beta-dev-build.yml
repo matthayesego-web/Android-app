@@ -117,6 +117,7 @@ jobs:
           grep -q "versionCode='${VERSION_CODE}'" apk-badging.txt
           grep -q "versionName='${VERSION_NAME}-beta'" apk-badging.txt
           grep -q "application-label:'Torn FCA Beta'" apk-badging.txt
+          sha256sum "$OUT" | tee apk-sha256.txt
 
       - name: Upload signed Beta APK
         uses: actions/upload-artifact@v7
@@ -126,10 +127,40 @@ jobs:
             TornFCA-Beta-v${{ env.VERSION_NAME }}.apk
             apk-badging.txt
             signer-verification.txt
+            apk-sha256.txt
           if-no-files-found: error
           retention-days: 30
 
+      - name: Publish connector-readable Beta snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/TornFCA-Beta-v${VERSION_NAME}.apk"
+          PUB="$RUNNER_TEMP/tornfca-beta-publish"
+          rm -rf "$PUB"
+          mkdir -p "$PUB"
+          cd "$PUB"
+          git init
+          git checkout --orphan beta-artifacts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          cp "$GITHUB_WORKSPACE/apk-badging.txt" .
+          cp "$GITHUB_WORKSPACE/signer-verification.txt" .
+          cp "$GITHUB_WORKSPACE/apk-sha256.txt" .
+          base64 -w 0 "$OUT" > TornFCA-Beta-latest.apk.b64
+          split -b 180000 -d -a 3 TornFCA-Beta-latest.apk.b64 TornFCA-Beta-latest.apk.b64.part.
+          rm TornFCA-Beta-latest.apk.b64
+          PARTS="$(find . -maxdepth 1 -name 'TornFCA-Beta-latest.apk.b64.part.*' | wc -l | tr -d ' ')"
+          SHA="$(awk '{print $1}' apk-sha256.txt)"
+          printf 'version_name=%s\nversion_code=%s\npackage=com.matthayesego.duckforcetoolkit.beta\nparts=%s\nchunk_bytes=180000\nsha256=%s\nsource_commit=%s\n' "$VERSION_NAME" "$VERSION_CODE" "$PARTS" "$SHA" "$GITHUB_SHA" > build-info.txt
+          git add .
+          git commit -m "Publish TornFCA Beta v${VERSION_NAME}"
+          git push --force origin HEAD:beta-artifacts
+
       - name: Publish latest Beta prerelease
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -146,7 +177,7 @@ jobs:
           else
             gh release create "$TAG" --title "TornFCA Beta v${VERSION_NAME}" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
-          gh release upload "$TAG" "$OUT" apk-badging.txt signer-verification.txt --clobber
+          gh release upload "$TAG" "$OUT" apk-badging.txt signer-verification.txt apk-sha256.txt --clobber
 
       - name: Remove temporary keystore
         if: always()
