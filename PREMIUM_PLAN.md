@@ -13,7 +13,7 @@ For the detailed tool-by-tool release boundary, see `docs/PREMIUM_MATRIX_0.10.1.
 Default for every authenticated Torn player.
 
 ### PREMIUM
-Player-level entitlement keyed to the verified numeric Torn `player_id`. It follows the player between factions. The backend is authoritative; the Android app caches only backend-verified state.
+Player-level entitlement keyed to the verified numeric Torn `player_id`. It follows the player between factions. The backend is authoritative; Android caches only backend-verified state.
 
 A separate faction-wide paid tier is **deferred beyond v1.0**. The older Faction Pro concept is not a v1.0 dependency and must not be implied in current product copy or authorization logic.
 
@@ -87,31 +87,46 @@ These are roadmap candidates, not implemented features unless separately shipped
 
 ## Payment / entitlement behavior
 
-Current Premium backend source supports a configurable Torn in-game item-payment model and defaults to 15 Premium days per Xanax with stacking enabled. The payment backend must be deployed and live-tested before production monetization is considered active.
+Premium backend v1.2.0 contains a prepared, configurable Torn item-payment model whose current defaults are 15 Premium days per Xanax, required message `TORNFCA`, and stacking enabled.
 
-Production rules:
+**Prepared does not mean enabled.** Automatic paid entitlement processing is fail-closed by default:
+
+- setup defaults `MONETIZATION_APPROVED=false`
+- the payment scan trigger cannot be installed while false
+- the payment scanner refuses to process while false
+- owner-only manual grants remain available so backend-verified Premium can be tested without accepting real payments
+
+Before setting `MONETIZATION_APPROVED=true`, the operator must handle Torn's applicable requirement for API-tool creators who intend to charge users and must choose a payment path permitted by the actual distribution channel. A Google Play build must separately comply with the applicable Play billing/payment program.
+
+Production entitlement rules:
 - Numeric Torn player ID is the entitlement identity.
 - Status reads require the signed-in user's Torn key and can only read that user's entitlement.
 - Admin grant/config changes require verified owner identity plus the admin password.
 - Client-side payment claims never grant Premium.
 - Expired entitlement falls back to Free.
 - Remote `disable_premium`, maintenance and minimum-version controls override entitlement.
+- Automatic receipt processing is locked/replay-safe and honors stacking only after the separate monetization gate is deliberately enabled.
 
 ## Developer testing
 
 Owner-only Premium simulation exists to test both matrix states. It defaults OFF, is accepted only for the verified developer player ID, is applied by `PremiumAccess`, and is never written into the backend entitlement cache.
 
+For a stronger end-to-end test, use the deployed backend's owner-only manual grant while `MONETIZATION_APPROVED=false`.
+
 ## Release gate
 
-Before v1.0.0:
+Before v1.0.0 app release readiness:
 1. Deploy/redeploy all five Apps Script backends.
 2. Configure the backend URLs in the signed candidate.
-3. Run the automated Premium Matrix audit.
-4. Device-test Free member, Free leader, Premium member, Premium leader, expired Premium, remote Premium disable and owner simulation.
-5. Verify basic FFScouter/TornStats use is identical for Free and Premium when provider consent/entitlement is the same.
-6. Verify no essential leadership route requires Premium.
-7. Verify backend entitlement refresh, expiration, revoke/grant and payment dedupe.
-8. Complete the final privacy/data-safety and release checklist.
+3. Keep automatic Premium monetization disabled during normal integration testing.
+4. Run the automated Premium Matrix and pre-1.0 source audits.
+5. Device-test Free member, Free leader, Premium member, Premium leader, expired Premium, remote Premium disable and owner simulation/manual grant.
+6. Verify basic FFScouter/TornStats use is identical for Free and Premium when provider consent/entitlement is the same.
+7. Verify no essential leadership route requires Premium.
+8. Verify backend entitlement refresh, expiration and manual grant behavior.
+9. Complete privacy/data-safety and release checks.
+
+Automatic production charging has its own additional gate: Torn approval/requirements + a valid distribution-channel payment path + payment replay/stacking smoke tests. The app architecture can reach v1.0 readiness while that switch remains off if Premium is not being sold yet.
 
 ## Version policy
 
