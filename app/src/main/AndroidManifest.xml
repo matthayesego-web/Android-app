@@ -40,6 +40,7 @@
         <activity android:name=".TrainingAdminActivity" android:exported="false"/>
         <activity android:name=".TrainingProgressActivity" android:exported="false"/>
         <activity android:name=".WarPrepActivity" android:exported="false"/>
+        <activity android:name=".WarPrepLeadershipActivity" android:exported="false"/>
         <activity android:name=".WarHubActivity" android:exported="false"/>
         <activity android:name=".TerritoryWarActivity" android:exported="false"/>
         <activity android:name=".TerritoryWarDetailActivity" android:exported="false"/>
