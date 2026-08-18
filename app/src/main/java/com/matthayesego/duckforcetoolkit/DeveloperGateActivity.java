@@ -1,10 +1,15 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
@@ -14,53 +19,56 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import org.json.JSONObject;
 
-/** Hidden triple-tap developer entry. Requires both the configured password and verified owner identity. */
+import java.util.UUID;
+
+/** Hidden developer entry. Authorization is backend username + password + per-account TOTP. */
 public class DeveloperGateActivity extends Activity {
-    private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(15,20,28),BORDER=Color.rgb(45,55,69),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(154,164,178),GOLD=Color.rgb(241,194,106),BAD=Color.rgb(248,81,73),BLUE=Color.rgb(88,166,255);
-    private SecureApiKeyStore keyStore;
+    private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(15,20,28),BORDER=Color.rgb(45,55,69),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(154,164,178),GOLD=Color.rgb(241,194,106),BAD=Color.rgb(248,81,73),BLUE=Color.rgb(88,166,255),GREEN=Color.rgb(63,185,80),PURPLE=Color.rgb(163,113,247);
+    private DeveloperSessionStore sessions;
+    private String enrollmentToken="",enrollmentSecret="",enrollmentUri="";
 
-    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);renderPassword(null);}
+    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);sessions=new DeveloperSessionStore(this);checkExistingSession();}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
+    private Button button(String label,int stroke){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(TEXT);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackground(rounded(PANEL,stroke,12));return b;}
+    private EditText field(String hint,boolean password,boolean numeric){EditText e=new EditText(this);e.setHint(hint);e.setHintTextColor(MUTED);e.setTextColor(TEXT);e.setSingleLine(true);e.setPadding(dp(14),0,dp(14),0);e.setBackground(rounded(BG,BORDER,12));if(password)e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);else if(numeric)e.setInputType(InputType.TYPE_CLASS_NUMBER);return e;}
     @SuppressWarnings("deprecation") private ScrollView shell(){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.setBackgroundColor(BG);int l=dp(18),t=dp(22),r=dp(18),b=dp(28);s.setPadding(l,t,r,b);s.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(l+i.getSystemWindowInsetLeft(),t+i.getSystemWindowInsetTop(),r+i.getSystemWindowInsetRight(),b+i.getSystemWindowInsetBottom());return i;});return s;}
+    private LinearLayout base(ScrollView s,String subtitle){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);r.setGravity(Gravity.CENTER_HORIZONTAL);s.addView(r,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));TextView brand=text("TORNFCA • DEVELOPER CHANNEL",11,GOLD,true);brand.setLetterSpacing(.12f);brand.setGravity(Gravity.CENTER);r.addView(brand);TextView title=text("Developer Console",30,TEXT,true);title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(7);r.addView(title,tp);TextView sub=text(subtitle,12,MUTED,false);sub.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(5);sp.bottomMargin=dp(18);r.addView(sub,sp);return r;}
+    private LinearLayout card(int stroke){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(18),dp(18),dp(18),dp(18));c.setBackground(rounded(PANEL,stroke,18));return c;}
+    private void addField(LinearLayout card,EditText field){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(54));p.topMargin=dp(9);card.addView(field,p);}
 
-    private void renderPassword(String error){
-        ScrollView s=shell();LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);r.setGravity(Gravity.CENTER_HORIZONTAL);s.addView(r,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView brand=text("TORNFCA • HIDDEN DEVELOPER CHANNEL",11,GOLD,true);brand.setLetterSpacing(.12f);brand.setGravity(Gravity.CENTER);r.addView(brand);
-        TextView title=text("Developer Console",30,TEXT,true);title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(7);tp.bottomMargin=dp(18);r.addView(title,tp);
-        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(18),dp(18),dp(18),dp(18));card.setBackground(rounded(PANEL,BLUE,18));card.addView(text("Developer password",19,TEXT,true));
-        TextView body=text("This console is intentionally absent from normal navigation. Access requires the configured developer password and the verified Torn identity assigned to the app owner.",13,MUTED,false);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(6);card.addView(body,bp);
-        EditText pass=new EditText(this);pass.setHint("Developer password");pass.setHintTextColor(MUTED);pass.setTextColor(TEXT);pass.setSingleLine(true);pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);pass.setPadding(dp(14),0,dp(14),0);pass.setBackground(rounded(BG,BORDER,12));LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(54));pp.topMargin=dp(15);card.addView(pass,pp);
-        Button unlock=new Button(this);unlock.setText("Open Developer Panel");unlock.setAllCaps(false);unlock.setTextColor(Color.rgb(24,17,8));unlock.setTextSize(15);unlock.setTypeface(Typeface.DEFAULT,Typeface.BOLD);unlock.setBackground(rounded(GOLD,GOLD,12));LinearLayout.LayoutParams up=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));up.topMargin=dp(11);card.addView(unlock,up);
-        TextView status=text(error==null?"Triple tap footer + developer password + verified owner account":error,12,error==null?MUTED:BAD,false);status.setGravity(Gravity.CENTER);LinearLayout.LayoutParams st=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);st.topMargin=dp(9);card.addView(status,st);r.addView(card,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-        unlock.setOnClickListener(v->{String entered=pass.getText().toString();if(!BuildConfig.DEVELOPER_ACCESS_SHA256.equals(sha256(entered))){status.setText("Incorrect developer password.");status.setTextColor(BAD);pass.setText("");return;}resolveContextAndOpen();});
+    private void checkExistingSession(){DeveloperSessionStore.Session s=sessions.load();if(s==null||!DeveloperBackendClient.isConfigured()){renderLogin(null);return;}renderChecking();new Thread(()->{try{DeveloperBackendClient.developerSession(s.token);runOnUiThread(this::openPanel);}catch(Exception e){sessions.clear();runOnUiThread(()->renderLogin("Developer session expired. Sign in again."));}},"TornFCA-DevSessionCheck").start();}
+    private void renderChecking(){ScrollView s=shell();LinearLayout r=base(s,"Checking the encrypted developer session on this device…");LinearLayout c=card(BLUE);c.addView(text("Verifying access",18,TEXT,true));c.addView(text("Developer sessions are short-lived and can be revoked from the access manager.",12,MUTED,false));r.addView(c,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));setContentView(s);s.requestApplyInsets();}
+
+    private void renderLogin(String error){
+        ScrollView s=shell();LinearLayout r=base(s,"Hidden entry • password + authenticator verification");LinearLayout c=card(BLUE);c.addView(text("Developer sign in",19,TEXT,true));c.addView(text("Use your individual developer credentials. Torn player identity is not used as the developer-login lock.",12,MUTED,false));
+        EditText username=field("Developer username",false,false),password=field("Developer password",true,false),otp=field("6-digit authenticator code",false,true);addField(c,username);addField(c,password);addField(c,otp);
+        Button unlock=button("Open Developer Panel",GOLD);LinearLayout.LayoutParams up=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));up.topMargin=dp(12);c.addView(unlock,up);TextView status=text(error==null?(DeveloperBackendClient.isConfigured()?"Authenticator codes rotate every 30 seconds. Repeated failures trigger server lockouts.":"Developer backend is not configured in this build."):error,12,error==null?MUTED:BAD,false);status.setGravity(Gravity.CENTER);LinearLayout.LayoutParams st=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);st.topMargin=dp(9);c.addView(status,st);r.addView(c,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        Button enroll=button("Enroll with Invitation Code",PURPLE);LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48));ep.topMargin=dp(12);r.addView(enroll,ep);enroll.setOnClickListener(v->renderEnrollmentBegin(null));
+        unlock.setEnabled(DeveloperBackendClient.isConfigured());unlock.setOnClickListener(v->{String u=username.getText().toString().trim(),p=password.getText().toString(),o=otp.getText().toString().trim();if(u.isEmpty()||p.isEmpty()||o.length()!=6){status.setText("Username, password and current 6-digit code are required.");status.setTextColor(BAD);return;}unlock.setEnabled(false);new Thread(()->{try{JSONObject response=DeveloperBackendClient.developerLogin(u,p,o,deviceId());saveSession(response);runOnUiThread(this::openPanel);}catch(Exception e){String m=e.getMessage()==null?"Developer authorization failed.":e.getMessage();runOnUiThread(()->{unlock.setEnabled(true);status.setText(m);status.setTextColor(BAD);password.setText("");otp.setText("");});}},"TornFCA-DeveloperLogin").start();});
         setContentView(s);s.requestApplyInsets();
     }
 
-    private void resolveContextAndOpen(){
-        String key=keyStore.load();
-        if(key==null||key.trim().isEmpty()){renderPassword("Reconnect your Torn API key before opening developer controls.");return;}
-        FactionScopeCache.Scope cached=FactionScopeCache.load(this,key);
-        if(cached!=null){
-            if(cached.playerId!=BuildConfig.DEVELOPER_PLAYER_ID){renderPassword("Developer controls are restricted to the verified owner account.");return;}
-            openPanel(cached.factionId,cached.factionName,cached.position,cached.factionApiAccess);return;
-        }
-        new Thread(()->{
-            try{
-                AuthSession session=TornApiClient.authenticate(key);FactionScopeCache.save(this,key,session);
-                runOnUiThread(()->{
-                    if(session.playerId!=BuildConfig.DEVELOPER_PLAYER_ID){renderPassword("Developer controls are restricted to the verified owner account.");return;}
-                    openPanel(session.factionId,session.factionName,session.position,session.factionApiAccess);
-                });
-            }catch(Exception e){runOnUiThread(()->renderPassword("Unable to verify the developer account. Reconnect and try again."));}
-        },"TornFCA-DeveloperIdentity").start();
+    private void renderEnrollmentBegin(String error){
+        ScrollView s=shell();LinearLayout r=base(s,"One-time developer enrollment");LinearLayout c=card(PURPLE);c.addView(text("Use invitation code",19,TEXT,true));c.addView(text("An Admin or Root Admin creates this one-time code. It expires automatically and can only enroll the assigned developer account.",12,MUTED,false));
+        EditText invite=field("Invitation code",false,false),password=field("Create password (14+ characters)",true,false),confirm=field("Confirm password",true,false);addField(c,invite);addField(c,password);addField(c,confirm);Button begin=button("Set Up Authenticator",PURPLE);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));bp.topMargin=dp(12);c.addView(begin,bp);TextView status=text(error==null?"Your password is never stored as plaintext.":error,12,error==null?MUTED:BAD,false);status.setGravity(Gravity.CENTER);LinearLayout.LayoutParams st=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);st.topMargin=dp(8);c.addView(status,st);r.addView(c,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));Button back=button("Back to Developer Sign In",BORDER);LinearLayout.LayoutParams backp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));backp.topMargin=dp(12);r.addView(back,backp);back.setOnClickListener(v->renderLogin(null));
+        begin.setEnabled(DeveloperBackendClient.isConfigured());begin.setOnClickListener(v->{String code=invite.getText().toString().trim(),p=password.getText().toString(),q=confirm.getText().toString();if(code.isEmpty()||p.length()<14||!p.equals(q)){status.setText(p.length()<14?"Password must be at least 14 characters.":"Passwords must match.");status.setTextColor(BAD);return;}begin.setEnabled(false);new Thread(()->{try{JSONObject response=DeveloperBackendClient.enrollmentBegin(code,p,deviceId());enrollmentToken=response.optString("enrollment_token","");enrollmentSecret=response.optString("totp_secret","");enrollmentUri=response.optString("otpauth_uri","");runOnUiThread(()->renderEnrollmentVerify(response.optString("username","Developer"),null));}catch(Exception e){String m=e.getMessage()==null?"Unable to begin enrollment.":e.getMessage();runOnUiThread(()->{begin.setEnabled(true);status.setText(m);status.setTextColor(BAD);});}},"TornFCA-DeveloperEnrollBegin").start();});
+        setContentView(s);s.requestApplyInsets();
     }
 
-    private void openPanel(int factionId,String factionName,String position,boolean factionApiAccess){Intent i=new Intent(this,DeveloperPanelActivity.class);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,factionId);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,factionName);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,factionApiAccess);i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,position);startActivity(i);finish();}
-    private static String sha256(String value){try{MessageDigest md=MessageDigest.getInstance("SHA-256");byte[] digest=md.digest(value.getBytes(StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();for(byte x:digest)b.append(String.format("%02X",x));return b.toString();}catch(Exception e){return"";}}
+    private void renderEnrollmentVerify(String username,String error){
+        ScrollView s=shell();LinearLayout r=base(s,"Authenticator enrollment for "+username);LinearLayout c=card(GREEN);c.addView(text("Add TornFCA to your authenticator",19,TEXT,true));c.addView(text("Open the authenticator link or manually add the setup key below. Then enter the current 6-digit code to activate this developer account.",12,MUTED,false));TextView secret=text(enrollmentSecret,16,GOLD,true);secret.setGravity(Gravity.CENTER);secret.setTextIsSelectable(true);LinearLayout.LayoutParams sk=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sk.topMargin=dp(14);c.addView(secret,sk);
+        Button open=button("Open Authenticator",BLUE),copy=button("Copy Setup Key",BORDER);LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));op.topMargin=dp(10);c.addView(open,op);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));cp.topMargin=dp(7);c.addView(copy,cp);open.setOnClickListener(v->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(enrollmentUri)));}catch(Exception ex){Toast.makeText(this,"No authenticator app accepted the setup link. Use the setup key instead.",Toast.LENGTH_LONG).show();}});copy.setOnClickListener(v->{ClipboardManager cm=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);if(cm!=null)cm.setPrimaryClip(ClipData.newPlainText("TornFCA authenticator key",enrollmentSecret));Toast.makeText(this,"Setup key copied.",Toast.LENGTH_SHORT).show();});
+        EditText otp=field("Current 6-digit authenticator code",false,true);addField(c,otp);Button finish=button("Activate Developer Account",GREEN);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));fp.topMargin=dp(12);c.addView(finish,fp);TextView status=text(error==null?"The setup key is unique to this developer account.":error,12,error==null?MUTED:BAD,false);status.setGravity(Gravity.CENTER);LinearLayout.LayoutParams st=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);st.topMargin=dp(8);c.addView(status,st);r.addView(c,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        finish.setOnClickListener(v->{String code=otp.getText().toString().trim();if(code.length()!=6){status.setText("Enter the current 6-digit authenticator code.");status.setTextColor(BAD);return;}finish.setEnabled(false);new Thread(()->{try{JSONObject response=DeveloperBackendClient.enrollmentComplete(enrollmentToken,code,deviceId());saveSession(response);runOnUiThread(this::openPanel);}catch(Exception e){String m=e.getMessage()==null?"Enrollment verification failed.":e.getMessage();runOnUiThread(()->{finish.setEnabled(true);status.setText(m);status.setTextColor(BAD);otp.setText("");});}},"TornFCA-DeveloperEnrollFinish").start();});setContentView(s);s.requestApplyInsets();
+    }
+
+    private void saveSession(JSONObject response)throws Exception{JSONObject dev=response.optJSONObject("developer");String token=response.optString("developer_session",""),username=dev==null?"Developer":dev.optString("username","Developer"),role=dev==null?"developer":dev.optString("role","developer");long expires=response.optLong("expires_at",0L);sessions.save(token,username,role,expires);}
+    private void openPanel(){DeveloperSessionStore.Session session=sessions.load();if(session==null){renderLogin("Developer session unavailable.");return;}Intent i=new Intent(this,DeveloperPanelActivity.class);String key=new SecureApiKeyStore(this).load();FactionScopeCache.Scope scope=key==null?null:FactionScopeCache.load(this,key);if(scope!=null){i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,scope.factionId);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,scope.factionName);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,scope.factionApiAccess);i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,scope.position);}i.putExtra(DeveloperPanelActivity.EXTRA_DEVELOPER_ROLE,session.role);i.putExtra(DeveloperPanelActivity.EXTRA_DEVELOPER_USERNAME,session.username);startActivity(i);finish();}
+    private String deviceId(){SharedPreferences p=getSharedPreferences("tornfca_developer_device_v1",MODE_PRIVATE);String id=p.getString("device_id","");if(id==null||id.isBlank()){id=UUID.randomUUID().toString();p.edit().putString("device_id",id).apply();}return id;}
 }
