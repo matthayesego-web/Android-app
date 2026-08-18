@@ -17,11 +17,12 @@ jobs:
           set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           BUILD_TOOLS="$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          mkdir -p recovery-tools/lib
+          mkdir -p recovery-tools/lib recovery-tools/lib64
           cp "$BUILD_TOOLS/apksigner" recovery-tools/apksigner
           cp "$BUILD_TOOLS/lib/apksigner.jar" recovery-tools/lib/apksigner.jar
           cp "$BUILD_TOOLS/zipalign" recovery-tools/zipalign
           cp "$BUILD_TOOLS/aapt" recovery-tools/aapt
+          if [ -f "$BUILD_TOOLS/lib64/libc++.so" ]; then cp "$BUILD_TOOLS/lib64/libc++.so" recovery-tools/lib64/libc++.so; fi
           chmod +x recovery-tools/apksigner recovery-tools/zipalign recovery-tools/aapt
           printf '%s\n' "$BUILD_TOOLS" > recovery-tools/build-tools-path.txt
       - name: Upload recovery tools
