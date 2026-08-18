@@ -37,14 +37,16 @@ public class FeatureRouterActivity extends Activity {
         if(!isKnownTarget(target)){showStatus("This TornFCA feature route is unavailable.",BAD);return;}
         if(key==null||key.trim().isEmpty()){showStatus("No active Torn API key is available. Return to TornFCA and sign in again.",BAD);return;}
         if(!TARGET_DEVELOPER.equals(target)&&blockedByPolicy(target))return;
-        if(!TARGET_DEVELOPER.equals(target)){
+
+        final boolean freshFaction=requiresLeadership(target);
+        if(!TARGET_DEVELOPER.equals(target)&&!freshFaction){
             FactionScopeCache.Scope cached=FactionScopeCache.load(this,key);
             if(cached!=null){launchFeature(target,cached.factionId,cached.factionName,cached.position,cached.factionApiAccess);return;}
             AuthSession hot=TornApiClient.cachedSession(key);
             if(hot!=null){FactionScopeCache.save(this,key,hot);launchFeature(target,hot.factionId,hot.factionName,hot.position,hot.factionApiAccess);return;}
         }
-        showStatus("Verifying faction scope…",GOLD);
-        new Thread(()->{try{AuthSession session=TornApiClient.authenticate(key);FactionScopeCache.save(this,key,session);runOnUiThread(()->launchVerified(target,session));}catch(Exception e){String message=e.getMessage()==null?"Unable to verify faction scope.":e.getMessage();runOnUiThread(()->showStatus(message,BAD));}}).start();
+        showStatus(freshFaction?"Re-verifying current faction leadership…":"Verifying faction scope…",GOLD);
+        new Thread(()->{try{AuthSession session=freshFaction?TornApiClient.authenticateFreshFaction(key):TornApiClient.authenticate(key);FactionScopeCache.save(this,key,session);runOnUiThread(()->launchVerified(target,session));}catch(Exception e){String message=e.getMessage()==null?"Unable to verify faction scope.":e.getMessage();runOnUiThread(()->showStatus(message,BAD));}}).start();
     }
 
     private boolean blockedByPolicy(String target){
