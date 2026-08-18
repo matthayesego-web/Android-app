@@ -41,6 +41,7 @@ public class MemberDossierActivity extends Activity {
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);
+        int playerId=PremiumAccess.currentPlayerId(this);PremiumAccess.refresh(this,playerId);if(!PremiumAccess.has(this,playerId,PremiumAccess.MEMBER_DOSSIER)){startActivity(new Intent(this,PremiumPreviewActivity.class));finish();return;}
         factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);String fn=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);if(fn!=null&&!fn.isBlank())factionName=fn;
         JSONArray cached=FactionMemberCache.load(factionId);if(cached!=null){members=cached;showLoading("Loading opted-in battle intelligence…");loadProviders();}else{showLoading("Loading faction roster…");loadRoster();}
     }
