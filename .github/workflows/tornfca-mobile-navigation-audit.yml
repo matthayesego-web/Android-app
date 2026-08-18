@@ -1,4 +1,4 @@
-name: TornFCA Mobile Navigation Audit
+name: TornFCA Mobile Command Navigation Audit
 
 on:
   push:
@@ -13,61 +13,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Verify simplified persistent navigation
+      - name: Verify persistent five-section command navigation
         run: |
           set -euo pipefail
-          CURRENT=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
-          HOTFIX=app/src/main/java/com/matthayesego/duckforcetoolkit/CurrentShellVisualHotfix.java
-          GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          COMMAND=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
+          SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
+          UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
           WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
 
-          # Five tabs for members, Leadership conditionally adds the sixth.
-          grep -q 'navItem("Home"' "$CURRENT"
-          grep -q 'navItem("Faction"' "$CURRENT"
-          grep -q 'navItem("War"' "$CURRENT"
-          grep -q 'navItem("Training"' "$CURRENT"
-          grep -q 'if(identity!=null&&identity.leader)nav.addView(navItem("Leadership"' "$CURRENT"
-          grep -q 'navItem("More"' "$CURRENT"
+          # Exactly the approved five top-level command sections.
+          grep -q 'navItem("Home"' "$COMMAND"
+          grep -q 'navItem("Members"' "$COMMAND"
+          grep -q 'navItem("Training"' "$COMMAND"
+          grep -q 'navItem("Operations"' "$COMMAND"
+          grep -q 'navItem("More"' "$COMMAND"
+          test "$(grep -o 'nav.addView(navItem(' "$COMMAND" | wc -l)" -eq 5
 
-          # Icon-first navigation hotfix is installed from the launcher.
-          grep -q 'CurrentShellVisualHotfix.install' "$GATE"
-          grep -q 'R.drawable.ic_nav_home' "$HOTFIX"
-          grep -q 'R.drawable.ic_nav_faction' "$HOTFIX"
-          grep -q 'R.drawable.ic_nav_war' "$HOTFIX"
-          grep -q 'R.drawable.ic_nav_training' "$HOTFIX"
-          grep -q 'R.drawable.ic_nav_leadership' "$HOTFIX"
-          grep -q 'R.drawable.ic_nav_more' "$HOTFIX"
-          grep -q 'tornfca-premium-action-label' "$HOTFIX"
+          # Home is summary/readiness, not a giant tool list.
+          grep -q '"Command Center"' "$COMMAND"
+          grep -q '"My Day"' "$COMMAND"
+          grep -q '"War Prep"' "$COMMAND"
+          grep -q 'NotificationInboxActivity.class' "$COMMAND"
 
-          # Home remains a summary instead of a full tool catalog.
-          grep -q '"Your faction companion"' "$CURRENT"
-          grep -q '"My Day"' "$CURRENT"
-          grep -q '"My War Prep"' "$CURRENT"
-          grep -q 'NotificationInboxActivity.class' "$CURRENT"
+          # Member, Training and Operations pages retain dedicated compositions.
+          grep -q '"Member Network"' "$COMMAND"
+          grep -q 'MemberDirectoryActivity.class' "$COMMAND"
+          grep -q 'FactionResourcesActivity.class' "$COMMAND"
+          grep -q 'FactionChatActivity.class' "$COMMAND"
+          grep -q '"Training Lab"' "$COMMAND"
+          grep -q 'TrainingCenterActivity.class' "$COMMAND"
+          grep -q 'TrainingProgressActivity.class' "$COMMAND"
+          grep -q '"Operations Command"' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_WAR' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_ACTIVITY' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_WAR_PAYOUT' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_BANKING' "$COMMAND"
 
-          # Faction and Leadership use explicit second-level groupings.
-          grep -q '"Faction Tools & Community"' "$CURRENT"
-          grep -q 'renderFactionTools' "$CURRENT"
-          grep -q '"People & Activity"' "$CURRENT"
-          grep -q '"War & Finance"' "$CURRENT"
-          grep -q '"Faction Operations"' "$CURRENT"
-          grep -q 'beginSubmenu' "$CURRENT"
+          # Leadership appears contextually within command pages rather than adding a sixth top-level tab.
+          grep -q 'if(identity.leader)' "$COMMAND"
+          ! grep -q 'navItem("Leadership"' "$COMMAND"
 
-          # Training is first-class and complete.
-          grep -q 'navItem("Training"' "$CURRENT"
-          grep -q 'TrainingCenterActivity.class' "$CURRENT"
-          grep -q 'TrainingProgressActivity.class' "$CURRENT"
-          grep -q 'TrainingAdminActivity.class' "$CURRENT"
+          # Secondary screens return to the canonical command section.
+          grep -q 'TornFcaCommandRuntime.homeIntent(activity,sectionFor(activity))' "$SURFACE"
+          grep -q 'TornFcaCommandRuntime.homeIntent(activity,section)' "$UX"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Operations")' "$WARHUB"
 
-          # Profile avatar identity is present on the persistent shell.
-          grep -q 'tornfca-profile-avatar' "$CURRENT"
-          grep -q 'duckforce_noir_art' "$CURRENT"
+          # Beta and production share navigation while branding remains variant-correct.
+          grep -q 'new Intent(context, BetaCommandActivity.class)' "$RUNTIME"
+          grep -q 'isBetaBuild() ? "TORN FCA BETA" : "TORN FCA"' "$RUNTIME"
+          grep -q 'replaceBetaCrest' "$RUNTIME"
 
-          # War compatibility routes feed back into the persistent War tab.
-          grep -q 'TornFcaCurrentActivity.class' "$WARHUB"
-          grep -q 'TornFcaCurrentActivity.EXTRA_SECTION,"War"' "$WARHUB"
-          grep -q 'WarCenterActivity.class' "$CURRENT"
-          grep -q 'TerritoryWarActivity.class' "$CURRENT"
-
-          echo 'TornFCA mobile navigation audit passed.'
+          echo 'TornFCA mobile command-navigation audit passed.'
