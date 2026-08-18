@@ -11,7 +11,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** Tenant-scoped TornFCA community transport for faction chat, moderation, training library and FCM device registration. */
+/** Tenant-scoped TornFCA community transport for chat, moderation, training, War Prep and FCM registration. */
 public final class CommunityBackendClient {
     private static final String BACKEND_URL=BuildConfig.COMMUNITY_BACKEND_URL==null?"":BuildConfig.COMMUNITY_BACKEND_URL.trim();
     private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android Community";
@@ -29,6 +29,10 @@ public final class CommunityBackendClient {
     public static JSONObject saveTrainingRules(String key,String statGainTarget,String xanaxTarget,String notes)throws IOException{JSONObject b=request("training_rules_save",key);put(b,"statGainTarget",statGainTarget);put(b,"xanaxTarget",xanaxTarget);put(b,"notes",notes);return postChecked(b,"Unable to save faction training rules.");}
     public static JSONObject saveTrainingGuide(String key,String id,String title,String category,String body)throws IOException{JSONObject b=request("training_guide_save",key);put(b,"id",id);put(b,"title",title);put(b,"category",category);put(b,"body",body);return postChecked(b,"Unable to save faction training guide.");}
     public static JSONObject archiveTrainingGuide(String key,String id)throws IOException{JSONObject b=request("training_guide_archive",key);put(b,"id",id);return postChecked(b,"Unable to archive faction training guide.");}
+    public static JSONObject warPrepState(String key,int warId)throws IOException{JSONObject b=request("warprep_state",key);put(b,"warId",warId);return postChecked(b,"Unable to load shared War Prep.").optJSONObject("warPrep");}
+    public static JSONObject saveWarPrepStatus(String key,int warId,JSONObject completed)throws IOException{JSONObject b=request("warprep_status_save",key);put(b,"warId",warId);put(b,"completed",completed==null?new JSONObject():completed);return postChecked(b,"Unable to sync War Prep status.").optJSONObject("warPrep");}
+    public static JSONObject warPrepLeadership(String key,int warId)throws IOException{JSONObject b=request("warprep_leadership",key);put(b,"warId",warId);return postChecked(b,"Unable to load faction War Prep status.").optJSONObject("warPrep");}
+    public static JSONObject saveWarPrepConfig(String key,JSONArray items)throws IOException{JSONObject b=request("warprep_config_save",key);put(b,"items",items==null?new JSONArray():items);return postChecked(b,"Unable to save faction War Prep options.").optJSONObject("warPrep");}
     public static void registerPushToken(String key,String token,String prefsJson)throws IOException{JSONObject b=request("push_register",key);put(b,"token",token);put(b,"preferences",prefsJson);put(b,"platform","android");postChecked(b,"Unable to register this device for push notifications.");}
     public static void unregisterPushToken(String key,String token)throws IOException{JSONObject b=request("push_unregister",key);put(b,"token",token);postChecked(b,"Unable to unregister this device from push notifications.");}
     public static void sendPushTest(String key)throws IOException{postChecked(request("push_test",key),"Unable to send a cloud push test.");}
