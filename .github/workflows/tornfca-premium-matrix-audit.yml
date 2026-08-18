@@ -35,8 +35,8 @@ jobs:
           MATRIX=docs/PREMIUM_MATRIX_0.10.1.md
           PLAN=PREMIUM_PLAN.md
 
-          grep -q 'versionName = "0.10.1"' "$GRADLE"
-          grep -q 'versionCode = 56' "$GRADLE"
+          grep -q 'versionName = "0.10.2"' "$GRADLE"
+          grep -q 'versionCode = 57' "$GRADLE"
 
           # Production entitlement cache must never contain developer simulation logic.
           if grep -q 'simulatePremium' "$STORE"; then
@@ -139,4 +139,4 @@ jobs:
           grep -q 'Premium leadership view: 30-day review' "$PLAN"
           grep -q 'A separate faction-wide paid tier is \*\*deferred beyond v1.0\*\*' "$PLAN"
 
-          echo 'TornFCA v0.10.1 Premium matrix audit passed.'
+          echo 'TornFCA v0.10.2 Premium matrix audit passed.'
