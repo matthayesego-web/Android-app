@@ -25,12 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/**
- * Beta-wide command-surface styling for secondary screens. The main BetaCommandActivity owns its
- * own layout and is intentionally excluded; this class brings the same visual language and a
- * console return rail to the proven feature Activities underneath it without changing their data
- * or permission logic.
- */
+/** Command-surface styling for secondary screens under the canonical TornFCA command shell. */
 public final class BetaSurfacePolish {
     private static final String RAIL_TAG="tornfca-beta-context-rail";
     private static final int BG=Color.rgb(3,6,10),PANEL=Color.rgb(9,15,23),PANEL_2=Color.rgb(13,21,32),PANEL_3=Color.rgb(19,29,43);
@@ -66,7 +61,8 @@ public final class BetaSurfacePolish {
         animateOnce(activity,root);
     }
 
-    private static boolean isBeta(){return BuildConfig.APPLICATION_ID!=null&&BuildConfig.APPLICATION_ID.endsWith(".beta");}
+    /** Historical name retained to avoid churn; now means canonical command runtime is enabled. */
+    private static boolean isBeta(){return TornFcaCommandRuntime.enabled();}
     private static boolean skip(Activity activity){return activity instanceof BetaCommandActivity||activity instanceof AccessGateActivity;}
 
     private static void attach(Activity activity){
@@ -109,7 +105,7 @@ public final class BetaSurfacePolish {
     }
 
     private static void openConsole(Activity activity){
-        Intent i=new Intent(activity,BetaCommandActivity.class);i.putExtra(BetaCommandActivity.EXTRA_SECTION,sectionFor(activity));i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);
+        Intent i=TornFcaCommandRuntime.homeIntent(activity,sectionFor(activity));i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);
     }
 
     private static String sectionFor(Activity activity){
@@ -122,12 +118,12 @@ public final class BetaSurfacePolish {
     }
 
     private static String contextLabel(Activity activity){
-        String section=sectionFor(activity);
-        if("Training".equals(section))return"TRAINING LAB  •  BETA";
-        if("Operations".equals(section))return"OPERATIONS COMMAND  •  BETA";
-        if("Members".equals(section))return"MEMBER NETWORK  •  BETA";
-        if("More".equals(section))return"APP CONTROL  •  BETA";
-        return"COMMAND TOOL  •  BETA";
+        String section=sectionFor(activity),suffix=TornFcaCommandRuntime.isBetaBuild()?"  •  BETA":"";
+        if("Training".equals(section))return"TRAINING LAB"+suffix;
+        if("Operations".equals(section))return"OPERATIONS COMMAND"+suffix;
+        if("Members".equals(section))return"MEMBER NETWORK"+suffix;
+        if("More".equals(section))return"APP CONTROL"+suffix;
+        return"COMMAND TOOL"+suffix;
     }
 
     private static void polishTree(Activity activity,View view){
