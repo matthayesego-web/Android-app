@@ -1,16 +1,20 @@
 /**
- * TornFCA global premium entitlement backend.
- * Deploy as a SEPARATE Apps Script web app from the per-faction backend.
+ * TornFCA global premium entitlement backend v1.0.0.
+ * Deploy as a SEPARATE Apps Script web app from faction/community/developer backends.
  *
  * Security:
- * - The owner Torn key lives only in Script Properties as OWNER_API_KEY.
- * - The app never submits a payment claim; it only reads server-verified entitlement state.
+ * - Status reads require a Torn API key and can only read the verified caller's own entitlement.
+ * - Admin mutations require BOTH verified TornFCA owner identity and the premium admin password.
+ * - Client API keys are never persisted; only SHA-256 fingerprints may be used for short-lived identity cache keys.
+ * - The owner Torn key used by the payment scanner lives only in Script Properties as OWNER_API_KEY.
  * - Incoming payments are deduped by Torn log id.
  *
  * API load:
  * - scanPremiumPayments() is intended to run once per minute: one Torn /user log request/minute.
+ * - entitlement identity verification is cached briefly by API-key fingerprint.
  */
-const TORNFCA_PREMIUM_VERSION='0.9.13';
+const TORNFCA_PREMIUM_VERSION='1.0.0';
+const TORNFCA_PREMIUM_DEVELOPER_ID=3987363;
 const TORNFCA_XANAX_ITEM_ID=206;
 const TORNFCA_ITEM_RECEIVE_LOG=4103;
 const P_SHEETS=Object.freeze({SETTINGS:'PremiumSettings',ENTITLEMENTS:'PremiumEntitlements',PAYMENTS:'PremiumPayments'});
@@ -19,12 +23,12 @@ function setupTornFcaPremiumBackend(){
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   PropertiesService.getScriptProperties().setProperty('PREMIUM_SHEET_ID',ss.getId());
   const settings=ensurePremiumSheet_(ss,P_SHEETS.SETTINGS,['key','value']);
-  setPremiumSetting_(settings,'days_per_xanax','15');
+  setPremiumSettingIfMissing_(settings,'days_per_xanax','15');
   setPremiumSettingIfMissing_(settings,'required_message','TORNFCA');
   setPremiumSettingIfMissing_(settings,'stacking','true');
   ensurePremiumSheet_(ss,P_SHEETS.ENTITLEMENTS,['player_id','tier','expires_at','updated_at','source','total_xanax']);
   ensurePremiumSheet_(ss,P_SHEETS.PAYMENTS,['log_id','timestamp','sender_id','xanax_qty','days_added','message','processed_at']);
-  return {ok:true,next:'Set Script Property OWNER_API_KEY to a custom Torn key with user log access for Item receive (4103), then run installPremiumScanTrigger().'};
+  return {ok:true,version:TORNFCA_PREMIUM_VERSION,next:'Set OWNER_API_KEY and the premium admin password in Script Properties, then run installPremiumScanTrigger().'};
 }
 
 function installPremiumScanTrigger(){
@@ -39,14 +43,23 @@ function setPremiumAdminPassword(password){
   return 'Premium admin password updated.';
 }
 
-function doGet(){return premiumJson_({ok:true,app:'TornFCA Premium Entitlements',version:TORNFCA_PREMIUM_VERSION});}
+function doGet(){return premiumJson_({ok:true,app:'TornFCA Premium Entitlements',version:TORNFCA_PREMIUM_VERSION,authenticated_actions:'POST only'});}
 
 function doPost(e){
   try{
     const body=JSON.parse((e&&e.postData&&e.postData.contents)||'{}');
     const action=String(body.action||'status');
-    if(action==='status')return premiumJson_({ok:true,entitlement:readEntitlement_(Number(body.player_id||0))});
+    const apiKey=String(body.apiKey||'').trim();
+    if(!apiKey)throw new Error('API key required.');
+    const user=verifyPremiumUser_(apiKey);
+
+    if(action==='status'){
+      const requested=Number(body.player_id||user.id);
+      if(requested!==user.id)throw new Error('Premium entitlement reads are limited to the verified signed-in player.');
+      return premiumJson_({ok:true,entitlement:readEntitlement_(user.id)});
+    }
     if(action==='admin_config'){
+      requirePremiumDeveloper_(user);
       requirePremiumAdmin_(String(body.admin_password||''));
       const days=Math.max(1,Math.min(365,Number(body.days_per_xanax||15)));
       const required=String(body.required_message==null?'TORNFCA':body.required_message).trim().slice(0,80);
@@ -56,6 +69,7 @@ function doPost(e){
       return premiumJson_({ok:true,config:readPremiumConfig_()});
     }
     if(action==='admin_grant'){
+      requirePremiumDeveloper_(user);
       requirePremiumAdmin_(String(body.admin_password||''));
       const playerId=Number(body.player_id||0),days=Math.max(1,Math.min(3650,Number(body.days||0)));
       if(!playerId||!days)throw new Error('Valid player_id and days required.');
@@ -63,6 +77,28 @@ function doPost(e){
     }
     throw new Error('Unknown action.');
   }catch(err){return premiumJson_({ok:false,error:String(err&&err.message||err)});}
+}
+
+function verifyPremiumUser_(apiKey){
+  const fingerprint=sha256_(apiKey).toLowerCase(),cache=CacheService.getScriptCache(),cacheKey='premium_identity:'+fingerprint;
+  const cached=cache.get(cacheKey);
+  if(cached){try{return JSON.parse(cached);}catch(_){} }
+  const root=premiumTornGet_('/user/basic',apiKey),profile=root&&root.profile||{};
+  const user={id:Number(profile.id||0),name:String(profile.name||'Unknown')};
+  if(!user.id)throw new Error('Unable to verify Torn player identity.');
+  cache.put(cacheKey,JSON.stringify(user),120);
+  return user;
+}
+
+function requirePremiumDeveloper_(user){if(Number(user&&user.id||0)!==TORNFCA_PREMIUM_DEVELOPER_ID)throw new Error('Verified TornFCA developer account required.');}
+
+function premiumTornGet_(path,key){
+  const joiner=String(path).indexOf('?')>=0?'&':'?';
+  const response=UrlFetchApp.fetch('https://api.torn.com/v2'+path+joiner+'key='+encodeURIComponent(key),{method:'get',muteHttpExceptions:true,headers:{'User-Agent':'TornFCA-Premium/'+TORNFCA_PREMIUM_VERSION}});
+  let root;try{root=JSON.parse(response.getContentText());}catch(_){throw new Error('Unreadable Torn API response.');}
+  if(root&&root.error)throw new Error(root.error.error||('Torn API error '+root.error.code));
+  if(response.getResponseCode()<200||response.getResponseCode()>=300)throw new Error('Torn API HTTP '+response.getResponseCode());
+  return root;
 }
 
 function scanPremiumPayments(){
