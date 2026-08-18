@@ -1,42 +1,61 @@
-# Premium entitlement architecture (prep)
+# TornFCA Premium entitlement architecture
 
-Status: **framework only — no payments accepted and no production unlocks yet.**
+Status: **source implementation complete; production deployment/smoke test pending.**
 
 ## Goal
-Allow selected features to unlock automatically after a verified Torn in-game payment/item transfer, while keeping the app fast and preventing client-side spoofing.
+Provide a single player-level Premium convenience tier while keeping TornFCA Free fully useful and keeping real Torn faction permissions independent from payment state.
 
 ## Trust model
-- Entitlements are keyed by **numeric Torn player ID**, never player name.
-- The Android client never unlocks premium merely because it sees or claims a payment.
-- A backend verifies the receipt/payment against the designated seller profile and records a durable entitlement.
-- The app fetches the verified entitlement after normal Torn authentication and caches the result locally for fast UI decisions.
-- A receipt/transaction identifier must be single-use to prevent replay.
+- Entitlements are keyed by numeric Torn `player_id`, never player name.
+- Android never grants Premium because it sees or claims a payment.
+- The Premium backend verifies payment activity and maintains durable entitlement state.
+- Entitlement status requests require the signed-in Torn API key and can only read the verified caller's own entitlement.
+- Android caches only backend-verified entitlement for responsive/offline display.
+- Owner admin changes require both verified owner Torn identity and the Premium admin password.
+- Payment/log identifiers are deduplicated server-side.
 
-## Proposed entitlement record
-- `player_id`
-- `faction_id` (optional scope; useful once multi-faction launches)
-- `product_id`
-- `tier` (`FREE`, `PREMIUM`)
-- `granted_at`
-- `expires_at` (`0` for lifetime)
-- `source_type` (item / cash / manual grant / promo)
-- `source_receipt_id`
-- `verified_at`
-- `revoked_at`
+## Client layers
 
-## Proposed premium features
-1. Smart Android alerts: war start, chain danger, OC ready, participation reminders.
-2. Advanced member intel: longer participation history, trends, comparisons.
-3. War analytics: zero-hit watch, readiness, richer completed-war analysis.
-4. History and export: longer retention and copy/export reports.
-5. Optional leadership automation: premium alerts and exception lists without replacing Torn permissions.
+### `PremiumEntitlementStore`
+Backend-verified cache only. It does not know about developer simulation.
+
+### `PremiumAccess`
+The only user-facing Premium decision layer. It applies, in order:
+1. remote Premium disable,
+2. maintenance mode,
+3. minimum-version block,
+4. verified player identity,
+5. owner-only developer simulation, or
+6. backend-verified cached entitlement.
+
+Developer simulation therefore cannot mutate or masquerade as production entitlement.
+
+## v1 Premium features
+- `PERSONAL_INSIGHTS`
+- `ADVANCED_ALERTS`
+- `EXTENDED_ACTIVITY`
+- `FACTION_PULSE`
+- `MEMBER_DOSSIER`
+- future `PERSONALIZATION`
+
+See `docs/PREMIUM_MATRIX_0.10.1.md` for the authoritative Free/Premium classification.
+
+## Provider boundary
+FFScouter and TornStats remain separate optional providers with separate consent/entitlement rules. Basic provider data is not a TornFCA Premium entitlement. TornFCA Premium can add convenience and aggregation around provider data without double-charging for access to the provider itself.
 
 ## Developer testing
-`DeveloperSettings.simulatePremium()` exists only for owner testing. It must never be treated as a real payment or backend entitlement.
+`DeveloperSettings.simulatePremium()` defaults OFF. `PremiumAccess` accepts simulation only when `playerId == BuildConfig.DEVELOPER_PLAYER_ID`. Public users cannot self-grant Premium by changing ordinary app state.
 
-## Release gate before payments go live
-- Decide accepted Torn item/payment products and prices.
-- Implement server-side receipt watcher/verifier.
-- Add replay protection and manual revoke/grant tools.
-- Add app entitlement refresh on login + periodic refresh.
-- Confirm Terms / Torn API usage and rate limits before enabling automatic receipt polling.
+## Backend source
+`backend/TornFcaPremiumBackend.gs` is the separate Premium service. Current source defaults to a configurable Torn in-game payment model of 15 Premium days per Xanax with stacking enabled. Production monetization is not live until this service is deployed/redeployed and the signed candidate is built with its HTTPS deployment URL.
+
+## Release gate
+- Deploy Premium backend and configure URL.
+- Configure owner payment-scanner key and admin password securely in Apps Script properties.
+- Install/test payment scan trigger.
+- Verify status cannot query another player's entitlement.
+- Verify payment dedupe and expiration.
+- Verify admin config/grant requires owner identity + password.
+- Run `.github/workflows/tornfca-premium-matrix-audit.yml`.
+- Device-test Free member, Free leader, Premium member, Premium leader, expired Premium, remote disable and owner simulation.
+- Confirm all essential leadership operations remain permission-gated rather than Premium-gated.
