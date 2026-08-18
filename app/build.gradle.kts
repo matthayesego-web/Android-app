@@ -23,8 +23,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 55
-        versionName = "0.9.38"
+        versionCode = 56
+        versionName = "0.10.1"
         manifestPlaceholders["appLabel"] = "TornFCA"
 
         val devHash = "BFB3F43E00B5530E0A2E42343287C792193DB09A9D87515B19A29992E18BAF7D"
