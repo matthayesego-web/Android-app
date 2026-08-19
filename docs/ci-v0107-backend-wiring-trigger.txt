@@ -1,4 +1,4 @@
-TornFCA Beta v0.10.8 developer-gate CI trigger.
-Hidden developer entry now requires only the developer password.
-Apps Script redirect handling hardened for developer backend responses.
-Unsigned export workflow updated and compile trigger armed.
+TornFCA Beta v0.10.9 Developer ID access CI trigger.
+Hidden developer entry now authorizes verified Torn player IDs.
+Owner Torn ID is permanent Root; Root may add/remove delegated Developer IDs.
+Hardened password/TOTP infrastructure remains preserved for future reactivation.
