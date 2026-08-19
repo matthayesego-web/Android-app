@@ -1,2 +1,3 @@
 Trigger isolated TornFCA v0.10.14 push build.
-Security binding pass: real Banking request ID required.
+Security binding: Banking push must map to a real recent faction Banking request.
+Authoritative compiler pass.
