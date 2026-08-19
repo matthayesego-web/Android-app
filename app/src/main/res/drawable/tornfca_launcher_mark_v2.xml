@@ -5,7 +5,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Network Helix launcher foreground v2. New resource identity forces launcher refresh. -->
+    <!-- Network Helix launcher foreground v2. Dedicated resource identity forces launcher refresh. -->
     <group
         android:pivotX="54"
         android:pivotY="54"
