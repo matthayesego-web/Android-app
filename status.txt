@@ -1,0 +1,4 @@
+run_id=32281066126
+source_commit=dc9abef02a21274ffaf2f3089ee15d40c3f6db33
+source_branch=v0.9-faction-automation
+artifact=TornFCA-Beta-v0.10.12-unsigned-export
