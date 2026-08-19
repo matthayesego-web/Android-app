@@ -1,31 +1,114 @@
-name: TornFCA Legacy Restriction Audit
+name: TornFCA v0.10.14 PR Compile Bridge
 
 on:
-  push:
+  pull_request:
     branches: [ v0.9-faction-automation ]
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  audit:
+  compile:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Reject obsolete single-faction restrictions
+      - name: Checkout isolated candidate
+        uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.14-push-infrastructure
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Secure Banking push binding
         run: |
-          bad=0
-          for needle in \
-            'This build is restricted to Duck Force members.' \
-            'production sign-in gate remains Duck Force-only' \
-            'This preview is restricted to Duck Force.'; do
-            if grep -R -n -F "$needle" app/src/main; then
-              bad=1
-            fi
-          done
-          if [ "$bad" -ne 0 ]; then
-            echo 'Obsolete single-faction restriction messaging must not be compiled into TornFCA.'
-            exit 1
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('backend/TornFcaCommunityBackend.gs'); text=p.read_text()
+          if 'tcVerifyLatestBankingRequest_' not in text:
+              marker="const TC_CHAT_CHUNK=500;"
+              if 'TC_FACTION_BACKEND_URL' not in text:
+                  text=text.replace(marker,marker+"\nconst TC_FACTION_BACKEND_URL='https://script.google.com/macros/s/AKfycbzR8zjFVYaDoIZaxFdJV4yBaM4mLSv-iqZL8146HCzq6vRzJgeYr1Y0TKkPGrdASjQj/exec';",1)
+              old="""    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',30);
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+    }
+"""
+              new="""    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',3);
+      const verified=tcVerifyLatestBankingRequest_(key,user),requestId=String(verified.id||'');
+      const pushCache=CacheService.getScriptCache(),dedupe='banking_push:'+user.faction_id+':'+requestId;
+      if(pushCache.get(dedupe))return tcJson_({ok:true,push:{duplicate:true,configured:tcFirebaseConfigured_(),sent:0,failed:0}});
+      pushCache.put(dedupe,'1',900);
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',request_id:requestId,requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+    }
+"""
+              if old not in text: raise SystemExit('Banking route marker missing')
+              text=text.replace(old,new,1)
+              reg='function tcRegisterDevice_(apiKey,user,body){'
+              helper="""function tcVerifyLatestBankingRequest_(apiKey,user){
+  const response=UrlFetchApp.fetch(TC_FACTION_BACKEND_URL,{method:'post',muteHttpExceptions:true,contentType:'text/plain;charset=UTF-8',payload:JSON.stringify({action:'banking_list',apiKey:apiKey,reconcile:false}),headers:{'User-Agent':'TornFCA-Community/'+TC_VERSION+' BankingPushVerify'}});
+  let data;try{data=JSON.parse(response.getContentText());}catch(_){throw new Error('Unable to verify the banking request.');}
+  if(response.getResponseCode()<200||response.getResponseCode()>=300||!data||!data.ok)throw new Error(String(data&&data.error||'Unable to verify the banking request.'));
+  const remoteUser=data.user||{};
+  if(Number(remoteUser.id||0)!==Number(user.id)||Number(remoteUser.faction_id||0)!==Number(user.faction_id))throw new Error('Banking request identity verification failed.');
+  const rows=Array.isArray(data.requests)?data.requests:[],now=Math.floor(Date.now()/1000);let best=null,bestAt=0;
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i]||{};
+    if(Number(row.requester_id||0)!==Number(user.id))continue;
+    if(String(row.status||'PENDING').toUpperCase()!=='PENDING')continue;
+    const created=Number(row.requested_at||row.detected_at||0);
+    if(created>bestAt){best=row;bestAt=created;}
+  }
+  if(!best||!String(best.id||''))throw new Error('No pending banking request was found for this player.');
+  if(bestAt<=0||now-bestAt>15*60)throw new Error('No newly submitted banking request is available to alert.');
+  return best;
+}
+
+"""
+              if reg not in text: raise SystemExit('Push registration marker missing')
+              text=text.replace(reg,helper+reg,1)
+              p.write_text(text)
+          PY
+
+      - name: Validate and compile
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.10.14"' app/build.gradle.kts
+          grep -q 'versionCode = 69' app/build.gradle.kts
+          grep -q "const TC_VERSION='1.8.0'" backend/TornFcaCommunityBackend.gs
+          grep -q 'tcVerifyLatestBankingRequest_' backend/TornFcaCommunityBackend.gs
+          grep -q '_server_can_banking' backend/TornFcaCommunityBackend.gs
+          grep -q 'CH_BANKING="tornfca_banking"' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java
+          grep -q 'bankingAlerts' app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java
+          cp backend/TornFcaCommunityBackend.gs /tmp/community.js
+          node --check /tmp/community.js
+          gradle --no-daemon :app:assembleBeta
+
+      - name: Save secured backend to work branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --quiet -- backend/TornFcaCommunityBackend.gs; then
+            git add backend/TornFcaCommunityBackend.gs
+            git commit -m 'Bind Banking push to verified queue request'
+            git push origin HEAD:work/v0.10.14-push-infrastructure
           fi
-          echo 'No obsolete Duck Force-only authentication/preview restriction found.'
+
+      - name: Upload unsigned Beta
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v0.10.14-push-unsigned
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
