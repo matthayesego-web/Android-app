@@ -14,9 +14,6 @@ import java.nio.charset.StandardCharsets;
 public final class CompanionBackendClient {
     private static final String BACKEND_URL = BuildConfig.FACTION_BACKEND_URL == null ? "" : BuildConfig.FACTION_BACKEND_URL.trim();
     private static final String USER_AGENT = "TornFCA/" + TornFcaBrand.VERSION + " Android";
-    // The shared backend re-verifies identity against Torn. Limit app-originated backend calls to
-    // 6/min/device so backend verification cannot become a hidden high-frequency Torn poller.
-    private static long nextBackendRequestAtMs=0L;
 
     private CompanionBackendClient() {}
 
@@ -30,7 +27,19 @@ public final class CompanionBackendClient {
     }
 
     public static JSONArray getNotices(String apiKey) throws IOException {if (!isConfigured()) return new JSONArray();JSONObject response = postChecked(request("notices", apiKey), "Unable to read faction notices.");JSONArray notices = response.optJSONArray("notices");return notices == null ? new JSONArray() : notices;}
-    public static void publishNotice(String apiKey, String title, String message, long expiresAt) throws IOException {if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");JSONObject body = request("post_notice", apiKey);try { body.put("title", title == null ? "" : title.trim());body.put("message", message == null ? "" : message.trim());body.put("expires_at", expiresAt); }catch (Exception e) { throw new IOException("Unable to prepare faction notice."); }postChecked(body, "Unable to publish faction notice.");if(CommunityBackendClient.isConfigured()){try{CommunityBackendClient.publishAnnouncement(apiKey,title,message);}catch(Exception ignored){/* Notice succeeded; push delivery is best-effort and must never roll it back. */}}}
+    public static void publishNotice(String apiKey, String title, String message, long expiresAt) throws IOException {
+        if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
+        JSONObject body = request("post_notice", apiKey);
+        try { body.put("title", title == null ? "" : title.trim());body.put("message", message == null ? "" : message.trim());body.put("expires_at", expiresAt); }
+        catch (Exception e) { throw new IOException("Unable to prepare faction notice."); }
+        postChecked(body, "Unable to publish faction notice.");
+        // The notice itself is authoritative. Cloud delivery is intentionally decoupled so a slow
+        // Firebase/community path cannot make the leadership UI look like publishing failed.
+        if(CommunityBackendClient.isConfigured()){
+            final String pushTitle=title,pushMessage=message,pushKey=apiKey;
+            new Thread(()->{try{CommunityBackendClient.publishAnnouncement(pushKey,pushTitle,pushMessage);}catch(Exception ignored){}},"TornFCA-NoticePush").start();
+        }
+    }
     public static JSONObject getBankingRequests(String apiKey, boolean reconcile) throws IOException {if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");JSONObject body = request("banking_list", apiKey);try { body.put("reconcile", reconcile); }catch (Exception ignored) {}return postChecked(body, "Unable to load banking requests.");}
     public static JSONObject submitBankingRequest(String apiKey, String amount, String note) throws IOException {if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");JSONObject body = request("banking_submit", apiKey);try {body.put("requested_amount", amount == null ? "" : amount.trim());body.put("note", note == null ? "" : note.trim());}catch (Exception e) {throw new IOException("Unable to prepare banking request.");}return postChecked(body, "Unable to submit banking request.");}
     public static JSONObject updateBankingRequest(String apiKey, String requestId, String status) throws IOException {if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");JSONObject body = request("banking_update", apiKey);try {body.put("request_id", requestId == null ? "" : requestId.trim());body.put("status", status == null ? "" : status.trim());}catch (Exception e) {throw new IOException("Unable to prepare banking update.");}return postChecked(body, "Unable to update banking request.");}
@@ -42,10 +51,10 @@ public final class CompanionBackendClient {
     private static JSONObject post(JSONObject body) throws IOException {
         if(!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
         String apiKey=body.optString("apiKey","");if(!apiKey.isEmpty())TornApiClient.validateKey(apiKey);
-        waitForBackendSlot();
+        BackendRequestGovernor.acquire();
         HttpURLConnection connection = (HttpURLConnection) new URL(BACKEND_URL).openConnection();
         try {
-            connection.setRequestMethod("POST");connection.setConnectTimeout(15000);connection.setReadTimeout(30000);connection.setUseCaches(false);connection.setDoOutput(true);
+            connection.setRequestMethod("POST");connection.setConnectTimeout(10000);connection.setReadTimeout(22000);connection.setUseCaches(false);connection.setDoOutput(true);
             connection.setRequestProperty("Content-Type", "text/plain;charset=UTF-8");connection.setRequestProperty("Accept", "application/json");connection.setRequestProperty("User-Agent", USER_AGENT);
             byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);try (OutputStream out = connection.getOutputStream()) { out.write(payload); }
             int code = connection.getResponseCode();InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();String raw = stream == null ? "" : readAll(stream);
@@ -56,6 +65,5 @@ public final class CompanionBackendClient {
         } finally {connection.disconnect();}
     }
 
-    private static synchronized void waitForBackendSlot(){long now=System.currentTimeMillis();long wait=Math.max(0L,nextBackendRequestAtMs-now);if(wait>0)try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();}nextBackendRequestAtMs=System.currentTimeMillis()+10000L;}
     private static String readAll(InputStream input) throws IOException {try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {byte[] buffer=new byte[4096];int n;while ((n = input.read(buffer)) >= 0) out.write(buffer, 0, n);return out.toString(StandardCharsets.UTF_8.name());}}
 }
