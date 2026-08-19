@@ -44,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
-          grep -q 'versionName = "0.10.7"' app/build.gradle.kts
-          grep -q 'versionCode = 62' app/build.gradle.kts
+          grep -q 'versionName = "0.10.8"' app/build.gradle.kts
+          grep -q 'versionCode = 63' app/build.gradle.kts
           ! grep -q 'DEVELOPER_ACCESS_SHA256' app/build.gradle.kts
           grep -q 'FEEDBACK_BACKEND_URL' app/build.gradle.kts
           grep -q 'FeedbackActivity' app/src/main/AndroidManifest.xml
@@ -57,7 +57,8 @@ jobs:
           grep -q '#29E6FF' app/src/main/res/drawable/tornfca_mark.xml
           grep -q '#9A5CFF' app/src/main/res/drawable/tornfca_mark.xml
           grep -q 'versionTaps>=5' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
-          grep -q '6-digit authenticator code' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          grep -q 'Hidden entry • developer password only' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          grep -q 'verifyOwnerPassword' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
           grep -q 'confirmClear(rows.length())' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
           for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs backend/TornFcaFeedbackBackend.gs; do
             cp "$file" "/tmp/$(basename "$file").js"
