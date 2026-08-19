@@ -1,0 +1,12 @@
+version_name=0.10.13
+version_code=68
+source_commit=10f238713f4ccd89976451907ae006420ec82c41
+preflight=failure
+backend_health=skipped
+compile=skipped
+unsigned_upload=skipped
+signing_secrets=skipped
+sign=skipped
+upload=skipped
+snapshot=skipped
+prerelease=skipped
