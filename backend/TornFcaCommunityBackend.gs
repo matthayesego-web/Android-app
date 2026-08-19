@@ -1,5 +1,5 @@
 /**
- * TornFCA Community Backend v1.7.0.
+ * TornFCA Community Backend v1.8.0.
  * Deploy this file as its OWN Google Apps Script web app, separate from faction, premium and developer backends.
  * Torn API keys are used only to verify the current request and are never written to Sheets/Properties/Cache.
  * Faction membership/position is read fresh from Torn on every request; only stable basic player identity may be
@@ -13,7 +13,7 @@
  * and report lookups use TextFinder so old history does not make each active poll progressively more expensive.
  * War Prep configuration and completion rows are always keyed by freshly verified faction_id + war_id.
  */
-const TC_VERSION='1.7.0';
+const TC_VERSION='1.8.0';
 const TC_CHAT='ChatMessages';
 const TC_REPORTS='ChatReports';
 const TC_DEVICES='PushDevices';
@@ -49,7 +49,7 @@ function doPost(e){
     if(!key)throw new Error('API key required.');
     const user=tcVerifyUser_(key);
 
-    if(action==='config')return tcJson_({ok:true,user:tcPublicUser_(user),capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,war_prep:true,push:tcFirebaseConfigured_()}});
+    if(action==='config')return tcJson_({ok:true,user:tcPublicUser_(user),capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,war_prep:true,push:tcFirebaseConfigured_(),banking_push:true,announcement_push:true}});
     if(action==='chat_list')return tcJson_({ok:true,user:tcPublicUser_(user),messages:tcReadChat_(user,body)});
     if(action==='chat_send')return tcJson_({ok:true,message:tcSendChat_(user,body)});
     if(action==='chat_report')return tcJson_({ok:true,report:tcReportChat_(user,body)});
@@ -84,7 +84,7 @@ function doPost(e){
       if(!tcLeader_(user.position))throw new Error('Faction Leader or Co-leader access is required to change War Prep options.');
       return tcJson_({ok:true,warPrep:tcSaveWarPrepConfig_(user,body)});
     }
-    if(action==='push_register')return tcJson_({ok:true,device:tcRegisterDevice_(user,body)});
+    if(action==='push_register')return tcJson_({ok:true,device:tcRegisterDevice_(key,user,body)});
     if(action==='push_unregister')return tcJson_({ok:true,removed:tcUnregisterDevice_(user,body)});
     if(action==='push_test'){
       tcRate_(user.id,'push_test',10);
@@ -94,7 +94,13 @@ function doPost(e){
       if(!tcCanAnnounce_(key,user))throw new Error('Announcement Changes permission is required.');
       const title=String(body.title||'Faction update').trim().slice(0,120),message=String(body.message||'').trim().slice(0,2000);
       if(!message)throw new Error('Announcement message required.');
-      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,0,'faction',title,message,{})});
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,0,'announcement',title,message,{destination:'announcements'})});
+    }
+    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',30);
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',requester_id:String(user.id),requester_name:String(user.name||'Member')})});
     }
     throw new Error('Unknown action.');
   }catch(err){return tcJson_({ok:false,error:String(err&&err.message||err)});}
@@ -361,19 +367,27 @@ function tcSaveWarPrepConfig_(user,body){
   const sheet=tcWarPrepSheets_().config,lock=LockService.getScriptLock();lock.waitLock(10000);try{const now=Math.floor(Date.now()/1000),row=tcFindExactRow_(sheet,1,String(user.faction_id)),values=[user.faction_id,tcSafe_(JSON.stringify(clean)),user.id,tcSafe_(user.name),now];if(row>=2)sheet.getRange(row,1,1,5).setValues([values]);else sheet.appendRow(values);return{items:clean,updated_by_id:user.id,updated_by_name:user.name,updated_at:now};}finally{lock.releaseLock();}
 }
 
-function tcRegisterDevice_(user,body){
+function tcRegisterDevice_(apiKey,user,body){
   tcRate_(user.id,'push_register',5);
   const token=String(body.token||'').trim();if(token.length<20||token.length>4096)throw new Error('Valid FCM token required.');
-  let prefs=String(body.preferences||'{}');if(prefs.length>4000)prefs='{}';
-  const platform=String(body.platform||'android').slice(0,40),hash=tcHash_(token),sheet=tcDb_().getSheetByName(TC_DEVICES),now=Math.floor(Date.now()/1000);
+  const now=Math.floor(Date.now()/1000);let prefsObj={};
+  try{prefsObj=JSON.parse(String(body.preferences||'{}'));}catch(_){prefsObj={};}
+  if(!prefsObj||typeof prefsObj!=='object'||Array.isArray(prefsObj))prefsObj={};
+  let abilities=[];if(!tcLeader_(user.position)){try{abilities=tcPositionAbilities_(apiKey,user).map(v=>String(v||'').trim().toLowerCase());}catch(_){abilities=[];}}
+  prefsObj._server_can_banking=tcLeader_(user.position)||abilities.indexOf('money giving')>=0||abilities.indexOf('balance adjustment')>=0;
+  prefsObj._server_can_announce=tcLeader_(user.position)||abilities.indexOf('announcement changes')>=0;
+  prefsObj._server_position=String(user.position||'').slice(0,80);
+  prefsObj._server_verified_at=now;
+  let prefs=JSON.stringify(prefsObj);if(prefs.length>4000)prefs=JSON.stringify({_server_can_banking:!!prefsObj._server_can_banking,_server_can_announce:!!prefsObj._server_can_announce,_server_position:prefsObj._server_position,_server_verified_at:now});
+  const platform=String(body.platform||'android').slice(0,40),hash=tcHash_(token),sheet=tcDb_().getSheetByName(TC_DEVICES);
   const lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
     const values=sheet.getDataRange().getValues();
     for(let i=1;i<values.length;i++){
       if(String(values[i][0])!==hash)continue;
-      sheet.getRange(i+1,1,1,8).setValues([[hash,user.faction_id,user.id,tcSafe_(token),tcSafe_(prefs),platform,now,true]]);return{registered:true,updated:true};
+      sheet.getRange(i+1,1,1,8).setValues([[hash,user.faction_id,user.id,tcSafe_(token),tcSafe_(prefs),platform,now,true]]);return{registered:true,updated:true,banking_push:!!prefsObj._server_can_banking};
     }
-    sheet.appendRow([hash,user.faction_id,user.id,tcSafe_(token),tcSafe_(prefs),platform,now,true]);return{registered:true,updated:false};
+    sheet.appendRow([hash,user.faction_id,user.id,tcSafe_(token),tcSafe_(prefs),platform,now,true]);return{registered:true,updated:false,banking_push:!!prefsObj._server_can_banking};
   }finally{lock.releaseLock();}
 }
 
@@ -387,12 +401,13 @@ function tcUnregisterDevice_(user,body){
 }
 
 function tcDevices_(factionId,playerId,type,excludePlayer){
-  const sheet=tcDb_().getSheetByName(TC_DEVICES),values=sheet.getDataRange().getValues(),out=[],cutoff=Math.floor(Date.now()/1000)-90*86400;
+  const sheet=tcDb_().getSheetByName(TC_DEVICES),values=sheet.getDataRange().getValues(),out=[],now=Math.floor(Date.now()/1000),cutoff=now-90*86400,bankingAuthCutoff=now-7*86400;
   for(let i=1;i<values.length;i++){
     if(!tcBool_(values[i][7])||Number(values[i][1])!==Number(factionId)||Number(values[i][6]||0)<cutoff)continue;
     const pid=Number(values[i][2]||0);if(playerId&&pid!==Number(playerId))continue;if(excludePlayer&&pid===Number(excludePlayer))continue;
     let prefs={};try{prefs=JSON.parse(String(values[i][4]||'{}'));}catch(_){}
     if(prefs.master===false)continue;if(type&&prefs[type]===false)continue;
+    if(type==='banking'&&(!tcBool_(prefs._server_can_banking)||Number(prefs._server_verified_at||0)<bankingAuthCutoff))continue;
     out.push({token:String(values[i][3]||''),player_id:pid});if(out.length>=100)break;
   }
   return out;
