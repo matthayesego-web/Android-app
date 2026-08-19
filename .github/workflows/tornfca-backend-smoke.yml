@@ -12,7 +12,7 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Check six public health endpoints
+      - name: Check six public health endpoints and developer POST transport
         run: |
           set -u
           OUT="$RUNNER_TEMP/backend-smoke.txt"
@@ -40,6 +40,21 @@ jobs:
           check_backend developer 'https://script.google.com/macros/s/AKfycbwQeLGPlVpbHgqq2ZG9b73r1PUNvroWQ1CQoy-DXNYCw4W-bCX9VhDkUM7yy_ydw_rjrQ/exec' 'TornFCA Developer Control Plane' '1.4.0'
           check_backend warpay 'https://script.google.com/macros/s/AKfycbzb2RKPNS_Q4LsAK7nIC2oId8UqHXEd-1t93lyyY8bNz3S-7eMJCP1BqP1bnrNq4JiTGQ/exec' 'TornFCA WarPay Backend' '1.1.0'
           check_backend feedback 'https://script.google.com/macros/s/AKfycbyAFt3NNQJWOrbWOuYsH-1MZjf0gxGYZ9l4oSTFtN4unBaXpS2u_Go5xOdP-tIAWi2X/exec' 'TornFCA Feedback Backend' '1.0.0'
+
+          DEV_URL='https://script.google.com/macros/s/AKfycbwQeLGPlVpbHgqq2ZG9b73r1PUNvroWQ1CQoy-DXNYCw4W-bCX9VhDkUM7yy_ydw_rjrQ/exec'
+          DEV_BODY="$RUNNER_TEMP/developer-post.body"
+          DEV_ERR="$RUNNER_TEMP/developer-post.err"
+          DEV_HTTP="$(curl --silent --show-error --location --max-time 25 --header 'Content-Type: text/plain;charset=UTF-8' --data '{"action":"developer_login","username":"smoke-invalid","password":"not-a-real-password","otp":"000000","device_id":"github-smoke"}' --output "$DEV_BODY" --write-out '%{http_code}' "$DEV_URL" 2>"$DEV_ERR" || true)"
+          DEV_RESPONSE="$(cat "$DEV_BODY" 2>/dev/null || true)"
+          DEV_POST_OK=true
+          [ "$DEV_HTTP" = "200" ] || DEV_POST_OK=false
+          printf '%s' "$DEV_RESPONSE" | grep -F '"ok":false' >/dev/null 2>&1 || DEV_POST_OK=false
+          printf '%s' "$DEV_RESPONSE" | grep -F '"error"' >/dev/null 2>&1 || DEV_POST_OK=false
+          printf 'developer_post http=%s readable_json=%s\n' "${DEV_HTTP:-none}" "$DEV_POST_OK" >> "$OUT"
+          if [ "$DEV_POST_OK" != "true" ]; then
+            printf '  response=%s\n' "$(printf '%s' "$DEV_RESPONSE" | tr '\n\r' '  ' | cut -c1-400)" >> "$OUT"
+            printf '  curl_error=%s\n' "$(cat "$DEV_ERR" 2>/dev/null | tr '\n\r' '  ' | cut -c1-300)" >> "$OUT"
+          fi
           cat "$OUT"
 
       - name: Publish diagnostic status
