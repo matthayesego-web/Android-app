@@ -1,32 +1,36 @@
 /**
- * TornFCA Developer Control Plane v1.4.0.
+ * TornFCA Developer Control Plane v1.5.0.
  * Deploy as its OWN Google Apps Script web app.
  *
- * Developer-channel security:
- * - hidden Android entry is not an authorization boundary.
- * - delegated developer access uses username + strong password + per-account TOTP.
+ * Beta developer entry mode:
+ * - TornFCA owner player ID is permanently allowed as Root.
+ * - Root may add/remove other verified Torn player IDs from a backend allowlist.
+ * - Delegated IDs receive Developer role only and cannot manage the allowlist.
+ * - Login requires only the already-signed-in Torn API key so the backend can verify the current player ID.
+ *
+ * Hardened developer infrastructure is intentionally retained for later reactivation:
+ * - delegated username/password/TOTP accounts remain supported.
  * - passwords are salted and HMAC-hashed with a server-only pepper; plaintext is never stored.
  * - TOTP secrets are stored in Script Properties, not the spreadsheet.
- * - successful login issues a short-lived 2-hour device-bound session token.
- * - failed logins progressively lock the account; access changes and privileged mutations are audited.
- * - Root/Admin may invite/revoke developers. Root cannot be revoked through the app.
+ * - failed logins progressively lock the account; privileged mutations are audited.
  *
  * Existing remote product-policy writes remain Torn-owner verified until cross-service delegated
- * authorization is explicitly enabled. This keeps developer-console delegation separate from
- * faction, premium, banking and moderation authority.
+ * authorization is explicitly enabled.
  */
-const TD_VERSION='1.4.0';
+const TD_VERSION='1.5.0';
 const TD_DEVELOPER_PLAYER_ID=3987363;
 const TD_CONFIG='DeveloperConfig';
 const TD_AUDIT='DeveloperAudit';
 const TD_USERS='DeveloperUsers';
 const TD_ACCESS='DeveloperAccess';
+const TD_ID_ACCESS='DeveloperIdAccess';
 const TD_INVITES='DeveloperInvites';
 const TD_SESSIONS='DeveloperSessions';
 const TD_ENROLL='DeveloperEnrollments';
 const TD_CURRENT_WINDOW_SECONDS=24*60*60;
 const TD_HEARTBEAT_SECONDS=6*60*60;
 const TD_SESSION_SECONDS=2*60*60;
+const TD_ID_SESSION_SECONDS=12*60*60;
 const TD_INVITE_SECONDS=24*60*60;
 const TD_ENROLL_SECONDS=15*60;
 const TD_ALLOWED_CONFIG=Object.freeze(['maintenance_mode','minimum_version_code','beta_message','disable_activity','disable_war','disable_chain','disable_oc','disable_pulse','disable_lookup','disable_premium']);
@@ -35,20 +39,21 @@ function setupTornFcaDeveloperBackend(){
   const ss=SpreadsheetApp.getActiveSpreadsheet(),props=PropertiesService.getScriptProperties();
   props.setProperty('DEVELOPER_SHEET_ID',ss.getId());
   if(!props.getProperty('TELEMETRY_SALT'))props.setProperty('TELEMETRY_SALT',Utilities.getUuid()+Utilities.getUuid());
-  if(!props.getProperty('DEVELOPER_PASSWORD_PEPPER'))props.setProperty('DEVELOPER_PASSWORD_PEPPER',Utilities.getUuid()+Utilities.getUuid()+Utilities.getUuid());
+  if(!props.getProperty('DEVELOER_PASSWORD_PEPPER')&&!props.getProperty('DEVELOPER_PASSWORD_PEPPER'))props.setProperty('DEVELOPER_PASSWORD_PEPPER',Utilities.getUuid()+Utilities.getUuid()+Utilities.getUuid());
   const config=tdEnsureSheet_(ss,TD_CONFIG,['key','value','updated_at','updated_by_id','updated_by_name']);
   tdSetIfMissing_(config,'maintenance_mode','false',0,'setup');tdSetIfMissing_(config,'minimum_version_code','0',0,'setup');tdSetIfMissing_(config,'beta_message','',0,'setup');
   ['activity','war','chain','oc','pulse','lookup','premium'].forEach(v=>tdSetIfMissing_(config,'disable_'+v,'false',0,'setup'));
   tdEnsureSheet_(ss,TD_AUDIT,['id','timestamp','actor_id','actor_name','action','details_json']);
   tdEnsureSheet_(ss,TD_USERS,['user_hash','first_seen','last_seen','last_version_code','last_version_name']);
   tdEnsureSheet_(ss,TD_ACCESS,['id','username','display_name','role','active','password_salt','password_hash','totp_enabled','created_at','created_by','updated_at','last_login','failed_count','lock_until']);
+  tdEnsureSheet_(ss,TD_ID_ACCESS,['player_id','player_name','active','added_at','added_by_id','added_by_name','updated_at']);
   tdEnsureSheet_(ss,TD_INVITES,['id','code_hash','username','display_name','role','created_at','created_by','expires_at','consumed_at','target_id']);
   tdEnsureSheet_(ss,TD_SESSIONS,['token_hash','developer_id','username','role','device_hash','created_at','expires_at','revoked_at','last_seen']);
   tdEnsureSheet_(ss,TD_ENROLL,['token_hash','invite_id','developer_id','device_hash','expires_at','completed_at']);
-  return{ok:true,version:TD_VERSION,sheet_id:ss.getId(),next:'Set DEVELOPER_ROOT_USERNAME_SETUP and DEVELOPER_ADMIN_PASSWORD_SETUP Script Properties, run bootstrapTornFcaDeveloperRoot(), save the returned authenticator secret, then deploy as a web app.'};
+  return{ok:true,version:TD_VERSION,sheet_id:ss.getId(),id_access_mode:true,next:'Redeploy the web app. TornFCA owner ID is Root automatically; additional developer IDs can be managed from the app. Existing password/TOTP infrastructure remains preserved for later reactivation.'};
 }
 
-/** First and only root bootstrap. Returns the TOTP setup secret once. */
+/** First and only hardened Root bootstrap. Retained for future MFA mode. */
 function bootstrapTornFcaDeveloperRoot(){
   const props=PropertiesService.getScriptProperties(),username=tdNormalizeUsername_(props.getProperty('DEVELOPER_ROOT_USERNAME_SETUP')||'root'),plain=String(props.getProperty('DEVELOPER_ADMIN_PASSWORD_SETUP')||'');
   if(plain.length<14)throw new Error('Set DEVELOPER_ADMIN_PASSWORD_SETUP to at least 14 characters.');
@@ -59,15 +64,18 @@ function bootstrapTornFcaDeveloperRoot(){
   return{ok:true,username:username,role:'root',totp_secret:secret,otpauth_uri:tdOtpUri_(username,secret),warning:'Store this authenticator secret now. It is not returned by normal API calls.'};
 }
 
-/** Legacy helper retained only to migrate old setup scripts; it no longer creates an app-embedded password. */
 function bootstrapTornFcaDeveloperAdminPassword(){return bootstrapTornFcaDeveloperRoot();}
 function setTornFcaDeveloperAdminPassword(){throw new Error('Use per-developer credentials. Root/password bootstrap is handled by bootstrapTornFcaDeveloperRoot().');}
 
-function doGet(){return tdJson_({ok:true,app:'TornFCA Developer Control Plane',version:TD_VERSION,authenticated_actions:'POST only'});}
+function doGet(){return tdJson_({ok:true,app:'TornFCA Developer Control Plane',version:TD_VERSION,id_access_mode:true,authenticated_actions:'POST only'});}
 
 function doPost(e){
   try{
     const body=JSON.parse((e&&e.postData&&e.postData.contents)||'{}'),action=String(body.action||'').trim();
+    if(action==='developer_id_login')return tdJson_(tdDeveloperIdLogin_(body));
+    if(action==='developer_id_access_list')return tdJson_(tdDeveloperIdAccessList_(body));
+    if(action==='developer_id_access_add')return tdJson_(tdDeveloperIdAccessAdd_(body));
+    if(action==='developer_id_access_remove')return tdJson_(tdDeveloperIdAccessRemove_(body));
     if(action==='developer_login')return tdJson_(tdDeveloperLogin_(body));
     if(action==='developer_session')return tdJson_(tdDeveloperSessionStatus_(body));
     if(action==='developer_logout')return tdJson_(tdDeveloperLogout_(body));
@@ -81,7 +89,6 @@ function doPost(e){
     const apiKey=String(body.apiKey||'').trim();if(!apiKey)throw new Error('API key required.');
     if(action==='public_config'){const user=tdVerifyUser_(apiKey);try{tdTrackUser_(user,body);}catch(_){}return tdJson_({ok:true,user:tdPublicUser_(user),version:TD_VERSION,config:tdReadConfig_()});}
 
-    // Sensitive remote product policy remains owner/Torn verified for this release.
     const user=tdVerifyDeveloper_(apiKey);
     if(action==='status'||action==='config_read')return tdJson_({ok:true,user:tdPublicUser_(user),version:TD_VERSION,config:tdReadConfig_(),user_stats:tdUserStats_()});
     if(action==='audit_list'){tdRequireLegacyAdmin_(String(body.admin_password||''));return tdJson_({ok:true,audit:tdReadAudit_()});}
@@ -89,6 +96,40 @@ function doPost(e){
     throw new Error('Unknown action.');
   }catch(err){return tdJson_({ok:false,error:String(err&&err.message||err)});}
 }
+
+function tdDeveloperIdLogin_(body){
+  const apiKey=String(body.apiKey||'').trim();if(!apiKey)throw new Error('Torn API key required.');
+  const user=tdVerifyUser_(apiKey),isRoot=user.id===TD_DEVELOPER_PLAYER_ID,allowed=isRoot?null:tdFindIdAccess_(user.id);
+  if(!isRoot&&(!allowed||!allowed.active))throw new Error('This Torn player ID is not authorized for the Developer Console.');
+  const access=tdIdAccessObject_(user.id,user.name,isRoot?'root':'developer'),device=tdDeviceHash_(body.device_id),session=tdIssueIdSession_(access,device);
+  tdAuditActor_(access,'developer_id_login',{player_id:user.id,root:isRoot,device_hash:device});
+  return{ok:true,version:TD_VERSION,developer:tdPublicDeveloper_(access),developer_session:session.token,expires_at:session.expires_at};
+}
+
+function tdDeveloperIdAccessList_(body){
+  const actor=tdRequireSession_(body,'root').access,sheet=tdDb_().getSheetByName(TD_ID_ACCESS),values=sheet.getDataRange().getValues(),out=[{player_id:TD_DEVELOPER_PLAYER_ID,player_name:actor.username||'TornFCA Owner',role:'root',active:true,immutable:true}];
+  for(let i=1;i<values.length;i++)if(tdBool_(values[i][2]))out.push({player_id:Number(values[i][0]||0),player_name:String(values[i][1]||('Player '+values[i][0])),role:'developer',active:true,immutable:false,added_at:Number(values[i][3]||0),added_by_id:Number(values[i][4]||0),added_by_name:String(values[i][5]||''),updated_at:Number(values[i][6]||0)});
+  out.sort((a,b)=>a.immutable?-1:b.immutable?1:String(a.player_name).localeCompare(String(b.player_name)));
+  return{ok:true,access:out};
+}
+
+function tdDeveloperIdAccessAdd_(body){
+  const actor=tdRequireSession_(body,'root').access,playerId=Math.floor(Number(body.player_id||0)),label=tdSafeLabel_(body.player_name||('Player '+playerId));
+  if(playerId<=0)throw new Error('Valid Torn player ID required.');if(playerId===TD_DEVELOPER_PLAYER_ID)return{ok:true,player_id:playerId,already_root:true};
+  const sheet=tdDb_().getSheetByName(TD_ID_ACCESS),now=tdNow_(),row=tdFindExactRow_(sheet,1,String(playerId)),record=[playerId,tdSafe_(label),true,now,TD_DEVELOPER_PLAYER_ID,tdSafe_(actor.username||'Root'),now];
+  if(row>1){const addedAt=Number(sheet.getRange(row,4).getValue()||now);record[3]=addedAt;sheet.getRange(row,1,1,7).setValues([record]);}else sheet.appendRow(record);
+  tdAuditActor_(actor,'developer_id_access_add',{player_id:playerId,player_name:label});return{ok:true,player_id:playerId,player_name:label,active:true};
+}
+
+function tdDeveloperIdAccessRemove_(body){
+  const actor=tdRequireSession_(body,'root').access,playerId=Math.floor(Number(body.player_id||0));if(playerId<=0)throw new Error('Valid Torn player ID required.');if(playerId===TD_DEVELOPER_PLAYER_ID)throw new Error('The TornFCA owner ID cannot be removed.');
+  const sheet=tdDb_().getSheetByName(TD_ID_ACCESS),row=tdFindExactRow_(sheet,1,String(playerId));if(row>1){sheet.getRange(row,3).setValue(false);sheet.getRange(row,7).setValue(tdNow_());}
+  tdRevokeSessions_('torn:'+playerId);tdAuditActor_(actor,'developer_id_access_remove',{player_id:playerId});return{ok:true,player_id:playerId,removed:true};
+}
+
+function tdFindIdAccess_(playerId){const sheet=tdDb_().getSheetByName(TD_ID_ACCESS);if(!sheet)return null;const row=tdFindExactRow_(sheet,1,String(playerId));if(row<2)return null;const v=sheet.getRange(row,1,1,7).getValues()[0];return{player_id:Number(v[0]||0),player_name:String(v[1]||('Player '+playerId)),active:tdBool_(v[2]),added_at:Number(v[3]||0),added_by_id:Number(v[4]||0),added_by_name:String(v[5]||''),updated_at:Number(v[6]||0),row:row};}
+function tdIdAccessObject_(playerId,name,role){return{id:'torn:'+playerId,player_id:playerId,username:String(name||('Player '+playerId)),display_name:String(name||('Player '+playerId)),role:role,active:true,totp_enabled:false,created_at:0,last_login:tdNow_(),lock_until:0};}
+function tdIssueIdSession_(access,deviceHash){tdRevokeExpiredSessions_();const token=tdRandomToken_(),now=tdNow_(),expires=now+TD_ID_SESSION_SECONDS;tdDb_().getSheetByName(TD_SESSIONS).appendRow([tdSha256_(token),access.id,access.username,access.role,deviceHash,now,expires,0,now]);return{token:token,expires_at:expires};}
 
 function tdDeveloperLogin_(body){
   const username=tdNormalizeUsername_(body.username),password=String(body.password||''),otp=String(body.otp||'').replace(/\D/g,''),device=tdDeviceHash_(body.device_id);if(!username||!password||otp.length!==6)throw new Error('Developer authorization failed.');
@@ -126,7 +167,14 @@ function tdDeveloperEnrollComplete_(body){
   }finally{lock.releaseLock();}
 }
 
-function tdRequireSession_(body,minRole){const token=String(body.developer_session||'');if(!token)throw new Error('Developer session required.');const hash=tdSha256_(token),sheet=tdDb_().getSheetByName(TD_SESSIONS),row=tdFindExactRow_(sheet,1,hash);if(row<2)throw new Error('Developer session is invalid.');const v=sheet.getRange(row,1,1,9).getValues()[0],session={token_hash:String(v[0]||''),developer_id:String(v[1]||''),username:String(v[2]||''),role:String(v[3]||''),device_hash:String(v[4]||''),created_at:Number(v[5]||0),expires_at:Number(v[6]||0),revoked_at:Number(v[7]||0),last_seen:Number(v[8]||0),row:row};if(session.revoked_at||session.expires_at<tdNow_())throw new Error('Developer session expired.');const access=tdFindAccessById_(session.developer_id);if(!access||!access.active)throw new Error('Developer account is disabled.');if(tdRoleRank_(access.role)<tdRoleRank_(minRole))throw new Error('Developer role does not permit this action.');sheet.getRange(row,9).setValue(tdNow_());return{session:session,access:access};}
+function tdRequireSession_(body,minRole){
+  const token=String(body.developer_session||'');if(!token)throw new Error('Developer session required.');const hash=tdSha256_(token),sheet=tdDb_().getSheetByName(TD_SESSIONS),row=tdFindExactRow_(sheet,1,hash);if(row<2)throw new Error('Developer session is invalid.');
+  const v=sheet.getRange(row,1,1,9).getValues()[0],session={token_hash:String(v[0]||''),developer_id:String(v[1]||''),username:String(v[2]||''),role:String(v[3]||''),device_hash:String(v[4]||''),created_at:Number(v[5]||0),expires_at:Number(v[6]||0),revoked_at:Number(v[7]||0),last_seen:Number(v[8]||0),row:row};
+  if(session.revoked_at||session.expires_at<tdNow_())throw new Error('Developer session expired.');let access;
+  if(session.developer_id.indexOf('torn:')===0){const playerId=Number(session.developer_id.slice(5)||0),isRoot=playerId===TD_DEVELOPER_PLAYER_ID,allowed=isRoot?null:tdFindIdAccess_(playerId);if(!isRoot&&(!allowed||!allowed.active))throw new Error('Developer access has been revoked.');access=tdIdAccessObject_(playerId,session.username,isRoot?'root':'developer');}
+  else access=tdFindAccessById_(session.developer_id);
+  if(!access||!access.active)throw new Error('Developer account is disabled.');if(tdRoleRank_(access.role)<tdRoleRank_(minRole))throw new Error('Developer role does not permit this action.');sheet.getRange(row,9).setValue(tdNow_());return{session:session,access:access};
+}
 function tdIssueSession_(access,deviceHash){tdRevokeExpiredSessions_();const token=tdRandomToken_(),now=tdNow_(),expires=now+TD_SESSION_SECONDS;tdDb_().getSheetByName(TD_SESSIONS).appendRow([tdSha256_(token),access.id,access.username,access.role,deviceHash,now,expires,0,now]);return{token:token,expires_at:expires};}
 function tdRevokeSessions_(developerId){const sheet=tdDb_().getSheetByName(TD_SESSIONS),values=sheet.getDataRange().getValues(),now=tdNow_();for(let i=1;i<values.length;i++)if(String(values[i][1]||'')===developerId&&!Number(values[i][7]||0))sheet.getRange(i+1,8).setValue(now);}
 function tdRevokeExpiredSessions_(){const sheet=tdDb_().getSheetByName(TD_SESSIONS),values=sheet.getDataRange().getValues(),now=tdNow_();for(let i=1;i<values.length;i++)if(!Number(values[i][7]||0)&&Number(values[i][6]||0)<now)sheet.getRange(i+1,8).setValue(now);}
@@ -140,7 +188,7 @@ function tdFindAccessByUsername_(username){const sheet=tdDb_().getSheetByName(TD
 function tdFindAccessById_(id){const sheet=tdDb_().getSheetByName(TD_ACCESS),row=tdFindExactRow_(sheet,1,id);if(row<2)return null;return tdAccessFromValues_(sheet.getRange(row,1,1,14).getValues()[0],row);}
 function tdFindRoot_(){const sheet=tdDb_().getSheetByName(TD_ACCESS),values=sheet.getDataRange().getValues();for(let i=1;i<values.length;i++){const r=tdAccessFromValues_(values[i],i+1);if(r.role==='root')return r;}return null;}
 function tdAccessFromValues_(v,row){return{id:String(v[0]||''),username:String(v[1]||''),display_name:String(v[2]||''),role:String(v[3]||'developer'),active:tdBool_(v[4]),password_salt:String(v[5]||''),password_hash:String(v[6]||''),totp_enabled:tdBool_(v[7]),created_at:Number(v[8]||0),created_by:String(v[9]||''),updated_at:Number(v[10]||0),last_login:Number(v[11]||0),failed_count:Number(v[12]||0),lock_until:Number(v[13]||0),row:row};}
-function tdPublicDeveloper_(r){return{id:r.id,username:r.username,display_name:r.display_name,role:r.role,active:!!r.active,totp_enabled:!!r.totp_enabled,created_at:r.created_at,last_login:r.last_login,locked_until:r.lock_until};}
+function tdPublicDeveloper_(r){return{id:r.id,player_id:Number(r.player_id||0),username:r.username,display_name:r.display_name,role:r.role,active:!!r.active,totp_enabled:!!r.totp_enabled,created_at:r.created_at,last_login:r.last_login,locked_until:r.lock_until};}
 function tdSetAccessActive_(r,active,totpEnabled){const sheet=tdDb_().getSheetByName(TD_ACCESS),now=tdNow_();sheet.getRange(r.row,5).setValue(!!active);if(totpEnabled!==undefined)sheet.getRange(r.row,8).setValue(!!totpEnabled);sheet.getRange(r.row,11).setValue(now);}
 function tdFailedLogin_(r){const count=r.failed_count+1,now=tdNow_();let lock=0;if(count>=12)lock=60*60;else if(count>=8)lock=5*60;else if(count>=5)lock=60;const sheet=tdDb_().getSheetByName(TD_ACCESS);sheet.getRange(r.row,13).setValue(count);if(lock)sheet.getRange(r.row,14).setValue(now+lock);tdAuditActor_(r,'developer_login_failed',{failed_count:count,lock_seconds:lock});}
 function tdResetFailures_(r,now){const sheet=tdDb_().getSheetByName(TD_ACCESS);sheet.getRange(r.row,12,1,3).setValues([[now,0,0]]);}
@@ -175,7 +223,7 @@ function tdTrackUser_(user,body){const hash=tdUserHash_(user.id),cache=CacheServ
 function tdUserStats_(){const sheet=tdDb_().getSheetByName(TD_USERS);if(!sheet)return{total_unique:0,current_total:0,current_window_hours:24,tracking_since:0,updated_at:tdNow_()};const values=sheet.getDataRange().getValues(),now=tdNow_(),cutoff=now-TD_CURRENT_WINDOW_SECONDS;let total=0,current=0,first=0;for(let i=1;i<values.length;i++){if(!String(values[i][0]||''))continue;const firstSeen=Number(values[i][1]||0),lastSeen=Number(values[i][2]||0);total++;if(lastSeen>=cutoff)current++;if(firstSeen>0&&(first===0||firstSeen<first))first=firstSeen;}return{total_unique:total,current_total:current,current_window_hours:24,tracking_since:first,updated_at:now};}
 function tdUserHash_(playerId){const props=PropertiesService.getScriptProperties();let salt=String(props.getProperty('TELEMETRY_SALT')||'');if(!salt){salt=Utilities.getUuid()+Utilities.getUuid();props.setProperty('TELEMETRY_SALT',salt);}return tdSha256_(salt+':'+String(Number(playerId)||0));}
 function tdAudit_(user,action,details){tdDb_().getSheetByName(TD_AUDIT).appendRow([Utilities.getUuid(),tdNow_(),user.id,tdSafe_(user.name),tdSafe_(action),tdSafe_(JSON.stringify(details||{}))]);}
-function tdAuditActor_(actor,action,details){tdDb_().getSheetByName(TD_AUDIT).appendRow([Utilities.getUuid(),tdNow_(),String(actor.id||''),tdSafe_(actor.display_name||actor.username||'Developer'),tdSafe_(action),tdSafe_(JSON.stringify(details||{}))]);}
+function tdAuditActor_(actor,action,details){tdDb_().getSheetByName(TD_AUDIT).appendRow([Utilities.getUuid(),tdNow_(),String(actor.id||actor.player_id||''),tdSafe_(actor.display_name||actor.username||'Developer'),tdSafe_(action),tdSafe_(JSON.stringify(details||{}))]);}
 function tdReadAudit_(){const values=tdDb_().getSheetByName(TD_AUDIT).getDataRange().getValues(),out=[];for(let i=Math.max(1,values.length-200);i<values.length;i++)out.push({id:String(values[i][0]||''),timestamp:Number(values[i][1]||0),actor_id:String(values[i][2]||''),actor_name:String(values[i][3]||''),action:String(values[i][4]||''),details_json:String(values[i][5]||'{}')});out.sort((a,b)=>b.timestamp-a.timestamp);return out;}
 function tdSetIfMissing_(sheet,key,value,id,name){const values=sheet.getDataRange().getValues();for(let i=1;i<values.length;i++)if(String(values[i][0])===key)return;sheet.appendRow([key,value,tdNow_(),id,tdSafe_(name)]);}
 function tdSet_(sheet,key,value,id,name){const values=sheet.getDataRange().getValues(),now=tdNow_(),row=[key,tdSafe_(value),now,id,tdSafe_(name)];for(let i=1;i<values.length;i++)if(String(values[i][0])===key){sheet.getRange(i+1,1,1,5).setValues([row]);return;}sheet.appendRow(row);}
