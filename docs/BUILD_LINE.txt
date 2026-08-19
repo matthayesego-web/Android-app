@@ -1,2 +1,2 @@
-TornFCA Beta v0.10.7 / versionCode 62
-Six-backend wiring + Beta feedback source.
+TornFCA Beta v0.10.8 / versionCode 63
+Hidden developer console now uses password-only Beta access with Apps Script redirect hardening.
