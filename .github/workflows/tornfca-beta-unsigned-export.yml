@@ -2,7 +2,7 @@ name: TornFCA Beta Unsigned Export
 
 on:
   push:
-    branches: [ v0.9-faction-automation ]
+    branches: [ v0.9-faction-automation, agent/dev-id-allowlist-v0109 ]
   workflow_dispatch:
 
 permissions:
@@ -26,13 +26,26 @@ jobs:
         with:
           gradle-version: '8.13'
 
+      - name: Validate Developer ID mode source
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.10.9"' app/build.gradle.kts
+          grep -q 'versionCode = 64' app/build.gradle.kts
+          grep -q 'developer_id_login' backend/TornFcaDeveloperBackend.gs
+          grep -q 'DeveloperIdAccess' backend/TornFcaDeveloperBackend.gs
+          grep -q 'developerIdLogin' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
+          grep -q 'Manage Authorized Torn IDs' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
+          grep -q 'Root developer access required' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperAccessActivity.java
+          cp backend/TornFcaDeveloperBackend.gs /tmp/TornFcaDeveloperBackend.js
+          node --check /tmp/TornFcaDeveloperBackend.js
+
       - name: Compile unsigned Beta
         run: gradle --no-daemon :app:assembleBeta
 
       - name: Upload unsigned Beta
         uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-Beta-v0.10.8-unsigned-export
+          name: TornFCA-Beta-v0.10.9-unsigned-export
           path: app/build/outputs/apk/beta/app-beta-unsigned.apk
           if-no-files-found: error
           retention-days: 7
@@ -50,7 +63,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          printf 'run_id=%s\nsource_commit=%s\nartifact=TornFCA-Beta-v0.10.8-unsigned-export\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" > status.txt
+          printf 'run_id=%s\nsource_commit=%s\nsource_branch=%s\nartifact=TornFCA-Beta-v0.10.9-unsigned-export\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "$GITHUB_REF_NAME" > status.txt
           git add status.txt
           git commit -m "Publish unsigned Beta export status"
           git push --force origin HEAD:beta-unsigned-status
