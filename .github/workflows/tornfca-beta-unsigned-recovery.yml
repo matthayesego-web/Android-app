@@ -30,8 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
-          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\)".*/\1/p' app/build.gradle.kts | head -1 || true)"
-          if [ -z "$VERSION_CODE" ]; then VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"; fi
+          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
           test -n "$VERSION_NAME"
           test -n "$VERSION_CODE"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
@@ -59,13 +58,16 @@ jobs:
           test -x "$BUILD_TOOLS/zipalign"
           test -x "$BUILD_TOOLS/apksigner"
           test -x "$BUILD_TOOLS/aapt"
+          test -f "$BUILD_TOOLS/lib/apksigner.jar"
+          test -f "$BUILD_TOOLS/lib64/libc++.so"
           rm -rf "$RUNNER_TEMP/tornfca-recovery"
-          mkdir -p "$RUNNER_TEMP/tornfca-recovery/build-tools/lib"
+          mkdir -p "$RUNNER_TEMP/tornfca-recovery/build-tools/lib" "$RUNNER_TEMP/tornfca-recovery/build-tools/lib64"
           cp app/build/outputs/apk/beta/app-beta-unsigned.apk "$RUNNER_TEMP/tornfca-recovery/"
           cp "$BUILD_TOOLS/zipalign" "$RUNNER_TEMP/tornfca-recovery/build-tools/"
           cp "$BUILD_TOOLS/apksigner" "$RUNNER_TEMP/tornfca-recovery/build-tools/"
           cp "$BUILD_TOOLS/aapt" "$RUNNER_TEMP/tornfca-recovery/build-tools/"
           cp "$BUILD_TOOLS/lib/apksigner.jar" "$RUNNER_TEMP/tornfca-recovery/build-tools/lib/"
+          cp "$BUILD_TOOLS/lib64/libc++.so" "$RUNNER_TEMP/tornfca-recovery/build-tools/lib64/"
 
       - name: Upload unsigned Beta recovery artifact
         uses: actions/upload-artifact@v7
