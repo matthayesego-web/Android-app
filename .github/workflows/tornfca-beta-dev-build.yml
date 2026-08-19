@@ -44,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
-          grep -q 'versionName = "0.10.11"' app/build.gradle.kts
-          grep -q 'versionCode = 66' app/build.gradle.kts
+          grep -q 'versionName = "0.10.12"' app/build.gradle.kts
+          grep -q 'versionCode = 67' app/build.gradle.kts
           ! grep -q 'DEVELOPER_ACCESS_SHA256' app/build.gradle.kts
           grep -q 'FEEDBACK_BACKEND_URL' app/build.gradle.kts
           grep -q 'FeedbackActivity' app/src/main/AndroidManifest.xml
@@ -53,7 +53,7 @@ jobs:
           grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
           grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           grep -q 'Official TornFCA Network Helix brand mark' app/src/main/res/drawable/tornfca_mark.xml
-          grep -q 'Simplified Network Helix launcher mark' app/src/main/res/drawable/tornfca_launcher_mark.xml
+          grep -q 'android:scaleX="1.14"' app/src/main/res/drawable/tornfca_launcher_mark.xml
           grep -q '#29E6FF' app/src/main/res/drawable/tornfca_mark.xml
           grep -q '#9A5CFF' app/src/main/res/drawable/tornfca_mark.xml
           grep -q 'versionTaps>=5' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
@@ -65,6 +65,9 @@ jobs:
           grep -q 'confirmClear(rows.length())' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
           grep -q 'StartupWarmup.start' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
           grep -q 'StartupWarmup.hasStartedThisProcess' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q 'FactionMemberCache.save' app/src/main/java/com/matthayesego/duckforcetoolkit/StartupWarmup.java
+          grep -q 'WAR_CACHE_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q 'DataFreshness.label' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDirectoryActivity.java
           grep -q '45L\*60L\*1000L' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
           grep -q 'renderSafe' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
           grep -q 'BackendRequestGovernor.acquire' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
