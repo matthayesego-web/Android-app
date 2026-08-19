@@ -1,2 +1,2 @@
-TornFCA Beta v0.10.6 / versionCode 61
-Member boundary audit source.
+TornFCA Beta v0.10.7 / versionCode 62
+Six-backend wiring + Beta feedback source.

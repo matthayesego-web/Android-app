@@ -16,13 +16,14 @@ public class MoreActivity extends Activity {
 
     private void render(){
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
-        TornFcaUi.header(this,r,"TornFCA","More","Member Center holds your everyday faction tools. This page keeps app settings, legal information and app details easy to find without repeating the same destinations everywhere.");
+        TornFcaUi.header(this,r,"TornFCA","More","Member Center holds your everyday faction tools. This page keeps app settings, feedback, legal information and app details easy to find without repeating the same destinations everywhere.");
 
         TornFcaUi.addSection(this,r,"Everyday faction tools");
         addLaunch(r,"MEMBER","Member Center","My Day, war prep, OC, chain, training, faction resources, directory, chat and saved alerts all start here.",TornFcaUi.GREEN,MemberCenterActivity.class,"Open Member Center");
 
         TornFcaUi.addSection(this,r,"App & account");
         addLaunch(r,"SETTINGS","Settings","Notifications, API-key storage, optional services, privacy controls and account actions.",TornFcaUi.BLUE,SettingsActivity.class,"Open Settings");
+        addLaunch(r,"FEEDBACK","Feedback & Requests","Report bugs, request features or send usability feedback directly into the TornFCA Beta review queue.",TornFcaUi.PURPLE,FeedbackActivity.class,"Send Feedback");
         addLaunch(r,"LEGAL","Legal & Privacy","Review the current Privacy Policy, Terms & Conditions, EULA and your acknowledgement status.",TornFcaUi.PURPLE,LegalActivity.class,"Review Legal Documents");
         addLaunch(r,"ABOUT","About TornFCA","What TornFCA is, what stays free, version information, privacy approach and third-party services.",TornFcaUi.BORDER,AboutActivity.class,"About TornFCA");
 
