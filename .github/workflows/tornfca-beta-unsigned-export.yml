@@ -32,7 +32,7 @@ jobs:
       - name: Upload unsigned Beta
         uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-Beta-v0.10.7-unsigned-export
+          name: TornFCA-Beta-v0.10.8-unsigned-export
           path: app/build/outputs/apk/beta/app-beta-unsigned.apk
           if-no-files-found: error
           retention-days: 7
@@ -50,7 +50,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          printf 'run_id=%s\nsource_commit=%s\nartifact=TornFCA-Beta-v0.10.7-unsigned-export\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" > status.txt
+          printf 'run_id=%s\nsource_commit=%s\nartifact=TornFCA-Beta-v0.10.8-unsigned-export\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" > status.txt
           git add status.txt
           git commit -m "Publish unsigned Beta export status"
           git push --force origin HEAD:beta-unsigned-status
