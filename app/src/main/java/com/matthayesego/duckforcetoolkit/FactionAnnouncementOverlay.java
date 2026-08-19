@@ -23,6 +23,8 @@ public final class FactionAnnouncementOverlay {
     private static final String TAG = "tornfca-faction-notice-overlay";
     private static final Map<Activity, Boolean> ACTIVE = Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Activity, View> VISIBLE = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<Activity, String> VISIBLE_IDS = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<Activity, Boolean> OBSERVED = Collections.synchronizedMap(new WeakHashMap<>());
 
     private FactionAnnouncementOverlay() {}
 
@@ -31,24 +33,39 @@ public final class FactionAnnouncementOverlay {
         ACTIVE.put(activity, Boolean.TRUE);
         FrameLayout content = activity.findViewById(android.R.id.content);
         if (content == null) return;
-        removeVisible(activity, content);
+        observe(activity, content);
+        ensure(activity, content);
+    }
 
+    private static void observe(Activity activity, FrameLayout content) {
+        if (OBSERVED.put(activity, Boolean.TRUE) != null) return;
+        content.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            if (activity.isFinishing() || !ACTIVE.containsKey(activity)) return;
+            FrameLayout latest = activity.findViewById(android.R.id.content);
+            if (latest != null) ensure(activity, latest);
+        });
+    }
+
+    private static void ensure(Activity activity, FrameLayout content) {
         SecureApiKeyStore keyStore = new SecureApiKeyStore(activity);
         String key = keyStore.load();
-        if (key == null || key.isBlank()) return;
+        if (key == null || key.isBlank()) { removeVisible(activity, content); return; }
         AuthSession hot = TornApiClient.cachedSession(key);
         FactionScopeCache.Scope scope = hot == null ? FactionScopeCache.load(activity, key) : null;
         int factionId = hot != null ? hot.factionId : scope == null ? 0 : scope.factionId;
         String factionName = hot != null ? hot.factionName : scope == null ? "Faction" : scope.factionName;
         String position = hot != null ? hot.position : scope == null ? "" : scope.position;
-        if (factionId <= 0) return;
+        if (factionId <= 0) { removeVisible(activity, content); return; }
 
         JSONObject notice = StartupWarmCache.latestVisibleNotice(activity, factionId);
-        if (notice == null) return;
+        if (notice == null) { removeVisible(activity, content); return; }
         String id = notice.optString("id", "");
+        View existing = VISIBLE.get(activity);
+        if (existing != null && existing.getParent() == content && id.equals(VISIBLE_IDS.get(activity))) return;
+        removeVisible(activity, content);
+
         String title = notice.optString("title", "Faction notice").trim();
         String body = notice.optString("message", "").trim();
-
         LinearLayout row = new LinearLayout(activity);
         row.setTag(TAG);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -109,6 +126,7 @@ public final class FactionAnnouncementOverlay {
         lp.bottomMargin = dp(activity, 14);
         content.addView(row, lp);
         VISIBLE.put(activity, row);
+        VISIBLE_IDS.put(activity, id);
     }
 
     public static void detach(Activity activity) {
@@ -117,6 +135,7 @@ public final class FactionAnnouncementOverlay {
         FrameLayout content = activity.findViewById(android.R.id.content);
         if (content != null) removeVisible(activity, content);
         VISIBLE.remove(activity);
+        VISIBLE_IDS.remove(activity);
     }
 
     public static void refreshVisible() {
@@ -124,12 +143,16 @@ public final class FactionAnnouncementOverlay {
         synchronized (ACTIVE) { activities = ACTIVE.keySet().toArray(new Activity[0]); }
         for (Activity activity : activities) {
             if (activity == null || activity.isFinishing()) continue;
-            activity.runOnUiThread(() -> attach(activity));
+            activity.runOnUiThread(() -> {
+                FrameLayout content = activity.findViewById(android.R.id.content);
+                if (content != null) ensure(activity, content);
+            });
         }
     }
 
     private static void removeVisible(Activity activity, FrameLayout content) {
         View existing = VISIBLE.remove(activity);
+        VISIBLE_IDS.remove(activity);
         if (existing != null && existing.getParent() == content) content.removeView(existing);
         for (int i = content.getChildCount() - 1; i >= 0; i--) {
             View child = content.getChildAt(i);
@@ -140,7 +163,8 @@ public final class FactionAnnouncementOverlay {
     private static boolean excluded(Activity activity) {
         return activity instanceof AccessGateActivity
                 || activity instanceof LegalActivity
-                || activity instanceof LegalDocumentActivity;
+                || activity instanceof LegalDocumentActivity
+                || activity instanceof WarNoticeActivity;
     }
 
     private static int dp(Activity activity, int value) {
