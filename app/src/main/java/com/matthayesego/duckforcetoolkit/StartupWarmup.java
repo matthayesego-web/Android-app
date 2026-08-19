@@ -114,8 +114,8 @@ public final class StartupWarmup {
         launch("TornFCA-Warm-Community", latch, () -> CommunityBackendClient.config(key),
                 listener, done, "Community services ready.");
 
-        // Only wake services that are not already being contacted by real startup work. Faction and
-        // Community are covered above, while Premium performs its real entitlement refresh below.
+        // Faction/Community are covered by real warm data, Premium refreshes below, and Developer
+        // policy has its own TTL-aware refresh. Only otherwise-idle services get passive wakeups.
         prewarmSecondaryBackends();
 
         try { latch.await(10L, TimeUnit.SECONDS); }
@@ -159,7 +159,6 @@ public final class StartupWarmup {
 
     private static void prewarmSecondaryBackends() {
         String[] urls = {
-                BuildConfig.DEVELOPER_BACKEND_URL,
                 BuildConfig.WARPAY_BACKEND_URL,
                 BuildConfig.FEEDBACK_BACKEND_URL
         };
