@@ -31,18 +31,20 @@ public class WarNoticeActivity extends Activity {
     private static final int BG = Color.rgb(8, 12, 18), PANEL = Color.rgb(20, 27, 38), PANEL2 = Color.rgb(27, 36, 49);
     private static final int BORDER = Color.rgb(49, 63, 81), ACCENT = Color.rgb(243, 184, 52), TEXT = Color.rgb(245, 248, 252);
     private static final int MUTED = Color.rgb(151, 163, 179), GOOD = Color.rgb(63, 185, 80), BLUE = Color.rgb(88, 166, 255);
+    private static final long NOTICE_CACHE_MS = 60L * 60L * 1000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SecureApiKeyStore keyStore;
     private int factionId;
     private String factionName="Faction";
     private boolean canPublish;
-    private TextView warHeadline, warDetail;
+    private boolean noticesRefreshing;
+    private TextView warHeadline, warDetail, noticeFreshness;
     private LinearLayout notices;
     private WarStatus currentWar = WarStatus.none();
 
     private final Runnable ticker = new Runnable() {
-        @Override public void run() { renderWarText(); handler.postDelayed(this, 1000); }
+        @Override public void run() { renderWarText(); handler.postDelayed(this, 1000L); }
     };
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +63,18 @@ public class WarNoticeActivity extends Activity {
         startScreen();
     }
 
-    private void startScreen(){buildUi();renderWarmData();refreshAll(false);handler.removeCallbacks(ticker);handler.post(ticker);}
+    @Override protected void onResume(){
+        super.onResume();
+        handler.removeCallbacks(ticker);
+        handler.post(ticker);
+    }
+
+    @Override protected void onPause(){
+        handler.removeCallbacks(ticker);
+        super.onPause();
+    }
+
+    private void startScreen(){buildUi();renderWarmData();refreshAll(false);}
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private GradientDrawable rounded(int fill, int stroke, int radius) { GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d; }
     private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
@@ -79,7 +92,8 @@ public class WarNoticeActivity extends Activity {
 
         LinearLayout war=card(ACCENT);warHeadline=text("Checking ranked war…",21,TEXT,true);warDetail=text("",13,MUTED,false);war.addView(warHeadline);LinearLayout.LayoutParams wdp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);wdp.topMargin=dp(6);war.addView(warDetail,wdp);Button refresh=button("Refresh War / Notices",false);refresh.setOnClickListener(v->{Toast.makeText(this,"Refreshing faction updates…",Toast.LENGTH_SHORT).show();refreshAll(true);});LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));rp.topMargin=dp(12);war.addView(refresh,rp);root.addView(war);
 
-        TextView ntitle=text("FACTION MESSAGE BOARD",12,ACCENT,true);ntitle.setLetterSpacing(.08f);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);np.topMargin=dp(18);np.bottomMargin=dp(8);root.addView(ntitle,np);
+        TextView ntitle=text("FACTION MESSAGE BOARD",12,ACCENT,true);ntitle.setLetterSpacing(.08f);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);np.topMargin=dp(18);root.addView(ntitle,np);
+        noticeFreshness=text("Waiting for faction notices",11.5f,MUTED,false);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fp.topMargin=dp(3);fp.bottomMargin=dp(8);root.addView(noticeFreshness,fp);
         notices=new LinearLayout(this);notices.setOrientation(LinearLayout.VERTICAL);root.addView(notices);
 
         if(canPublish){
@@ -100,8 +114,8 @@ public class WarNoticeActivity extends Activity {
     private void renderWarmData(){
         if(factionId<=0)return;
         JSONObject war=StartupWarmCache.war(factionId,2L*60L*1000L);if(war!=null){try{currentWar=WarStatus.from(war,factionId);}catch(Exception ignored){}}
-        JSONArray cached=StartupWarmCache.notices(this,factionId,6L*60L*60L*1000L);if(cached!=null)renderNotices(cached);else renderNotices(new JSONArray());
-        renderWarText();
+        JSONArray cached=StartupWarmCache.notices(this,factionId,NOTICE_CACHE_MS);if(cached!=null)renderNotices(cached);else renderNotices(new JSONArray());
+        renderWarText();updateNoticeFreshness();
     }
 
     private void refreshAll(boolean manual){String key=keyStore.load();if(key==null||key.isEmpty())return;new Thread(()->{try{JSONObject root=TornApiClient.getJson("/faction/wars",key);StartupWarmCache.putWar(factionId,root);currentWar=WarStatus.from(root,factionId);}catch(Exception ignored){}runOnUiThread(this::renderWarText);}).start();loadNotices();}
@@ -109,10 +123,16 @@ public class WarNoticeActivity extends Activity {
 
     private void loadNotices(){
         if(!CompanionBackendClient.isConfigured()){if(notices.getChildCount()==0)addNoticeCard("Notice board ready","Shared backend is not configured in this build.","",BORDER);return;}
-        String key=keyStore.load();if(key==null||key.isBlank())return;new Thread(()->{try{JSONArray rows=CompanionBackendClient.getNotices(key);StartupWarmCache.putNotices(this,factionId,rows);runOnUiThread(()->renderNotices(rows));}catch(Exception e){runOnUiThread(()->{if(notices.getChildCount()==0)addNoticeCard("Unable to refresh notices",e.getMessage(),"",BORDER);});}}).start();
+        String key=keyStore.load();if(key==null||key.isBlank())return;
+        noticesRefreshing=true;updateNoticeFreshness();
+        new Thread(()->{try{
+            JSONArray rows=CompanionBackendClient.getNotices(key);StartupWarmCache.putNotices(this,factionId,rows);
+            runOnUiThread(()->{noticesRefreshing=false;renderNotices(rows);});
+        }catch(Exception e){runOnUiThread(()->{noticesRefreshing=false;updateNoticeFreshness();if(notices.getChildCount()==0)addNoticeCard("Unable to refresh notices",e.getMessage(),"",BORDER);});}}).start();
     }
 
-    private void renderNotices(JSONArray rows){notices.removeAllViews();if(rows==null||rows.length()==0){addNoticeCard("No active notices","Faction announcements will appear here and on the global notice banner.","",BORDER);return;}for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row==null)continue;long created=row.optLong("created_at",0);String meta=row.optString("author_name","Leadership");if(created>0)meta+=" • "+DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(new Date(created*1000L));addNoticeCard(row.optString("title","Notice"),row.optString("message",""),meta,ACCENT);}}
+    private void updateNoticeFreshness(){if(noticeFreshness!=null)noticeFreshness.setText(DataFreshness.label(StartupWarmCache.noticesAgeMs(this,factionId),noticesRefreshing));}
+    private void renderNotices(JSONArray rows){notices.removeAllViews();if(rows==null||rows.length()==0){addNoticeCard("No active notices","Faction announcements will appear here and on the global notice banner.","",BORDER);updateNoticeFreshness();return;}for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row==null)continue;long created=row.optLong("created_at",0);String meta=row.optString("author_name","Leadership");if(created>0)meta+=" • "+DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(new Date(created*1000L));addNoticeCard(row.optString("title","Notice"),row.optString("message",""),meta,ACCENT);}updateNoticeFreshness();}
     private void addNoticeCard(String title,String message,String meta,int stroke){LinearLayout c=card(stroke);c.addView(text(title,18,TEXT,true));TextView body=text(message==null?"":message,14,TEXT,false);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(6);c.addView(body,bp);if(meta!=null&&!meta.isEmpty()){TextView m=text(meta,11.5f,MUTED,false);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);mp.topMargin=dp(8);c.addView(m,mp);}LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);cp.bottomMargin=dp(9);notices.addView(c,cp);}
 
     @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null);super.onDestroy();}
