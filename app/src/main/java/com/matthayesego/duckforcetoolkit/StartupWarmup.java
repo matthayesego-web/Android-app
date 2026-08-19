@@ -13,12 +13,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Warms the app's reusable data before Home is shown.
+ * Warms TornFCA once per Android process.
  *
- * Public GET health pings wake every Apps Script deployment without spending Torn API requests.
- * Once the current Torn session is verified, the high-value authenticated datasets are loaded in
- * parallel and stored in StartupWarmCache. The launcher owns the visible timeout; unfinished work
- * can safely continue in the process and populate caches after Home opens.
+ * Putting the app in the background does not trigger another warm cycle. If Android kills the
+ * process or the user fully closes it, these process flags disappear and the next cold launch warms
+ * the services again. Individual screens may still refresh their own time-sensitive data.
  */
 public final class StartupWarmup {
     public interface Listener {
@@ -41,11 +40,26 @@ public final class StartupWarmup {
     }
 
     private static final int CORE_TASKS = 4;
+    private static boolean startedThisProcess=false;
+    private static boolean finishedThisProcess=false;
+    private static Result lastResult;
 
     private StartupWarmup() {}
 
+    public static synchronized boolean hasStartedThisProcess(){return startedThisProcess;}
+    public static synchronized boolean hasFinishedThisProcess(){return finishedThisProcess;}
+    public static synchronized Result lastResult(){return lastResult;}
+
     public static void start(Context context, Listener listener) {
         if (context == null) return;
+        synchronized (StartupWarmup.class) {
+            if (startedThisProcess) {
+                Result cached=lastResult;
+                if(listener!=null)listener.onFinished(cached==null?new Result(null,0,CORE_TASKS+1,"Startup warmup is already running in this app session."):cached);
+                return;
+            }
+            startedThisProcess=true;
+        }
         Context app = context.getApplicationContext();
         new Thread(() -> run(app, listener), "TornFCA-StartupWarmup").start();
     }
@@ -56,7 +70,7 @@ public final class StartupWarmup {
         SecureApiKeyStore keyStore = new SecureApiKeyStore(app);
         String key = keyStore.load();
         if (key == null || key.isBlank()) {
-            finished(listener, new Result(null, 0, CORE_TASKS + 1, "Connect a Torn API key to warm faction data."));
+            complete(listener, new Result(null, 0, CORE_TASKS + 1, "Connect a Torn API key to warm faction data."));
             return;
         }
 
@@ -68,7 +82,7 @@ public final class StartupWarmup {
             StartupWarmCache.putSession(session);
             progress(listener, "Torn session ready. Loading faction data…", 1, CORE_TASKS + 1);
         } catch (Exception e) {
-            finished(listener, new Result(null, 0, CORE_TASKS + 1,
+            complete(listener, new Result(null, 0, CORE_TASKS + 1,
                     e.getMessage() == null ? "Torn session verification failed." : e.getMessage()));
             return;
         }
@@ -98,15 +112,12 @@ public final class StartupWarmup {
         try { latch.await(10L, TimeUnit.SECONDS); }
         catch (InterruptedException e) { Thread.currentThread().interrupt(); }
 
-        // Secondary work should never hold the splash screen open.
         try { PremiumBackendClient.refreshAsync(app, verified.playerId); } catch (Exception ignored) {}
         try { PushNotifications.syncIfReady(app); } catch (Exception ignored) {}
 
         int completed = Math.min(CORE_TASKS + 1, done.get());
-        String warning = completed < CORE_TASKS + 1
-                ? "Some services are still warming in the background."
-                : "";
-        finished(listener, new Result(verified, completed, CORE_TASKS + 1, warning));
+        String warning = completed < CORE_TASKS + 1 ? "Some services are still warming in the background." : "";
+        complete(listener, new Result(verified, completed, CORE_TASKS + 1, warning));
     }
 
     private interface WarmTask { void run() throws Exception; }
@@ -119,7 +130,6 @@ public final class StartupWarmup {
                 int completed = done.incrementAndGet();
                 progress(listener, successMessage, completed, CORE_TASKS + 1);
             } catch (Exception ignored) {
-                // One slow/unavailable service must not block the entire app. Its screen can retry.
             } finally {
                 latch.countDown();
             }
@@ -130,7 +140,11 @@ public final class StartupWarmup {
         if (listener != null) listener.onProgress(message, completed, total);
     }
 
-    private static void finished(Listener listener, Result result) {
+    private static void complete(Listener listener, Result result) {
+        synchronized (StartupWarmup.class) {
+            lastResult=result;
+            finishedThisProcess=true;
+        }
         if (listener != null) listener.onFinished(result);
     }
 
@@ -143,8 +157,8 @@ public final class StartupWarmup {
                 BuildConfig.WARPAY_BACKEND_URL,
                 BuildConfig.FEEDBACK_BACKEND_URL
         };
-        for (int i = 0; i < urls.length; i++) {
-            final String value = urls[i] == null ? "" : urls[i].trim();
+        for (String raw : urls) {
+            final String value = raw == null ? "" : raw.trim();
             if (!value.startsWith("https://") || value.contains("###")) continue;
             new Thread(() -> ping(value), "TornFCA-Backend-Wake").start();
         }
@@ -162,7 +176,7 @@ public final class StartupWarmup {
             c.setRequestProperty("User-Agent", "TornFCA/" + TornFcaBrand.VERSION + " StartupWarmup");
             int code = c.getResponseCode();
             InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
-            if (in != null) try (InputStream ignored = in) { while (ignored.read() != -1) { /* drain */ } }
+            if (in != null) try (InputStream ignored = in) { while (ignored.read() != -1) {} }
         } catch (Exception ignored) {
         } finally {
             if (c != null) c.disconnect();
