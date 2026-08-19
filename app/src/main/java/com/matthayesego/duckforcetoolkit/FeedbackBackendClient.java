@@ -15,7 +15,6 @@ import java.nio.charset.StandardCharsets;
 public final class FeedbackBackendClient {
     private static final String BACKEND_URL=BuildConfig.FEEDBACK_BACKEND_URL==null?"":BuildConfig.FEEDBACK_BACKEND_URL.trim();
     private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android Feedback";
-    private static long nextRequestAtMs=0L;
 
     private FeedbackBackendClient(){}
 
@@ -56,12 +55,12 @@ public final class FeedbackBackendClient {
         String apiKey=body.optString("apiKey","");
         if(apiKey.isEmpty())throw new IOException("Signed-in Torn API key required.");
         TornApiClient.validateKey(apiKey);
-        waitForSlot();
+        BackendRequestGovernor.acquire();
         HttpURLConnection c=(HttpURLConnection)new URL(BACKEND_URL).openConnection();
         try{
             c.setRequestMethod("POST");
-            c.setConnectTimeout(12000);
-            c.setReadTimeout(22000);
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(20000);
             c.setUseCaches(false);
             c.setDoOutput(true);
             c.setRequestProperty("Content-Type","text/plain;charset=UTF-8");
@@ -78,12 +77,6 @@ public final class FeedbackBackendClient {
             if(!response.optBoolean("ok",false))throw new IOException(response.optString("error",fallback));
             return response;
         }finally{c.disconnect();}
-    }
-
-    private static synchronized void waitForSlot(){
-        long now=System.currentTimeMillis(),wait=Math.max(0L,nextRequestAtMs-now);
-        if(wait>0)try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();}
-        nextRequestAtMs=System.currentTimeMillis()+2500L;
     }
 
     private static String read(InputStream input)throws IOException{
