@@ -30,17 +30,13 @@ public final class DeveloperBackendClient {
     public static JSONObject writeConfig(String apiKey,String developerPassword,JSONObject config)throws IOException{JSONObject body=request("config_write",apiKey);put(body,"admin_password",developerPassword==null?"":developerPassword);try{body.put("config",config==null?new JSONObject():config);}catch(Exception ignored){}return postChecked(body,true,"Unable to update developer configuration.");}
     public static JSONObject readAudit(String apiKey,String developerPassword)throws IOException{JSONObject body=request("audit_list",apiKey);put(body,"admin_password",developerPassword==null?"":developerPassword);return postChecked(body,true,"Unable to read developer audit history.");}
 
-    /**
-     * Beta password-only gate. The user enters only the developer password; the already-signed-in Torn key is
-     * supplied internally so the existing v1.4.0 backend can verify the Root password without another deployment.
-     */
-    public static JSONObject verifyOwnerPassword(String apiKey,String developerPassword)throws IOException{
-        JSONObject body=request("audit_list",apiKey);
-        put(body,"admin_password",developerPassword==null?"":developerPassword);
-        return postChecked(body,true,"Developer password was not accepted.");
-    }
+    /** Beta gate: backend verifies the current Torn player ID and returns Root or Developer access. */
+    public static JSONObject developerIdLogin(String apiKey,String deviceId)throws IOException{JSONObject body=request("developer_id_login",apiKey);put(body,"device_id",deviceId);return postChecked(body,true,"This Torn player ID is not authorized for the Developer Console.");}
+    public static JSONObject idAccessList(String sessionToken)throws IOException{JSONObject body=plain("developer_id_access_list");put(body,"developer_session",sessionToken);return postChecked(body,false,"Unable to read authorized Torn IDs.");}
+    public static JSONObject addIdAccess(String sessionToken,long playerId,String playerName)throws IOException{JSONObject body=plain("developer_id_access_add");put(body,"developer_session",sessionToken);put(body,"player_id",playerId);put(body,"player_name",playerName);return postChecked(body,false,"Unable to authorize that Torn ID.");}
+    public static JSONObject removeIdAccess(String sessionToken,long playerId)throws IOException{JSONObject body=plain("developer_id_access_remove");put(body,"developer_session",sessionToken);put(body,"player_id",playerId);return postChecked(body,false,"Unable to remove that Torn ID.");}
 
-    /** Existing delegated developer APIs are retained for later re-hardening, but are no longer exposed by the Beta gate. */
+    /** Hardened username/password/TOTP APIs are retained for later reactivation. */
     public static JSONObject developerLogin(String username,String password,String otp,String deviceId)throws IOException{JSONObject body=plain("developer_login");put(body,"username",username);put(body,"password",password);put(body,"otp",otp);put(body,"device_id",deviceId);return postChecked(body,false,"Developer authentication failed.");}
     public static JSONObject developerSession(String sessionToken)throws IOException{JSONObject body=plain("developer_session");put(body,"developer_session",sessionToken);return postChecked(body,false,"Developer session is no longer valid.");}
     public static JSONObject developerLogout(String sessionToken)throws IOException{JSONObject body=plain("developer_logout");put(body,"developer_session",sessionToken);return postChecked(body,false,"Unable to close developer session.");}
@@ -73,8 +69,8 @@ public final class DeveloperBackendClient {
             try{
                 c.setInstanceFollowRedirects(false);
                 c.setRequestMethod(method);
-                c.setConnectTimeout(12000);
-                c.setReadTimeout(25000);
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(18000);
                 c.setUseCaches(false);
                 c.setRequestProperty("Accept","application/json");
                 c.setRequestProperty("User-Agent",USER_AGENT);
@@ -102,6 +98,6 @@ public final class DeveloperBackendClient {
         throw new IOException("Developer backend redirected too many times.");
     }
 
-    private static synchronized void waitForSlot(){long now=System.currentTimeMillis();long wait=Math.max(0L,nextRequestAtMs-now);if(wait>0)try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();}nextRequestAtMs=System.currentTimeMillis()+1500L;}
+    private static synchronized void waitForSlot(){long now=System.currentTimeMillis();long wait=Math.max(0L,nextRequestAtMs-now);if(wait>0)try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();}nextRequestAtMs=System.currentTimeMillis()+1000L;}
     private static String read(InputStream input)throws IOException{try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return out.toString(StandardCharsets.UTF_8.name());}}
 }
