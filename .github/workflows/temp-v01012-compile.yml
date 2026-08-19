@@ -3,6 +3,8 @@ name: TEMP TornFCA v0.10.12 Compile
 on:
   push:
     branches: [ work/v0.10.12-stability-polish ]
+  pull_request:
+    branches: [ restore/v0.10.1-source-hardened-2026-08-17 ]
   workflow_dispatch:
 
 permissions:
