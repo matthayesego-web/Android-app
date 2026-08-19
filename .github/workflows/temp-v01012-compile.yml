@@ -73,7 +73,7 @@ jobs:
             RESULT=failure
             SHA=unavailable
           fi
-          printf 'version=0.10.12\nversion_code=67\nsource_commit=%s\ncompile=%s\nunsigned_sha256=%s\n' "$GITHUB_SHA" "$RESULT" "$SHA" > status.txt
+          printf 'version=0.10.12\nversion_code=67\nrun_id=%s\nsource_commit=%s\ncompile=%s\nunsigned_sha256=%s\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "$RESULT" "$SHA" > status.txt
           git add status.txt
           git commit -m "Publish v0.10.12 compile status"
           git push --force origin HEAD:v01012-status
