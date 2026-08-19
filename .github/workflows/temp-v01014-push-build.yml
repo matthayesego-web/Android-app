@@ -1,0 +1,213 @@
+name: TEMP TornFCA v0.10.14 Push Build
+
+on:
+  push:
+    branches: [ work/v0.10.14-push-infrastructure ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement-and-build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.14-push-infrastructure
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Implement v0.10.14 push routing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path); text=p.read_text()
+              if old not in text:
+                  raise SystemExit(f'Missing expected source marker in {path}: {old[:100]}')
+              p.write_text(text.replace(old,new,1))
+
+          # Version bump.
+          replace_once('app/build.gradle.kts','versionCode = 68','versionCode = 69')
+          replace_once('app/build.gradle.kts','versionName = "0.10.13"','versionName = "0.10.14"')
+
+          # Community backend v1.8: server-verified push roles + banking route.
+          replace_once('backend/TornFcaCommunityBackend.gs','TornFCA Community Backend v1.7.0.','TornFCA Community Backend v1.8.0.')
+          replace_once('backend/TornFcaCommunityBackend.gs',"const TC_VERSION='1.7.0';","const TC_VERSION='1.8.0';")
+          replace_once('backend/TornFcaCommunityBackend.gs',
+              "capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,war_prep:true,push:tcFirebaseConfigured_()}",
+              "capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,war_prep:true,push:tcFirebaseConfigured_(),banking_push:true,announcement_push:true}")
+          replace_once('backend/TornFcaCommunityBackend.gs',
+              "if(action==='push_register')return tcJson_({ok:true,device:tcRegisterDevice_(user,body)});",
+              "if(action==='push_register')return tcJson_({ok:true,device:tcRegisterDevice_(key,user,body)});")
+          replace_once('backend/TornFcaCommunityBackend.gs',
+              "return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,0,'faction',title,message,{})});",
+              "return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,0,'announcement',title,message,{destination:'announcements'})});")
+
+          marker="""    if(action==='announcement_push'){
+      if(!tcCanAnnounce_(key,user))throw new Error('Announcement Changes permission is required.');
+      const title=String(body.title||'Faction update').trim().slice(0,120),message=String(body.message||'').trim().slice(0,2000);
+      if(!message)throw new Error('Announcement message required.');
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,0,'announcement',title,message,{destination:'announcements'})});
+    }
+"""
+          addition=marker+"""    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',3);
+      const requestId=String(body.request_id||'').trim().slice(0,100);
+      if(!requestId)throw new Error('Banking request ID required.');
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',request_id:requestId,requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+    }
+"""
+          replace_once('backend/TornFcaCommunityBackend.gs',marker,addition)
+
+          old="""function tcRegisterDevice_(user,body){
+  tcRate_(user.id,'push_register',5);
+  const token=String(body.token||'').trim();if(token.length<20||token.length>4096)throw new Error('Valid FCM token required.');
+  let prefs=String(body.preferences||'{}');if(prefs.length>4000)prefs='{}';
+  const platform=String(body.platform||'android').slice(0,40),hash=tcHash_(token),sheet=tcDb_().getSheetByName(TC_DEVICES),now=Math.floor(Date.now()/1000);
+"""
+          new="""function tcRegisterDevice_(apiKey,user,body){
+  tcRate_(user.id,'push_register',5);
+  const token=String(body.token||'').trim();if(token.length<20||token.length>4096)throw new Error('Valid FCM token required.');
+  const now=Math.floor(Date.now()/1000);let prefsObj={};
+  try{prefsObj=JSON.parse(String(body.preferences||'{}'));}catch(_){prefsObj={};}
+  if(!prefsObj||typeof prefsObj!=='object'||Array.isArray(prefsObj))prefsObj={};
+  let abilities=[];if(!tcLeader_(user.position)){try{abilities=tcPositionAbilities_(apiKey,user).map(v=>String(v||'').trim().toLowerCase());}catch(_){abilities=[];}}
+  prefsObj._server_can_banking=tcLeader_(user.position)||abilities.indexOf('money giving')>=0||abilities.indexOf('balance adjustment')>=0;
+  prefsObj._server_can_announce=tcLeader_(user.position)||abilities.indexOf('announcement changes')>=0;
+  prefsObj._server_position=String(user.position||'').slice(0,80);
+  prefsObj._server_verified_at=now;
+  let prefs=JSON.stringify(prefsObj);if(prefs.length>4000)prefs=JSON.stringify({_server_can_banking:!!prefsObj._server_can_banking,_server_can_announce:!!prefsObj._server_can_announce,_server_position:prefsObj._server_position,_server_verified_at:now});
+  const platform=String(body.platform||'android').slice(0,40),hash=tcHash_(token),sheet=tcDb_().getSheetByName(TC_DEVICES);
+"""
+          replace_once('backend/TornFcaCommunityBackend.gs',old,new)
+
+          old="""function tcDevices_(factionId,playerId,type,excludePlayer){
+  const sheet=tcDb_().getSheetByName(TC_DEVICES),values=sheet.getDataRange().getValues(),out=[],cutoff=Math.floor(Date.now()/1000)-90*86400;
+  for(let i=1;i<values.length;i++){
+    if(!tcBool_(values[i][7])||Number(values[i][1])!==Number(factionId)||Number(values[i][6]||0)<cutoff)continue;
+    const pid=Number(values[i][2]||0);if(playerId&&pid!==Number(playerId))continue;if(excludePlayer&&pid===Number(excludePlayer))continue;
+    let prefs={};try{prefs=JSON.parse(String(values[i][4]||'{}'));}catch(_){}
+    if(prefs.master===false)continue;if(type&&prefs[type]===false)continue;
+    out.push({token:String(values[i][3]||''),player_id:pid});if(out.length>=100)break;
+  }
+  return out;
+}
+"""
+          new="""function tcDevices_(factionId,playerId,type,excludePlayer){
+  const sheet=tcDb_().getSheetByName(TC_DEVICES),values=sheet.getDataRange().getValues(),out=[],now=Math.floor(Date.now()/1000),cutoff=now-90*86400,bankingAuthCutoff=now-7*86400;
+  for(let i=1;i<values.length;i++){
+    if(!tcBool_(values[i][7])||Number(values[i][1])!==Number(factionId)||Number(values[i][6]||0)<cutoff)continue;
+    const pid=Number(values[i][2]||0);if(playerId&&pid!==Number(playerId))continue;if(excludePlayer&&pid===Number(excludePlayer))continue;
+    let prefs={};try{prefs=JSON.parse(String(values[i][4]||'{}'));}catch(_){}
+    if(prefs.master===false)continue;if(type&&prefs[type]===false)continue;
+    if(type==='banking'&&(!tcBool_(prefs._server_can_banking)||Number(prefs._server_verified_at||0)<bankingAuthCutoff))continue;
+    out.push({token:String(values[i][3]||''),player_id:pid});if(out.length>=100)break;
+  }
+  return out;
+}
+"""
+          replace_once('backend/TornFcaCommunityBackend.gs',old,new)
+
+          # Client sends the actual request ID, so backend notifications cannot be fired accidentally by old clients.
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java',
+              'public static JSONObject publishBankingRequest(String key,String summary,String note)throws IOException{JSONObject b=request("banking_request_push",key);put(b,"summary",summary);put(b,"note",note);return postChecked(b,"Unable to alert faction leadership about this banking request.");}',
+              'public static JSONObject publishBankingRequest(String key,String requestId,String summary,String note)throws IOException{JSONObject b=request("banking_request_push",key);put(b,"request_id",requestId);put(b,"summary",summary);put(b,"note",note);return postChecked(b,"Unable to alert faction leadership about this banking request.");}')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java',
+              'CommunityBackendClient.publishBankingRequest(key,summary,noteValue);',
+              'CommunityBackendClient.publishBankingRequest(key,request==null?"":request.optString("id",""),summary,noteValue);')
+
+          # Separate, high-importance Banking notification channel.
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java',
+              'public static final String CH_WAR="tornfca_war",CH_OC_CHAIN="tornfca_oc_chain",CH_FACTION="tornfca_faction",CH_CHAT="tornfca_chat",CH_PERSONAL="tornfca_personal";',
+              'public static final String CH_WAR="tornfca_war",CH_OC_CHAIN="tornfca_oc_chain",CH_FACTION="tornfca_faction",CH_BANKING="tornfca_banking",CH_CHAT="tornfca_chat",CH_PERSONAL="tornfca_personal";')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java',
+              'create(m,CH_FACTION,"Faction updates","Faction announcements, banking requests and important updates",NotificationManager.IMPORTANCE_DEFAULT);create(m,CH_CHAT',
+              'create(m,CH_FACTION,"Faction updates","Faction announcements and important updates",NotificationManager.IMPORTANCE_DEFAULT);create(m,CH_BANKING,"Banking requests","New faction banking requests that need leadership attention",NotificationManager.IMPORTANCE_HIGH);create(m,CH_CHAT')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java',
+              'if("faction".equals(t)||"announcement".equals(t)||"banking".equals(t))return CH_FACTION;if("chat".equals(t))return CH_CHAT;',
+              'if("banking".equals(t))return CH_BANKING;if("faction".equals(t)||"announcement".equals(t))return CH_FACTION;if("chat".equals(t))return CH_CHAT;')
+
+          # Independent user preference for Banking alerts.
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java',
+              'public static boolean factionAlerts(Context c){return p(c).getBoolean("notify_faction",true);}\n    public static void setFactionAlerts(Context c,boolean v){p(c).edit().putBoolean("notify_faction",v).apply();}',
+              'public static boolean factionAlerts(Context c){return p(c).getBoolean("notify_faction",true);}\n    public static void setFactionAlerts(Context c,boolean v){p(c).edit().putBoolean("notify_faction",v).apply();}\n    public static boolean bankingAlerts(Context c){return p(c).getBoolean("notify_banking",true);}\n    public static void setBankingAlerts(Context c,boolean v){p(c).edit().putBoolean("notify_banking",v).apply();}')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java',
+              'if("faction".equals(t)||"announcement".equals(t)||"banking".equals(t))return factionAlerts(c);',
+              'if("banking".equals(t))return bankingAlerts(c);if("faction".equals(t)||"announcement".equals(t))return factionAlerts(c);')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java',
+              'o.put("banking",factionAlerts(c));',
+              'o.put("banking",bankingAlerts(c));')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java',
+              'addToggle(r,"FACTION","Faction updates",AppSettingsStore.factionAlerts(this),v->AppSettingsStore.setFactionAlerts(this,v),TornFcaUi.GOLD,"Important faction announcements and notices.");addToggle(r,"CHAT"',
+              'addToggle(r,"FACTION","Faction updates",AppSettingsStore.factionAlerts(this),v->AppSettingsStore.setFactionAlerts(this,v),TornFcaUi.GOLD,"Important faction announcements and notices.");addToggle(r,"BANKING","Banking requests",AppSettingsStore.bankingAlerts(this),v->AppSettingsStore.setBankingAlerts(this,v),TornFcaUi.GREEN,"New banking requests for devices with current faction banking authority.");addToggle(r,"CHAT"')
+          PY
+
+      - name: Validate push implementation
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.10.14"' app/build.gradle.kts
+          grep -q 'versionCode = 69' app/build.gradle.kts
+          grep -q "const TC_VERSION='1.8.0'" backend/TornFcaCommunityBackend.gs
+          grep -q "banking_request_push" backend/TornFcaCommunityBackend.gs
+          grep -q '_server_can_banking' backend/TornFcaCommunityBackend.gs
+          grep -q 'CH_BANKING="tornfca_banking"' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java
+          grep -q 'bankingAlerts' app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java
+          grep -q 'Banking requests' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
+          cp backend/TornFcaCommunityBackend.gs /tmp/community.js
+          node --check /tmp/community.js
+
+      - name: Compile Beta
+        run: gradle --no-daemon :app:assembleBeta
+
+      - name: Commit validated source
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle.kts backend/TornFcaCommunityBackend.gs \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
+          git commit -m 'Implement v0.10.14 banking push infrastructure'
+          git push origin HEAD:work/v0.10.14-push-infrastructure
+
+      - name: Upload unsigned Beta
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v0.10.14-push-unsigned
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish connector-readable status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PUB="$RUNNER_TEMP/v01014-push-status"
+          rm -rf "$PUB" && mkdir -p "$PUB" && cd "$PUB"
+          git init
+          git checkout --orphan v01014-push-status
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if [ -f "$GITHUB_WORKSPACE/app/build/outputs/apk/beta/app-beta-unsigned.apk" ]; then RESULT=success; else RESULT=failure; fi
+          printf 'version=0.10.14\nversion_code=69\nrun_id=%s\nsource_commit=%s\ncompile=%s\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "$RESULT" > status.txt
+          git add status.txt
+          git commit -m 'Publish v0.10.14 push build status'
+          git push --force origin HEAD:v01014-push-status
