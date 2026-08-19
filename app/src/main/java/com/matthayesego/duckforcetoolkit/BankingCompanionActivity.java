@@ -82,15 +82,20 @@ public class BankingCompanionActivity extends Activity {
     }
 
     private void refreshLive(String key,boolean firstLoad){
-        if(refreshing)return;refreshing=true;
+        if(refreshing)return;refreshing=true;if(!firstLoad)render();
         new Thread(()->{try{
-            if(playerId<=0||factionId<=0){AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);FactionScopeCache.save(this,key,verified);StartupWarmCache.putSession(verified);runOnUiThread(()->{playerId=verified.playerId;playerName=verified.playerName;factionId=verified.factionId;factionName=verified.factionName;position=verified.position;factionApiAccess=verified.factionApiAccess;});}
+            if(playerId<=0||factionId<=0){
+                AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);
+                FactionScopeCache.save(this,key,verified);StartupWarmCache.putSession(verified);
+                playerId=verified.playerId;playerName=verified.playerName;factionId=verified.factionId;factionName=verified.factionName;position=verified.position;factionApiAccess=verified.factionApiAccess;
+            }
             JSONObject response=CompanionBackendClient.getBankingRequests(key,false);
-            int cacheFaction=response.optJSONObject("user")!=null?response.optJSONObject("user").optInt("faction_id",factionId):factionId;
-            int cachePlayer=response.optJSONObject("user")!=null?response.optJSONObject("user").optInt("id",playerId):playerId;
+            JSONObject user=response.optJSONObject("user");
+            int cacheFaction=user!=null?user.optInt("faction_id",factionId):factionId;
+            int cachePlayer=user!=null?user.optInt("id",playerId):playerId;
             if(cacheFaction>0&&cachePlayer>0)StartupWarmCache.putBanking(cacheFaction,cachePlayer,response);
             runOnUiThread(()->{refreshing=false;applyResponse(response);render();loadBalancesAsync(key);});
-        }catch(Exception e){String m=e.getMessage()==null?"Unable to load the banking queue.":e.getMessage();runOnUiThread(()->{refreshing=false;if(firstLoad)renderUnavailable(m);else Toast.makeText(this,"Queue refresh failed: "+m,Toast.LENGTH_LONG).show();});}}).start();
+        }catch(Exception e){String m=e.getMessage()==null?"Unable to load the banking queue.":e.getMessage();runOnUiThread(()->{refreshing=false;if(firstLoad)renderUnavailable(m);else{render();Toast.makeText(this,"Queue refresh failed: "+m,Toast.LENGTH_LONG).show();}});}}).start();
     }
 
     private void applyResponse(JSONObject response){
@@ -107,7 +112,7 @@ public class BankingCompanionActivity extends Activity {
 
     private void loadBalancesAsync(String key){
         if(!canManage||balancesLoading)return;
-        if(!factionApiAccess){balanceError="Detailed faction balances are not available to this key. Amount requests still work, and full-balance requests can be resolved by the requesting member at submission time.";render();return;}
+        if(!factionApiAccess){if(balanceError.isEmpty()){balanceError="Detailed faction balances are not available to this key. Amount requests still work, and full-balance requests can be resolved by the requesting member at submission time.";render();}return;}
         balancesLoading=true;
         new Thread(()->{String error="";Map<Integer,Long> fresh=new HashMap<>();try{
             JSONObject data=TornApiClient.getJson("/faction/balance?cat=current",key);
@@ -123,7 +128,7 @@ public class BankingCompanionActivity extends Activity {
         addRequestCard(r);
         LinearLayout status=card(canManage?GREEN:BLUE);status.addView(eyebrow(canManage?"BANKER ACCESS":"MEMBER VIEW",canManage?GREEN:BLUE));status.addView(text(canManage?"Shared queue + payout controls":"Your banking requests",19,TEXT,true));status.addView(text(canManage?"The queue opens from warmed data first. Current balances refresh separately so they never hold this screen hostage.":"Submit a request here. Authorized faction bankers receive it in the shared queue.",12.5f,MUTED,false));if(!balanceError.isEmpty())status.addView(text(balanceError,11.5f,RED,false));
         if(canManage){Button torn=button("Open Torn Faction Banking",BLUE);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));tp.topMargin=dp(10);status.addView(torn,tp);torn.setOnClickListener(v->openTornBanking());}
-        Button refresh=button(refreshing?"Refreshing Queue…":"Refresh Queue",BORDER);refresh.setEnabled(!refreshing);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));rp.topMargin=dp(8);status.addView(refresh,rp);refresh.setOnClickListener(v->{String key=keyStore.load();if(key!=null){refreshing=true;render();refreshLive(key,false);}});add(r,status);
+        Button refresh=button(refreshing?"Refreshing Queue…":"Refresh Queue",BORDER);refresh.setEnabled(!refreshing);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));rp.topMargin=dp(8);status.addView(refresh,rp);refresh.setOnClickListener(v->{String key=keyStore.load();if(key!=null)refreshLive(key,false);});add(r,status);
 
         if(requests.length()==0){LinearLayout none=card(BORDER);none.addView(text("No banking requests yet.",17,TEXT,true));none.addView(text("Requests you submit in TornFCA will appear here.",12,MUTED,false));add(r,none);}else{
             for(int i=0;i<requests.length();i++){JSONObject row=requests.optJSONObject(i);if(row!=null)add(r,requestCard(row));}
@@ -147,7 +152,6 @@ public class BankingCompanionActivity extends Activity {
             });
             String summary=requestedFull?(resolved>0L?"Full balance request: "+money(resolved):"Full balance requested"):("Requested "+raw);
             if(CommunityBackendClient.isConfigured())new Thread(()->{try{CommunityBackendClient.publishBankingRequest(key,summary,noteValue);}catch(Exception ignored){}},"TornFCA-BankingAlert").start();
-            // Reconcile the local warm cache quietly; the user does not wait on this second request.
             new Thread(()->{try{JSONObject fresh=CompanionBackendClient.getBankingRequests(key,false);if(factionId>0&&playerId>0)StartupWarmCache.putBanking(factionId,playerId,fresh);runOnUiThread(()->{applyResponse(fresh);render();loadBalancesAsync(key);});}catch(Exception ignored){}},"TornFCA-BankingRefresh").start();
         }catch(Exception e){String m=e.getMessage()==null?"Unable to submit banking request.":e.getMessage();runOnUiThread(()->{submit.setEnabled(true);submit.setText("Submit Banking Request");Toast.makeText(this,m,Toast.LENGTH_LONG).show();});}}).start();});
         add(r,c);
