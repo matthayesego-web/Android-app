@@ -1,0 +1,61 @@
+name: TornFCA Backend Smoke Diagnostics
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check six public health endpoints
+        run: |
+          set -u
+          OUT="$RUNNER_TEMP/backend-smoke.txt"
+          : > "$OUT"
+          check_backend() {
+            label="$1"; url="$2"; expected="$3"; version="$4"
+            tmp="$RUNNER_TEMP/${label}.body"
+            http="$(curl --silent --show-error --location --max-time 25 --output "$tmp" --write-out '%{http_code}' "$url" 2>"$RUNNER_TEMP/${label}.err" || true)"
+            body="$(cat "$tmp" 2>/dev/null || true)"
+            err="$(cat "$RUNNER_TEMP/${label}.err" 2>/dev/null || true)"
+            ok=true
+            [ "$http" = "200" ] || ok=false
+            printf '%s' "$body" | grep -F '"ok":true' >/dev/null 2>&1 || ok=false
+            printf '%s' "$body" | grep -F "$expected" >/dev/null 2>&1 || ok=false
+            printf '%s' "$body" | grep -F '"version":"'"$version"'"' >/dev/null 2>&1 || ok=false
+            printf '%s http=%s expected_version=%s result=%s\n' "$label" "${http:-none}" "$version" "$ok" >> "$OUT"
+            if [ "$ok" != "true" ]; then
+              printf '  response=%s\n' "$(printf '%s' "$body" | tr '\n\r' '  ' | cut -c1-400)" >> "$OUT"
+              printf '  curl_error=%s\n' "$(printf '%s' "$err" | tr '\n\r' '  ' | cut -c1-300)" >> "$OUT"
+            fi
+          }
+          check_backend faction 'https://script.google.com/macros/s/AKfycbzR8zjFVYaDoIZaxFdJV4yBaM4mLSv-iqZL8146HCzq6vRzJgeYr1Y0TKkPGrdASjQj/exec' 'TornFCA Faction Backend' '1.1.0'
+          check_backend community 'https://script.google.com/macros/s/AKfycbwphLmR-N82GJUChzwZlxQ8DGKVoaN6VCNiXvbpKfgJV6JUxlcwPOYVKgbI1h9tmjp-ig/exec' 'TornFCA Community Backend' '1.7.0'
+          check_backend premium 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' 'TornFCA Premium Entitlements' '1.2.0'
+          check_backend developer 'https://script.google.com/macros/s/AKfycbwQeLGPlVpbHgqq2ZG9b73r1PUNvroWQ1CQoy-DXNYCw4W-bCX9VhDkUM7yy_ydw_rjrQ/exec' 'TornFCA Developer Control Plane' '1.4.0'
+          check_backend warpay 'https://script.google.com/macros/s/AKfycbzb2RKPNS_Q4LsAK7nIC2oId8UqHXEd-1t93lyyY8bNz3S-7eMJCP1BqP1bnrNq4JiTGQ/exec' 'TornFCA WarPay Backend' '1.1.0'
+          check_backend feedback 'https://script.google.com/macros/s/AKfycbyAFt3NNQJWOrbWOuYsH-1MZjf0gxGYZ9l4oSTFtN4unBaXpS2u_Go5xOdP-tIAWi2X/exec' 'TornFCA Feedback Backend' '1.0.0'
+          cat "$OUT"
+
+      - name: Publish diagnostic status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PUB="$RUNNER_TEMP/backend-smoke-publish"
+          rm -rf "$PUB"; mkdir -p "$PUB"; cd "$PUB"
+          git init
+          git checkout --orphan backend-smoke-status
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          cp "$RUNNER_TEMP/backend-smoke.txt" status.txt
+          printf '\nsource_commit=%s\n' "$GITHUB_SHA" >> status.txt
+          git add status.txt
+          git commit -m "Publish backend smoke diagnostics"
+          git push --force origin HEAD:backend-smoke-status
