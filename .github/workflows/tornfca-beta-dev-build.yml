@@ -44,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
-          grep -q 'versionName = "0.10.10"' app/build.gradle.kts
-          grep -q 'versionCode = 65' app/build.gradle.kts
+          grep -q 'versionName = "0.10.11"' app/build.gradle.kts
+          grep -q 'versionCode = 66' app/build.gradle.kts
           ! grep -q 'DEVELOPER_ACCESS_SHA256' app/build.gradle.kts
           grep -q 'FEEDBACK_BACKEND_URL' app/build.gradle.kts
           grep -q 'FeedbackActivity' app/src/main/AndroidManifest.xml
@@ -64,6 +64,9 @@ jobs:
           grep -q "const TD_VERSION='1.5.0'" backend/TornFcaDeveloperBackend.gs
           grep -q 'confirmClear(rows.length())' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
           grep -q 'StartupWarmup.start' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q 'StartupWarmup.hasStartedThisProcess' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q '45L\*60L\*1000L' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
+          grep -q 'renderSafe' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
           grep -q 'BackendRequestGovernor.acquire' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
           for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs backend/TornFcaFeedbackBackend.gs; do
             cp "$file" "/tmp/$(basename "$file").js"
