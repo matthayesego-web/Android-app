@@ -10,7 +10,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** Transport for TornFCA's developer control plane, delegated developer authentication and public product policy. */
+/** Transport for TornFCA's developer control plane and public product policy. */
 public final class DeveloperBackendClient {
     private static final String BACKEND_URL=BuildConfig.DEVELOPER_BACKEND_URL==null?"":BuildConfig.DEVELOPER_BACKEND_URL.trim();
     private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android Developer";
@@ -24,20 +24,28 @@ public final class DeveloperBackendClient {
     /** Non-secret app policy. Any verified Torn user may read it. */
     public static JSONObject publicConfig(String apiKey)throws IOException{return postChecked(request("public_config",apiKey),true,"Unable to read TornFCA remote policy.");}
 
-    /** Legacy/root control-plane calls remain Torn-owner verified until cross-service delegation is explicitly enabled. */
+    /** Root control-plane calls remain Torn-owner verified until cross-service delegation is explicitly enabled. */
     public static JSONObject status(String apiKey)throws IOException{return postChecked(request("status",apiKey),true,"Unable to read developer backend status.");}
     public static JSONObject readConfig(String apiKey)throws IOException{return postChecked(request("config_read",apiKey),true,"Unable to read developer configuration.");}
     public static JSONObject writeConfig(String apiKey,String developerPassword,JSONObject config)throws IOException{JSONObject body=request("config_write",apiKey);put(body,"admin_password",developerPassword==null?"":developerPassword);try{body.put("config",config==null?new JSONObject():config);}catch(Exception ignored){}return postChecked(body,true,"Unable to update developer configuration.");}
     public static JSONObject readAudit(String apiKey,String developerPassword)throws IOException{JSONObject body=request("audit_list",apiKey);put(body,"admin_password",developerPassword==null?"":developerPassword);return postChecked(body,true,"Unable to read developer audit history.");}
 
-    /** Delegated developer login uses username + password + TOTP, not a Torn player-ID lock. */
+    /**
+     * Beta password-only gate. The user enters only the developer password; the already-signed-in Torn key is
+     * supplied internally so the existing v1.4.0 backend can verify the Root password without another deployment.
+     */
+    public static JSONObject verifyOwnerPassword(String apiKey,String developerPassword)throws IOException{
+        JSONObject body=request("audit_list",apiKey);
+        put(body,"admin_password",developerPassword==null?"":developerPassword);
+        return postChecked(body,true,"Developer password was not accepted.");
+    }
+
+    /** Existing delegated developer APIs are retained for later re-hardening, but are no longer exposed by the Beta gate. */
     public static JSONObject developerLogin(String username,String password,String otp,String deviceId)throws IOException{JSONObject body=plain("developer_login");put(body,"username",username);put(body,"password",password);put(body,"otp",otp);put(body,"device_id",deviceId);return postChecked(body,false,"Developer authentication failed.");}
     public static JSONObject developerSession(String sessionToken)throws IOException{JSONObject body=plain("developer_session");put(body,"developer_session",sessionToken);return postChecked(body,false,"Developer session is no longer valid.");}
     public static JSONObject developerLogout(String sessionToken)throws IOException{JSONObject body=plain("developer_logout");put(body,"developer_session",sessionToken);return postChecked(body,false,"Unable to close developer session.");}
-
     public static JSONObject enrollmentBegin(String inviteCode,String password,String deviceId)throws IOException{JSONObject body=plain("developer_enroll_begin");put(body,"invite_code",inviteCode);put(body,"password",password);put(body,"device_id",deviceId);return postChecked(body,false,"Unable to begin developer enrollment.");}
     public static JSONObject enrollmentComplete(String enrollmentToken,String otp,String deviceId)throws IOException{JSONObject body=plain("developer_enroll_complete");put(body,"enrollment_token",enrollmentToken);put(body,"otp",otp);put(body,"device_id",deviceId);return postChecked(body,false,"Unable to complete developer enrollment.");}
-
     public static JSONObject accessList(String sessionToken)throws IOException{JSONObject body=plain("developer_access_list");put(body,"developer_session",sessionToken);return postChecked(body,false,"Unable to read developer access list.");}
     public static JSONObject createInvite(String sessionToken,String username,String displayName,String role)throws IOException{JSONObject body=plain("developer_invite_create");put(body,"developer_session",sessionToken);put(body,"username",username);put(body,"display_name",displayName);put(body,"role",role);return postChecked(body,false,"Unable to create developer invitation.");}
     public static JSONObject revokeAccess(String sessionToken,String developerId)throws IOException{JSONObject body=plain("developer_access_revoke");put(body,"developer_session",sessionToken);put(body,"developer_id",developerId);return postChecked(body,false,"Unable to revoke developer access.");}
@@ -49,9 +57,49 @@ public final class DeveloperBackendClient {
 
     private static JSONObject postChecked(JSONObject body,boolean requireTornKey,String fallback)throws IOException{
         if(!isConfigured())throw new IOException("TornFCA developer backend is not configured in this build.");
-        if(requireTornKey){String apiKey=body.optString("apiKey","");if(apiKey.isEmpty())throw new IOException("Developer verification requires the signed-in Torn API key.");TornApiClient.validateKey(apiKey);}
-        waitForSlot();HttpURLConnection c=(HttpURLConnection)new URL(BACKEND_URL).openConnection();
-        try{c.setRequestMethod("POST");c.setConnectTimeout(12000);c.setReadTimeout(22000);c.setUseCaches(false);c.setDoOutput(true);c.setRequestProperty("Content-Type","text/plain;charset=UTF-8");c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent",USER_AGENT);byte[] bytes=body.toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=c.getOutputStream()){out.write(bytes);}int code=c.getResponseCode();InputStream in=code>=400?c.getErrorStream():c.getInputStream();String raw=in==null?"":read(in);JSONObject result;try{result=new JSONObject(raw);}catch(Exception e){throw new IOException("Developer backend returned an unreadable response.");}if(code<200||code>=300)throw new IOException("Developer backend HTTP "+code+".");if(!result.optBoolean("ok",false))throw new IOException(result.optString("error",fallback));return result;}finally{c.disconnect();}
+        if(requireTornKey){String apiKey=body.optString("apiKey","");if(apiKey.isEmpty())throw new IOException("Reconnect your Torn API key before opening the developer console.");TornApiClient.validateKey(apiKey);}
+        waitForSlot();JSONObject result=execute(body);
+        if(!result.optBoolean("ok",false))throw new IOException(result.optString("error",fallback));
+        return result;
+    }
+
+    /** Explicit redirect handling is required for Google Apps Script ContentService POST responses on some Android builds. */
+    private static JSONObject execute(JSONObject body)throws IOException{
+        URL url=new URL(BACKEND_URL);
+        String method="POST";
+        byte[] bytes=body.toString().getBytes(StandardCharsets.UTF_8);
+        for(int redirect=0;redirect<6;redirect++){
+            HttpURLConnection c=(HttpURLConnection)url.openConnection();
+            try{
+                c.setInstanceFollowRedirects(false);
+                c.setRequestMethod(method);
+                c.setConnectTimeout(12000);
+                c.setReadTimeout(25000);
+                c.setUseCaches(false);
+                c.setRequestProperty("Accept","application/json");
+                c.setRequestProperty("User-Agent",USER_AGENT);
+                if("POST".equals(method)){
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type","text/plain;charset=UTF-8");
+                    try(OutputStream out=c.getOutputStream()){out.write(bytes);}
+                }
+                int code=c.getResponseCode();
+                if(code==301||code==302||code==303||code==307||code==308){
+                    String location=c.getHeaderField("Location");
+                    if(location==null||location.trim().isEmpty())throw new IOException("Developer backend redirect was missing its destination.");
+                    url=new URL(url,location);
+                    method=(code==307||code==308)?"POST":"GET";
+                    continue;
+                }
+                InputStream in=code>=400?c.getErrorStream():c.getInputStream();
+                String raw=in==null?"":read(in);
+                JSONObject result;
+                try{result=new JSONObject(raw);}catch(Exception e){throw new IOException("Developer backend returned an unreadable response.");}
+                if(code<200||code>=300)throw new IOException(result.optString("error","Developer backend HTTP "+code+"."));
+                return result;
+            }finally{c.disconnect();}
+        }
+        throw new IOException("Developer backend redirected too many times.");
     }
 
     private static synchronized void waitForSlot(){long now=System.currentTimeMillis();long wait=Math.max(0L,nextRequestAtMs-now);if(wait>0)try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();}nextRequestAtMs=System.currentTimeMillis()+1500L;}
