@@ -14,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 public final class DeveloperBackendClient {
     private static final String BACKEND_URL=BuildConfig.DEVELOPER_BACKEND_URL==null?"":BuildConfig.DEVELOPER_BACKEND_URL.trim();
     private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android Developer";
-    private static long nextRequestAtMs=0L;
 
     private DeveloperBackendClient(){}
 
@@ -54,7 +53,7 @@ public final class DeveloperBackendClient {
     private static JSONObject postChecked(JSONObject body,boolean requireTornKey,String fallback)throws IOException{
         if(!isConfigured())throw new IOException("TornFCA developer backend is not configured in this build.");
         if(requireTornKey){String apiKey=body.optString("apiKey","");if(apiKey.isEmpty())throw new IOException("Reconnect your Torn API key before opening the developer console.");TornApiClient.validateKey(apiKey);}
-        waitForSlot();JSONObject result=execute(body);
+        BackendRequestGovernor.acquire();JSONObject result=execute(body);
         if(!result.optBoolean("ok",false))throw new IOException(result.optString("error",fallback));
         return result;
     }
@@ -98,6 +97,5 @@ public final class DeveloperBackendClient {
         throw new IOException("Developer backend redirected too many times.");
     }
 
-    private static synchronized void waitForSlot(){long now=System.currentTimeMillis();long wait=Math.max(0L,nextRequestAtMs-now);if(wait>0)try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();}nextRequestAtMs=System.currentTimeMillis()+1000L;}
     private static String read(InputStream input)throws IOException{try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return out.toString(StandardCharsets.UTF_8.name());}}
 }
