@@ -50,6 +50,14 @@ jobs:
           TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
         run: gradle --no-daemon :app:assembleBeta
 
+      - name: Upload unsigned Beta recovery artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v${{ env.VERSION_NAME }}-unsigned-direct
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Publish connector-readable unsigned snapshot
         env:
           GH_TOKEN: ${{ github.token }}
@@ -71,7 +79,7 @@ jobs:
           rm TornFCA-Beta-unsigned-latest.apk.b64
           PARTS="$(find . -maxdepth 1 -name 'TornFCA-Beta-unsigned-latest.apk.b64.part.*' | wc -l | tr -d ' ')"
           SHA="$(sha256sum "$INPUT" | awk '{print $1}')"
-          printf 'version_name=%s\nversion_code=%s\npackage=com.matthayesego.duckforcetoolkit.beta\nparts=%s\nchunk_bytes=180000\nsha256=%s\nsource_commit=%s\n' "$VERSION_NAME" "$VERSION_CODE" "$PARTS" "$SHA" "$GITHUB_SHA" > build-info.txt
+          printf 'version_name=%s\nversion_code=%s\npackage=com.matthayesego.duckforcetoolkit.beta\nparts=%s\nchunk_bytes=180000\nsha256=%s\nsource_commit=%s\nrun_id=%s\n' "$VERSION_NAME" "$VERSION_CODE" "$PARTS" "$SHA" "$GITHUB_SHA" "$GITHUB_RUN_ID" > build-info.txt
           git add .
           git commit -m "Publish unsigned TornFCA Beta v${VERSION_NAME} recovery"
           git push --force origin HEAD:beta-unsigned-artifacts
