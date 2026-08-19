@@ -1,0 +1,77 @@
+name: TornFCA Beta Unsigned Recovery
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recovery-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Read version
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - name: Compile unsigned Beta
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+          TORNFCA_FEEDBACK_BACKEND_URL: ${{ secrets.TORNFCA_FEEDBACK_BACKEND_URL }}
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: gradle --no-daemon :app:assembleBeta
+
+      - name: Publish connector-readable unsigned snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          INPUT="$GITHUB_WORKSPACE/app/build/outputs/apk/beta/app-beta-unsigned.apk"
+          test -f "$INPUT"
+          PUB="$RUNNER_TEMP/tornfca-beta-unsigned-publish"
+          rm -rf "$PUB"
+          mkdir -p "$PUB"
+          cd "$PUB"
+          git init
+          git checkout --orphan beta-unsigned-artifacts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          base64 -w 0 "$INPUT" > TornFCA-Beta-unsigned-latest.apk.b64
+          split -b 180000 -d -a 3 TornFCA-Beta-unsigned-latest.apk.b64 TornFCA-Beta-unsigned-latest.apk.b64.part.
+          rm TornFCA-Beta-unsigned-latest.apk.b64
+          PARTS="$(find . -maxdepth 1 -name 'TornFCA-Beta-unsigned-latest.apk.b64.part.*' | wc -l | tr -d ' ')"
+          SHA="$(sha256sum "$INPUT" | awk '{print $1}')"
+          printf 'version_name=%s\nversion_code=%s\npackage=com.matthayesego.duckforcetoolkit.beta\nparts=%s\nchunk_bytes=180000\nsha256=%s\nsource_commit=%s\n' "$VERSION_NAME" "$VERSION_CODE" "$PARTS" "$SHA" "$GITHUB_SHA" > build-info.txt
+          git add .
+          git commit -m "Publish unsigned TornFCA Beta v${VERSION_NAME} recovery"
+          git push --force origin HEAD:beta-unsigned-artifacts
