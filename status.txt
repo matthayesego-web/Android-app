@@ -1,0 +1,6 @@
+version=0.10.12
+version_code=67
+run_id=32274581142
+source_commit=c0c8fe086db39d5386169831c8d70f7f800283df
+compile=failure
+unsigned_sha256=unavailable
