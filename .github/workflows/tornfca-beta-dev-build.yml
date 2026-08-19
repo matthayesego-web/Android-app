@@ -44,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
-          grep -q 'versionName = "0.10.8"' app/build.gradle.kts
-          grep -q 'versionCode = 63' app/build.gradle.kts
+          grep -q 'versionName = "0.10.9"' app/build.gradle.kts
+          grep -q 'versionCode = 64' app/build.gradle.kts
           ! grep -q 'DEVELOPER_ACCESS_SHA256' app/build.gradle.kts
           grep -q 'FEEDBACK_BACKEND_URL' app/build.gradle.kts
           grep -q 'FeedbackActivity' app/src/main/AndroidManifest.xml
@@ -57,8 +57,11 @@ jobs:
           grep -q '#29E6FF' app/src/main/res/drawable/tornfca_mark.xml
           grep -q '#9A5CFF' app/src/main/res/drawable/tornfca_mark.xml
           grep -q 'versionTaps>=5' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
-          grep -q 'Hidden entry • developer password only' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
-          grep -q 'verifyOwnerPassword' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
+          grep -q 'Hidden entry • verified Torn ID access' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          grep -q 'developerIdLogin' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
+          grep -q 'Manage Authorized Torn IDs' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
+          grep -q 'DeveloperIdAccess' backend/TornFcaDeveloperBackend.gs
+          grep -q "const TD_VERSION='1.5.0'" backend/TornFcaDeveloperBackend.gs
           grep -q 'confirmClear(rows.length())' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
           for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs backend/TornFcaFeedbackBackend.gs; do
             cp "$file" "/tmp/$(basename "$file").js"
@@ -80,7 +83,7 @@ jobs:
           check_backend 'https://script.google.com/macros/s/AKfycbzR8zjFVYaDoIZaxFdJV4yBaM4mLSv-iqZL8146HCzq6vRzJgeYr1Y0TKkPGrdASjQj/exec' 'TornFCA Faction Backend' '1.1.0'
           check_backend 'https://script.google.com/macros/s/AKfycbwphLmR-N82GJUChzwZlxQ8DGKVoaN6VCNiXvbpKfgJV6JUxlcwPOYVKgbI1h9tmjp-ig/exec' 'TornFCA Community Backend' '1.7.0'
           check_backend 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' 'TornFCA Premium Entitlements' '1.2.0'
-          check_backend 'https://script.google.com/macros/s/AKfycbwQeLGPlVpbHgqq2ZG9b73r1PUNvroWQ1CQoy-DXNYCw4W-bCX9VhDkUM7yy_ydw_rjrQ/exec' 'TornFCA Developer Control Plane' '1.4.0'
+          check_backend 'https://script.google.com/macros/s/AKfycbwQeLGPlVpbHgqq2ZG9b73r1PUNvroWQ1CQoy-DXNYCw4W-bCX9VhDkUM7yy_ydw_rjrQ/exec' 'TornFCA Developer Control Plane' '1.5.0'
           check_backend 'https://script.google.com/macros/s/AKfycbzb2RKPNS_Q4LsAK7nIC2oId8UqHXEd-1t93lyyY8bNz3S-7eMJCP1BqP1bnrNq4JiTGQ/exec' 'TornFCA WarPay Backend' '1.1.0'
           check_backend 'https://script.google.com/macros/s/AKfycbyAFt3NNQJWOrbWOuYsH-1MZjf0gxGYZ9l4oSTFtN4unBaXpS2u_Go5xOdP-tIAWi2X/exec' 'TornFCA Feedback Backend' '1.0.0'
 
