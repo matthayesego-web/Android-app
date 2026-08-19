@@ -1,4 +1,5 @@
 name: TEMP Export Android APK Signer
+# One-time local signing support for Beta recovery builds.
 
 on:
   push:
