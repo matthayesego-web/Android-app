@@ -31,11 +31,11 @@ public class MemberDirectoryActivity extends Activity {
 
     private void open(){
         String key=keyStore.load();if(key==null||key.isBlank()){renderError("Reconnect your Torn API key to view your faction directory.");return;}
-        AuthSession hot=TornApiClient.cachedSession(key);FactionScopeCache.Scope scope=hot==null?FactionScopeCache.load(this,key):null;
-        int factionId=hot!=null?hot.factionId:scope==null?0:scope.factionId;
+        AuthSession hot=TornApiClient.cachedSession(key);
+        int factionId=hot==null?0:hot.factionId;
         JSONArray cached=FactionMemberCache.load(factionId);
-        if(cached!=null){
-            session=hot!=null?hot:new AuthSession(scope.playerId,scope.playerName,scope.factionId,scope.factionName,scope.position,scope.factionApiAccess,scope.abilities);
+        if(cached!=null&&hot!=null){
+            session=hot;
             members=cached;
             render("");
             refresh(false);
@@ -61,11 +61,13 @@ public class MemberDirectoryActivity extends Activity {
                 AuthSession verified=TornApiClient.cachedSession(key);if(verified==null)verified=TornApiClient.authenticate(key);
                 JSONObject root=TornApiClient.getJson("/faction/members",key);JSONArray data=root.optJSONArray("members");
                 session=verified;members=data==null?new JSONArray():data;FactionMemberCache.save(verified.factionId,members);
+                refreshing=false;
                 runOnUiThread(()->render(""));
             }catch(Exception e){
+                refreshing=false;
                 String message=e.getMessage()==null?"Unable to refresh faction members.":e.getMessage();
                 if(firstLoad)renderError(message);else runOnUiThread(()->Toast.makeText(this,"Roster refresh failed. Showing cached data.",Toast.LENGTH_SHORT).show());
-            }finally{refreshing=false;}
+            }
         },"TornFCA-MemberDirectory").start();
     }
 
@@ -81,7 +83,7 @@ public class MemberDirectoryActivity extends Activity {
         Button go=TornFcaUi.button(this,"Search directory",TornFcaUi.BLUE);LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));gp.topMargin=TornFcaUi.dp(this,8);r.addView(go,gp);
         Button all=TornFcaUi.button(this,"Show all members",TornFcaUi.BORDER);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));ap.topMargin=TornFcaUi.dp(this,7);r.addView(all,ap);
         Button refresh=TornFcaUi.button(this,refreshing?"Refreshing…":"Refresh roster",TornFcaUi.BORDER);refresh.setEnabled(!refreshing);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));rp.topMargin=TornFcaUi.dp(this,7);rp.bottomMargin=TornFcaUi.dp(this,14);r.addView(refresh,rp);
-        go.setOnClickListener(v->render(search.getText().toString().trim()));all.setOnClickListener(v->render(""));refresh.setOnClickListener(v->{refreshing=true;render(search.getText().toString().trim());refresh(false);});
+        go.setOnClickListener(v->render(search.getText().toString().trim()));all.setOnClickListener(v->render(""));refresh.setOnClickListener(v->refresh(false));
 
         List<JSONObject> visible=matching(filter);
         TornFcaUi.addSection(this,r,filter==null||filter.isBlank()?"CURRENT ROSTER":"SEARCH RESULTS");
