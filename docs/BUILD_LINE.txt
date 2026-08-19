@@ -1,2 +1,2 @@
-TornFCA Beta v0.10.8 / versionCode 63
-Hidden developer console now uses password-only Beta access with Apps Script redirect hardening.
+TornFCA Beta v0.10.9 / versionCode 64
+Hidden Developer Console now uses verified Torn player ID access. Owner ID is permanent Root; Root may add/remove delegated Developer IDs. Hardened password/TOTP infrastructure is retained for later reactivation.
