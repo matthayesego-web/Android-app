@@ -14,24 +14,21 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-/** Hidden developer tools reached through the simplified password-only Beta gate. */
+/** Hidden developer tools reached through verified Torn-ID access. */
 public class DeveloperPanelActivity extends Activity {
     public static final String EXTRA_DEVELOPER_ROLE="developer_role",EXTRA_DEVELOPER_USERNAME="developer_username";
     private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(15,20,28),BORDER=Color.rgb(45,55,69),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(154,164,178),GOLD=Color.rgb(241,194,106),BLUE=Color.rgb(88,166,255),GREEN=Color.rgb(63,185,80),PURPLE=Color.rgb(163,113,247),RED=Color.rgb(248,81,73);
-    private int factionId;private String factionName;private boolean factionApi;private String position,developerRole,developerUsername;private DeveloperSessionStore sessions;private boolean localBetaSession,passwordSession;
+    private int factionId;private String factionName;private boolean factionApi;private String position,developerRole,developerUsername;private DeveloperSessionStore sessions;
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);sessions=new DeveloperSessionStore(this);
         DeveloperSessionStore.Session current=sessions.load();if(current==null){finish();return;}
-        localBetaSession=current.token!=null&&current.token.startsWith("local-beta-owner:");
-        passwordSession=current.token!=null&&current.token.startsWith("password-owner:");
-        if(localBetaSession&&(!TornFcaCommandRuntime.isBetaBuild()||DeveloperBackendClient.isConfigured())){sessions.clear();finish();return;}
         developerRole=current.role;developerUsername=current.username;
         factionId=getIntent().getIntExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME);factionApi=getIntent().getBooleanExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,false);position=getIntent().getStringExtra(DeveloperConsoleActivity.EXTRA_POSITION);
         if(factionName==null||factionName.trim().isEmpty())factionName="No faction context";if(position==null||position.trim().isEmpty())position="Unknown role";render();
     }
 
-    private boolean admin(){return"root".equals(developerRole)||"admin".equals(developerRole);}private boolean root(){return"root".equals(developerRole);}
+    private boolean root(){return"root".equals(developerRole);}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
@@ -46,30 +43,27 @@ public class DeveloperPanelActivity extends Activity {
         Button back=button("← Companion",BORDER);back.setOnClickListener(v->{Intent i=TornFcaCommandRuntime.homeIntent(this,"More");i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);startActivity(i);finish();});r.addView(back,new LinearLayout.LayoutParams(dp(132),dp(44)));
         TextView brand=text("TORNFCA • HIDDEN DEVELOPER CHANNEL",10,GOLD,true);brand.setLetterSpacing(.10f);brand.setGravity(Gravity.CENTER);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(18);r.addView(brand,bp);
         TextView title=text("Developer Panel",30,TEXT,true);title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(5);tp.bottomMargin=dp(4);r.addView(title,tp);
-        String authLine=passwordSession?"ROOT • developer password verified":localBetaSession?"ROOT • temporary Beta owner verification":"@"+developerUsername+" • "+developerRole.toUpperCase()+" • verified developer session";
+        String authLine="@"+developerUsername+" • "+developerRole.toUpperCase()+" • Torn ID verified";
         TextView sub=text(authLine,13,MUTED,false);sub.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.bottomMargin=dp(18);r.addView(sub,sp);
 
-        if(passwordSession){addCard(r,card("Password Session","The hidden console was unlocked with the developer password. This device keeps an encrypted local developer session for up to 12 hours so you do not need to re-enter it every time you move around the console.",GOLD));}
-        else if(localBetaSession){addCard(r,card("Beta Test Session","Temporary owner-only access is active because the Developer Backend is not configured. Use this to test local diagnostics and previews.",GOLD));}
-        else if(admin()){
-            LinearLayout access=card("Developer Access","Legacy delegated developer accounts remain available in the backend for future hardening.",PURPLE);addButton(access,"Manage Developer Access",PURPLE,()->startActivity(new Intent(this,DeveloperAccessActivity.class)));addCard(r,access);
+        if(root()){
+            LinearLayout access=card("Developer Access","Authorize or remove Torn player IDs. Your Root ID is permanent; every added ID receives Developer access only and cannot manage this list.",PURPLE);addButton(access,"Manage Authorized Torn IDs",PURPLE,()->startActivity(new Intent(this,DeveloperAccessActivity.class)));addCard(r,access);
         }
 
         boolean preview=DeveloperPreviewStore.isMemberPreview(this);LinearLayout previewCard=card("Standard Member Preview",preview?"ACTIVE — TornFCA is presenting the non-leadership member view. Your actual Torn identity and backend permissions are unchanged.":"Switch the presentation layer to what a normal non-leadership faction member sees without impersonating another player or changing server authorization.",preview?GREEN:GOLD);addButton(previewCard,preview?"Exit Member Preview":"Enter Member Preview",preview?GREEN:GOLD,()->{DeveloperPreviewStore.setMemberPreview(this,!DeveloperPreviewStore.isMemberPreview(this));Intent i=TornFcaCommandRuntime.homeIntent(this,"Home");i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);startActivity(i);finish();});addCard(r,previewCard);
 
         LinearLayout advanced=card("Advanced Developer Console","Diagnostics, permission simulation, local feature switches, faction-scope cache controls and test launchers.",BLUE);addButton(advanced,"Open Advanced Console",BLUE,()->{Intent i=new Intent(this,DeveloperConsoleActivity.class);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,factionId);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,factionName);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,factionApi);i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,position);startActivity(i);});addCard(r,advanced);
 
-        if(root()&&!localBetaSession){
-            LinearLayout backend=card("Developer Backend",DeveloperBackendClient.isConfigured()?"Maintenance mode, minimum supported version, aggregate usage and remote emergency feature switches. Destructive remote changes still ask for the developer password again.":"Developer control-plane architecture is present, but this build does not contain its backend URL.",BLUE);addButton(backend,"Open Backend Control",BLUE,()->startActivity(new Intent(this,DeveloperBackendActivity.class)));addCard(r,backend);
-            LinearLayout moderation=card("Community Moderation",CommunityBackendClient.isConfigured()?"Separate moderation authorization still applies; developer access does not automatically grant faction moderation rights.":"Community moderation backend is not configured in this build.",PURPLE);addButton(moderation,"Open Moderation Queue",PURPLE,()->startActivity(new Intent(this,CommunityModerationActivity.class)));addCard(r,moderation);
+        if(root()){
+            LinearLayout backend=card("Developer Backend",DeveloperBackendClient.isConfigured()?"Maintenance mode, minimum supported version, aggregate usage and remote emergency feature switches. Existing sensitive write controls keep their separate authorization until we deliberately simplify them.":"Developer control-plane architecture is present, but this build does not contain its backend URL.",BLUE);addButton(backend,"Open Backend Control",BLUE,()->startActivity(new Intent(this,DeveloperBackendActivity.class)));addCard(r,backend);
+            LinearLayout moderation=card("Community Moderation",CommunityBackendClient.isConfigured()?"Separate moderation authorization still applies; Developer Console access does not automatically grant faction moderation rights.":"Community moderation backend is not configured in this build.",PURPLE);addButton(moderation,"Open Moderation Queue",PURPLE,()->startActivity(new Intent(this,CommunityModerationActivity.class)));addCard(r,moderation);
             LinearLayout premium=card("Premium & Entitlements",PremiumBackendClient.isConfigured()?"Premium administration keeps its own authorization boundary.":"Premium backend is not configured in this build.",GOLD);addButton(premium,"Open Premium Controls",GOLD,()->startActivity(new Intent(this,PremiumAdminActivity.class)));addCard(r,premium);
         }
 
-        String boundary=passwordSession?"For the current Beta, the developer console itself is intentionally protected only by the hidden entry plus your developer password. Remote faction, moderation and Premium actions keep their own separate server-side permission checks.":localBetaSession?"This temporary fallback is limited to local Beta diagnostics and expires after two hours.":"Developer access does not rewrite Torn identity, faction permissions, banking authorization, moderation rights or Premium entitlement authority.";
-        addCard(r,card("Security boundary",boundary,BORDER));
-        LinearLayout logout=card("Developer Session",passwordSession?"This encrypted device-local session expires after 12 hours. Sign out any time to require the password again.":"Developer sessions expire automatically and can be ended here.",RED);addButton(logout,"Sign Out of Developer Channel",RED,this::logout);addCard(r,logout);
+        addCard(r,card("Access boundary",root()?"Your verified Torn player ID is the permanent Root. Only Root can add or remove Developer Console IDs. Delegated IDs can use developer/testing tools but cannot grant access to anyone else.":"Your Torn player ID has delegated Developer Console access. You cannot add or remove other developer IDs and you do not gain Root-only backend, moderation or Premium controls.",BORDER));
+        LinearLayout logout=card("Developer Session","Torn-ID sessions expire automatically and are invalidated immediately if Root removes an authorized ID.",RED);addButton(logout,"Sign Out of Developer Channel",RED,this::logout);addCard(r,logout);
         TextView footer=text("TornFCA v"+TornFcaBrand.VERSION+" • hidden developer channel",11,MUTED,false);footer.setGravity(Gravity.CENTER);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fp.topMargin=dp(8);r.addView(footer,fp);setContentView(s);s.requestApplyInsets();
     }
 
-    private void logout(){DeveloperSessionStore.Session s=sessions.load();sessions.clear();if(s!=null&&!localBetaSession&&!passwordSession&&DeveloperBackendClient.isConfigured())new Thread(()->{try{DeveloperBackendClient.developerLogout(s.token);}catch(Exception ignored){}},"TornFCA-DeveloperLogout").start();Toast.makeText(this,"Developer session ended.",Toast.LENGTH_SHORT).show();finish();}
+    private void logout(){DeveloperSessionStore.Session current=sessions.load();sessions.clear();if(current!=null&&DeveloperBackendClient.isConfigured())new Thread(()->{try{DeveloperBackendClient.developerLogout(current.token);}catch(Exception ignored){}},"TornFCA-DeveloperLogout").start();Toast.makeText(this,"Developer session ended.",Toast.LENGTH_SHORT).show();finish();}
 }
