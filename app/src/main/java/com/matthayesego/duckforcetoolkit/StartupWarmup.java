@@ -39,7 +39,7 @@ public final class StartupWarmup {
         }
     }
 
-    private static final int CORE_TASKS = 4;
+    private static final int CORE_TASKS = 5;
     private static boolean startedThisProcess=false;
     private static boolean finishedThisProcess=false;
     private static Result lastResult;
@@ -65,7 +65,6 @@ public final class StartupWarmup {
     }
 
     private static void run(Context app, Listener listener) {
-        prewarmBackendHealth();
         progress(listener, "Verifying your Torn session…", 0, CORE_TASKS + 1);
         SecureApiKeyStore keyStore = new SecureApiKeyStore(app);
         String key = keyStore.load();
@@ -106,8 +105,18 @@ public final class StartupWarmup {
             StartupWarmCache.putWar(verified.factionId, response);
         }, listener, done, "War status ready.");
 
+        launch("TornFCA-Warm-Roster", latch, () -> {
+            JSONObject response = TornApiClient.getJson("/faction/members", key);
+            JSONArray members=response.optJSONArray("members");
+            if(members!=null)FactionMemberCache.save(verified.factionId,members);
+        }, listener, done, "Faction roster ready.");
+
         launch("TornFCA-Warm-Community", latch, () -> CommunityBackendClient.config(key),
                 listener, done, "Community services ready.");
+
+        // Only wake services that are not already being contacted by real startup work. Faction and
+        // Community are covered above, while Premium performs its real entitlement refresh below.
+        prewarmSecondaryBackends();
 
         try { latch.await(10L, TimeUnit.SECONDS); }
         catch (InterruptedException e) { Thread.currentThread().interrupt(); }
@@ -148,11 +157,8 @@ public final class StartupWarmup {
         if (listener != null) listener.onFinished(result);
     }
 
-    private static void prewarmBackendHealth() {
+    private static void prewarmSecondaryBackends() {
         String[] urls = {
-                BuildConfig.FACTION_BACKEND_URL,
-                BuildConfig.COMMUNITY_BACKEND_URL,
-                BuildConfig.PREMIUM_BACKEND_URL,
                 BuildConfig.DEVELOPER_BACKEND_URL,
                 BuildConfig.WARPAY_BACKEND_URL,
                 BuildConfig.FEEDBACK_BACKEND_URL
