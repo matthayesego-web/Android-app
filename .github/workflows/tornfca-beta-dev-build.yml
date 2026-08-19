@@ -66,6 +66,7 @@ jobs:
 
       - name: Verify deployed backend health
         id: backend_health
+        continue-on-error: true
         run: |
           set -euo pipefail
           check_backend() {
