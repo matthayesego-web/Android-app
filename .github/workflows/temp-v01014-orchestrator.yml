@@ -1,0 +1,89 @@
+name: TEMP TornFCA v0.10.14 Push Orchestrator
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-isolated-push-candidate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated v0.10.14 branch
+        uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.14-push-infrastructure
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - name: Apply staged implementation transform
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          raw=Path('.github/workflows/temp-v01014-push-build.yml').read_text()
+          start="python3 - <<'PY'\n"
+          if start not in raw: raise SystemExit('Embedded transform start marker missing')
+          script=raw.split(start,1)[1].split('\n          PY',1)[0]
+          exec(textwrap.dedent(script),{})
+          PY
+      - name: Validate and compile
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.10.14"' app/build.gradle.kts
+          grep -q 'versionCode = 69' app/build.gradle.kts
+          grep -q "const TC_VERSION='1.8.0'" backend/TornFcaCommunityBackend.gs
+          grep -q "banking_request_push" backend/TornFcaCommunityBackend.gs
+          grep -q '_server_can_banking' backend/TornFcaCommunityBackend.gs
+          grep -q 'CH_BANKING="tornfca_banking"' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java
+          cp backend/TornFcaCommunityBackend.gs /tmp/community.js
+          node --check /tmp/community.js
+          gradle --no-daemon :app:assembleBeta
+      - name: Commit validated isolated source
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle.kts backend/TornFcaCommunityBackend.gs \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java \
+            app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
+          git commit -m 'Implement v0.10.14 banking push infrastructure'
+          git push origin HEAD:work/v0.10.14-push-infrastructure
+      - name: Upload unsigned candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v0.10.14-push-unsigned
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PUB="$RUNNER_TEMP/v01014-push-status"
+          rm -rf "$PUB" && mkdir -p "$PUB" && cd "$PUB"
+          git init
+          git checkout --orphan v01014-push-status
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          RESULT=failure
+          if [ -f "$GITHUB_WORKSPACE/app/build/outputs/apk/beta/app-beta-unsigned.apk" ]; then RESULT=success; fi
+          printf 'version=0.10.14\nversion_code=69\nrun_id=%s\nsource_branch=work/v0.10.14-push-infrastructure\ncompile=%s\n' "$GITHUB_RUN_ID" "$RESULT" > status.txt
+          git add status.txt
+          git commit -m 'Publish v0.10.14 push status'
+          git push --force origin HEAD:v01014-push-status
