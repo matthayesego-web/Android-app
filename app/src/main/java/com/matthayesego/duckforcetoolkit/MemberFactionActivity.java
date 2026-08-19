@@ -17,6 +17,9 @@ import org.json.JSONObject;
 
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /** Member-safe faction views. These screens use only the signed-in player's data plus public faction status. */
 public class MemberFactionActivity extends Activity {
@@ -25,6 +28,7 @@ public class MemberFactionActivity extends Activity {
     public static final String MODE_OC = "OC";
     public static final String MODE_PARTICIPATION = "PARTICIPATION";
 
+    private static final long WAR_CACHE_MS=2L*60L*1000L;
     private static final int BG=Color.rgb(6,9,13), PANEL=Color.rgb(15,20,28), PANEL2=Color.rgb(10,15,22), BORDER=Color.rgb(45,55,69);
     private static final int TEXT=Color.rgb(244,246,249), MUTED=Color.rgb(154,164,178), GOLD=Color.rgb(241,194,106), BLUE=Color.rgb(88,166,255), GOOD=Color.rgb(63,185,80), BAD=Color.rgb(248,81,73);
 
@@ -92,29 +96,45 @@ public class MemberFactionActivity extends Activity {
                 else if(MODE_PARTICIPATION.equals(mode))loadParticipation(key,session);
                 else loadOverview(key,session);
             }catch(Exception e){renderError(e.getMessage()==null?"Unable to load your faction status.":e.getMessage());}
-        }).start();
+        },"TornFCA-MemberFaction").start();
+    }
+
+    private JSONObject loadWarRoot(String key,int factionId)throws Exception{
+        JSONObject warm=StartupWarmCache.war(factionId,WAR_CACHE_MS);
+        if(warm!=null)return warm;
+        JSONObject live=TornApiClient.getJson("/faction/wars",key);
+        StartupWarmCache.putWar(factionId,live);
+        return live;
     }
 
     private void loadOverview(String key,AuthSession session) throws Exception {
-        OcSummary oc=readOc(key,session.playerId);
-        WarStatus war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),session.factionId);
-        JSONObject chainRoot=TornApiClient.getJson("/faction/chain",key);
-        JSONObject chain=chainRoot.optJSONObject("chain");
-        ParticipationSummary participation=readParticipation(key,war);
-        runOnUiThread(()->{
-            ScrollView s=shell();LinearLayout r=root(s);addHeader(r,session.factionName+" • "+session.playerName);
-            int attention=0;if(!oc.assigned)attention++;if(war.isLive(System.currentTimeMillis()/1000L)&&participation.known&&participation.hits==0)attention++;
-            section(r,"TODAY");
-            addCard(r,card(attention==0?"✓ You're clear right now":"! "+attention+" item"+(attention==1?"":"s")+" need attention",attention==0?"No immediate member obligations were detected from the data currently available.":"Review the highlighted cards below to see what needs action.",attention==0?GOOD:GOLD));
-            section(r,"ACTION & READINESS");
-            addCard(r,card("My OC",oc.summary,oc.assigned?GOOD:GOLD));
-            addCard(r,card("War participation",participation.summary,participation.known?(participation.hits>0?GOOD:GOLD):BORDER));
-            if(chain==null)addCard(r,card("Chain","No active chain returned by Torn.",BORDER));
-            else addCard(r,card("Chain","Current: "+chain.optInt("current",0)+" / "+chain.optInt("max",0)+"\nTimeout: "+chain.optInt("timeout",0)+" sec",chain.optInt("current",0)>0?GOOD:GOLD));
-            section(r,"DIGEST");
-            addCard(r,card("While You Were Away","Live status is generated from current Torn data. Persistent cross-device history will be added with the shared backend rather than guessed locally.",BLUE));
-            addFooter(r);setContentView(s);s.requestApplyInsets();
-        });
+        ExecutorService pool=Executors.newFixedThreadPool(4);
+        try{
+            Future<OcSummary> ocFuture=pool.submit(()->readOc(key,session.playerId));
+            Future<JSONObject> warFuture=pool.submit(()->loadWarRoot(key,session.factionId));
+            Future<JSONObject> chainFuture=pool.submit(()->TornApiClient.getJson("/faction/chain",key));
+            WarStatus war=WarStatus.from(warFuture.get(),session.factionId);
+            Future<ParticipationSummary> participationFuture=pool.submit(()->readParticipation(key,war));
+            OcSummary oc=ocFuture.get();
+            JSONObject chainRoot=chainFuture.get();
+            JSONObject chain=chainRoot.optJSONObject("chain");
+            ParticipationSummary participation=participationFuture.get();
+            runOnUiThread(()->{
+                ScrollView s=shell();LinearLayout r=root(s);addHeader(r,session.factionName+" • "+session.playerName);
+                long warAge=StartupWarmCache.warAgeMs(session.factionId);if(warAge>=0){section(r,"DATA STATUS");addCard(r,card("Faction status",DataFreshness.ageText(warAge),BORDER));}
+                int attention=0;if(!oc.assigned)attention++;if(war.isLive(System.currentTimeMillis()/1000L)&&participation.known&&participation.hits==0)attention++;
+                section(r,"TODAY");
+                addCard(r,card(attention==0?"✓ You're clear right now":"! "+attention+" item"+(attention==1?"":"s")+" need attention",attention==0?"No immediate member obligations were detected from the data currently available.":"Review the highlighted cards below to see what needs action.",attention==0?GOOD:GOLD));
+                section(r,"ACTION & READINESS");
+                addCard(r,card("My OC",oc.summary,oc.assigned?GOOD:GOLD));
+                addCard(r,card("War participation",participation.summary,participation.known?(participation.hits>0?GOOD:GOLD):BORDER));
+                if(chain==null)addCard(r,card("Chain","No active chain returned by Torn.",BORDER));
+                else addCard(r,card("Chain","Current: "+chain.optInt("current",0)+" / "+chain.optInt("max",0)+"\nTimeout: "+chain.optInt("timeout",0)+" sec",chain.optInt("current",0)>0?GOOD:GOLD));
+                section(r,"DIGEST");
+                addCard(r,card("While You Were Away","Live status is generated from current Torn data. Persistent cross-device history will be added with the shared backend rather than guessed locally.",BLUE));
+                addFooter(r);setContentView(s);s.requestApplyInsets();
+            });
+        }finally{pool.shutdownNow();}
     }
 
     private void loadOc(String key,AuthSession session) throws Exception {
@@ -128,7 +148,7 @@ public class MemberFactionActivity extends Activity {
     }
 
     private void loadParticipation(String key,AuthSession session) throws Exception {
-        WarStatus war=WarStatus.from(TornApiClient.getJson("/faction/wars",key),session.factionId);
+        WarStatus war=WarStatus.from(loadWarRoot(key,session.factionId),session.factionId);
         ParticipationSummary p=readParticipation(key,war);
         runOnUiThread(()->{
             ScrollView s=shell();LinearLayout r=root(s);addHeader(r,session.factionName+" • your attacks only");
@@ -158,7 +178,7 @@ public class MemberFactionActivity extends Activity {
         catch(Exception e){return new ParticipationSummary(false,0,"Personal attack history is unavailable with this key. A Limited/Custom/Full key is required for verified personal hit counts.");}
     }
 
-    private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");section(r,"CONNECTION");addCard(r,card("Unable to load",message,BAD));addFooter(r);setContentView(s);s.requestApplyInsets();});}
+    private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");section(r,"CONNECTION");addCard(r,card("Unable to load",message,BAD));Button retry=button("Retry");retry.setOnClickListener(v->{showLoading();load();});LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));rp.bottomMargin=dp(10);r.addView(retry,rp);addFooter(r);setContentView(s);s.requestApplyInsets();});}
 
     private static final class ParticipationSummary {final boolean known;final int hits;final String summary;ParticipationSummary(boolean known,int hits,String summary){this.known=known;this.hits=hits;this.summary=summary;}}
     private static final class OcSummary {
