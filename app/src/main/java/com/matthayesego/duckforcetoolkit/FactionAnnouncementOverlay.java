@@ -21,15 +21,17 @@ import java.util.WeakHashMap;
 /** A compact faction-notice banner that follows the user across authenticated TornFCA screens. */
 public final class FactionAnnouncementOverlay {
     private static final String TAG = "tornfca-faction-notice-overlay";
+    private static final Map<Activity, Boolean> ACTIVE = Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Activity, View> VISIBLE = Collections.synchronizedMap(new WeakHashMap<>());
 
     private FactionAnnouncementOverlay() {}
 
     public static void attach(Activity activity) {
         if (activity == null || activity.isFinishing() || excluded(activity)) return;
+        ACTIVE.put(activity, Boolean.TRUE);
         FrameLayout content = activity.findViewById(android.R.id.content);
         if (content == null) return;
-        remove(activity, content);
+        removeVisible(activity, content);
 
         SecureApiKeyStore keyStore = new SecureApiKeyStore(activity);
         String key = keyStore.load();
@@ -111,21 +113,22 @@ public final class FactionAnnouncementOverlay {
 
     public static void detach(Activity activity) {
         if (activity == null) return;
+        ACTIVE.remove(activity);
         FrameLayout content = activity.findViewById(android.R.id.content);
-        if (content != null) remove(activity, content);
+        if (content != null) removeVisible(activity, content);
         VISIBLE.remove(activity);
     }
 
     public static void refreshVisible() {
         Activity[] activities;
-        synchronized (VISIBLE) { activities = VISIBLE.keySet().toArray(new Activity[0]); }
+        synchronized (ACTIVE) { activities = ACTIVE.keySet().toArray(new Activity[0]); }
         for (Activity activity : activities) {
             if (activity == null || activity.isFinishing()) continue;
             activity.runOnUiThread(() -> attach(activity));
         }
     }
 
-    private static void remove(Activity activity, FrameLayout content) {
+    private static void removeVisible(Activity activity, FrameLayout content) {
         View existing = VISIBLE.remove(activity);
         if (existing != null && existing.getParent() == content) content.removeView(existing);
         for (int i = content.getChildCount() - 1; i >= 0; i--) {
