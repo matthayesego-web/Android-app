@@ -25,6 +25,7 @@ import java.util.concurrent.Future;
 
 /** Member-first daily readiness screen built from the signed-in player's own Torn data. */
 public class MemberDailyActivity extends Activity {
+    private static final long WAR_CACHE_MS=2L*60L*1000L;
     private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(15,20,28),PANEL2=Color.rgb(10,15,22),BORDER=Color.rgb(45,55,69),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(154,164,178),GOLD=Color.rgb(241,194,106),BLUE=Color.rgb(88,166,255),GREEN=Color.rgb(63,185,80),RED=Color.rgb(248,81,73);
     private SecureApiKeyStore keyStore;
 
@@ -51,14 +52,13 @@ public class MemberDailyActivity extends Activity {
                 pool=Executors.newFixedThreadPool(4);
                 Future<JSONObject> selfFuture=pool.submit(()->loadSelfSnapshot(key));
                 Future<JSONObject> perksFuture=pool.submit(()->safeJson("/user/perks",key));
-                Future<JSONObject> warFuture=pool.submit(()->safeJson("/faction/wars",key));
-                Future<JSONObject> membersFuture=pool.submit(()->safeJson("/faction/"+verified.factionId+"/members",key));
+                Future<JSONObject> warFuture=pool.submit(()->loadWarRoot(key,verified.factionId));
+                Future<JSONArray> membersFuture=pool.submit(()->loadMembers(key,verified.factionId));
                 JSONObject self=selfFuture.get();
                 JSONObject perksRoot=perksFuture.get();
                 JSONObject perks=perksRoot.optJSONObject("perks");if(perks!=null)self.put("perks",perks);
                 WarStatus war=WarStatus.from(warFuture.get(),verified.factionId);
-                JSONObject membersRoot=membersFuture.get();
-                Standing standing=findStanding(membersRoot.optJSONArray("members"),verified.playerId,verified.position);
+                Standing standing=findStanding(membersFuture.get(),verified.playerId,verified.position);
 
                 JSONObject bars=self.optJSONObject("bars");JSONObject chain=bars==null?null:bars.optJSONObject("chain");
                 long now=System.currentTimeMillis()/1000L;long chainStart=chain==null?0:chain.optLong("start",0);long warStart=war.isLive(now)?war.start:0;int chainHits=0,warHits=0;
@@ -68,6 +68,24 @@ public class MemberDailyActivity extends Activity {
             }catch(Exception e){renderError(cleanError(e));}
             finally{if(pool!=null)pool.shutdownNow();}
         },"TornFCA-MyDay").start();
+    }
+
+    private JSONObject loadWarRoot(String key,int factionId)throws Exception{
+        JSONObject cached=StartupWarmCache.war(factionId,WAR_CACHE_MS);
+        if(cached!=null)return cached;
+        JSONObject live=TornApiClient.getJson("/faction/wars",key);
+        StartupWarmCache.putWar(factionId,live);
+        return live;
+    }
+
+    private JSONArray loadMembers(String key,int factionId)throws Exception{
+        JSONArray cached=FactionMemberCache.load(factionId);
+        if(cached!=null)return cached;
+        JSONObject root=TornApiClient.getJson("/faction/members",key);
+        JSONArray members=root.optJSONArray("members");
+        if(members==null)members=new JSONArray();
+        FactionMemberCache.save(factionId,members);
+        return members;
     }
 
     /** Keep current v2 selections together for latency, but fall back to individual endpoints if Torn rejects a field bundle. */
@@ -91,6 +109,8 @@ public class MemberDailyActivity extends Activity {
 
     private void render(AuthSession session,JSONObject self,WarStatus war,JSONObject chain,int chainHits,int warHits,Standing standing){
         ScrollView s=shell();LinearLayout r=root(s);header(r,session.factionName+" • "+session.playerName);
+        long warAge=StartupWarmCache.warAgeMs(session.factionId),rosterAge=FactionMemberCache.ageMs(session.factionId);
+        section(r,"DATA STATUS");LinearLayout freshness=card(BORDER);freshness.addView(text("Snapshot freshness",16,TEXT,true));freshness.addView(text("War: "+DataFreshness.ageText(warAge)+"\nRoster: "+DataFreshness.ageText(rosterAge)+"\nPersonal bars/cooldowns are refreshed when My Day opens.",12.5f,MUTED,false));add(r,freshness);
         JSONObject bars=self.optJSONObject("bars"),cooldowns=self.optJSONObject("cooldowns"),travel=self.optJSONObject("travel"),refills=self.optJSONObject("refills"),perks=self.optJSONObject("perks"),moneyRoot=self.optJSONObject("money"),balance=moneyRoot==null?null:moneyRoot.optJSONObject("faction");OcSummary oc=readOc(self.optJSONObject("organizedCrime"),session.playerId);long now=System.currentTimeMillis()/1000L;
 
         section(r,"WHAT SHOULD I DO NEXT?");String action;int actionColor=GREEN;if(war.isLive(now)&&warHits==0){action="War is live — you have no verified ranked-war hits yet. Open My War when you're ready to contribute.";actionColor=GOLD;}else if(chain!=null&&chain.optInt("current",0)>0&&chain.optInt("timeout",0)<=120){action="The faction chain is active and its timer is getting low. If you're able to hit, this is the priority.";actionColor=RED;}else if(oc.assigned&&oc.itemRequired&&!oc.itemAvailable){action="Your organized crime needs an item that Torn reports as unavailable. Check your OC before it is ready.";actionColor=GOLD;}else if(barFull(bars,"energy")){action="Your energy is full. This is a good time to train or use it before regeneration is wasted.";actionColor=GREEN;}else if(chain!=null&&chain.optInt("current",0)>0){action="The faction chain is active. Your current-chain contribution is "+chainHits+" verified hit"+(chainHits==1?"":"s")+".";actionColor=BLUE;}else if(cooldowns!=null&&cooldowns.optInt("drug",1)==0){action="Drug cooldown is clear. No urgent faction obligation is showing right now.";actionColor=GREEN;}else action="No urgent faction obligation is showing right now. Keep an eye on your OC, energy and upcoming war status.";LinearLayout next=card(actionColor);next.addView(text(action,17,TEXT,true));add(r,next);
