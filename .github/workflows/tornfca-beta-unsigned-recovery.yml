@@ -30,7 +30,8 @@ jobs:
         run: |
           set -euo pipefail
           VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
-          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
+          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\)".*/\1/p' app/build.gradle.kts | head -1 || true)"
+          if [ -z "$VERSION_CODE" ]; then VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"; fi
           test -n "$VERSION_NAME"
           test -n "$VERSION_CODE"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
@@ -50,11 +51,27 @@ jobs:
           TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
         run: gradle --no-daemon :app:assembleBeta
 
+      - name: Prepare recovery bundle
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          BUILD_TOOLS="$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          test -x "$BUILD_TOOLS/zipalign"
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/aapt"
+          rm -rf "$RUNNER_TEMP/tornfca-recovery"
+          mkdir -p "$RUNNER_TEMP/tornfca-recovery/build-tools/lib"
+          cp app/build/outputs/apk/beta/app-beta-unsigned.apk "$RUNNER_TEMP/tornfca-recovery/"
+          cp "$BUILD_TOOLS/zipalign" "$RUNNER_TEMP/tornfca-recovery/build-tools/"
+          cp "$BUILD_TOOLS/apksigner" "$RUNNER_TEMP/tornfca-recovery/build-tools/"
+          cp "$BUILD_TOOLS/aapt" "$RUNNER_TEMP/tornfca-recovery/build-tools/"
+          cp "$BUILD_TOOLS/lib/apksigner.jar" "$RUNNER_TEMP/tornfca-recovery/build-tools/lib/"
+
       - name: Upload unsigned Beta recovery artifact
         uses: actions/upload-artifact@v7
         with:
           name: TornFCA-Beta-v${{ env.VERSION_NAME }}-unsigned-direct
-          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          path: ${{ runner.temp }}/tornfca-recovery
           if-no-files-found: error
           retention-days: 7
 
