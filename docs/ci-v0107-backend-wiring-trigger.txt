@@ -1,2 +1,3 @@
 TornFCA Beta v0.10.7 backend wiring CI trigger.
 Six live backend health checks + feedback integration.
+Diagnostics workflow armed after creation.
