@@ -6,10 +6,13 @@ import android.content.SharedPreferences;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
- * Small process cache populated by the startup warmup.
- * Banking/war data remains process-local. Notices may survive a process restart for up to one hour
- * so the UI has a safe fallback while a cold-start refresh is running.
+ * Small process cache populated by the startup warmup and high-value screens.
+ * Banking/war/chat data remains process-local. Notices may survive a process restart for up to one
+ * hour so the UI has a safe fallback while a cold-start refresh is running.
  */
 public final class StartupWarmCache {
     private static final String PREFS = "tornfca_warm_cache_v1";
@@ -27,6 +30,8 @@ public final class StartupWarmCache {
     private static JSONArray notices;
     private static long noticesAtMs;
     private static int noticesFactionId;
+    private static final Map<String, JSONArray> chatByKey = new HashMap<>();
+    private static final Map<String, Long> chatAtByKey = new HashMap<>();
 
     private StartupWarmCache() {}
 
@@ -35,6 +40,7 @@ public final class StartupWarmCache {
         banking = null; bankingAtMs = 0L; bankingFactionId = 0; bankingPlayerId = 0;
         war = null; warAtMs = 0L; warFactionId = 0;
         notices = null; noticesAtMs = 0L; noticesFactionId = 0;
+        chatByKey.clear(); chatAtByKey.clear();
     }
 
     public static synchronized void putSession(AuthSession value) { session = value; sessionFactionId = value == null ? 0 : value.factionId; }
@@ -51,6 +57,11 @@ public final class StartupWarmCache {
         return copy(banking);
     }
 
+    public static synchronized long bankingAgeMs(int factionId, int playerId) {
+        if (banking == null || bankingFactionId != factionId || bankingPlayerId != playerId || bankingAtMs <= 0L) return -1L;
+        return Math.max(0L, System.currentTimeMillis() - bankingAtMs);
+    }
+
     public static synchronized void putWar(int factionId, JSONObject value) {
         if (value == null || factionId <= 0) return;
         war = copy(value); warAtMs = System.currentTimeMillis(); warFactionId = factionId;
@@ -60,6 +71,11 @@ public final class StartupWarmCache {
         if (war == null || warFactionId != factionId) return null;
         if (maxAgeMs > 0L && System.currentTimeMillis() - warAtMs > maxAgeMs) return null;
         return copy(war);
+    }
+
+    public static synchronized long warAgeMs(int factionId) {
+        if (war == null || warFactionId != factionId || warAtMs <= 0L) return -1L;
+        return Math.max(0L, System.currentTimeMillis() - warAtMs);
     }
 
     public static void putNotices(Context context, int factionId, JSONArray value) {
@@ -94,6 +110,40 @@ public final class StartupWarmCache {
         } catch (Exception ignored) { return null; }
     }
 
+    public static long noticesAgeMs(Context context, int factionId) {
+        synchronized (StartupWarmCache.class) {
+            if (notices != null && noticesFactionId == factionId && noticesAtMs > 0L)
+                return Math.max(0L, System.currentTimeMillis() - noticesAtMs);
+        }
+        if (context == null || factionId <= 0) return -1L;
+        SharedPreferences p = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        if (p.getInt("notice_faction_id", 0) != factionId) return -1L;
+        long at = p.getLong("notice_at", 0L);
+        if (at <= 0L || System.currentTimeMillis() - at > NOTICE_PERSIST_MS) return -1L;
+        return Math.max(0L, System.currentTimeMillis() - at);
+    }
+
+    public static synchronized void putChat(int factionId, String channel, JSONArray value) {
+        if (factionId <= 0 || value == null) return;
+        String key = chatKey(factionId, channel);
+        chatByKey.put(key, copy(value));
+        chatAtByKey.put(key, System.currentTimeMillis());
+    }
+
+    public static synchronized JSONArray chat(int factionId, String channel, long maxAgeMs) {
+        String key = chatKey(factionId, channel);
+        JSONArray value = chatByKey.get(key);
+        Long at = chatAtByKey.get(key);
+        if (value == null || at == null) return null;
+        if (maxAgeMs > 0L && System.currentTimeMillis() - at > maxAgeMs) return null;
+        return copy(value);
+    }
+
+    public static synchronized long chatAgeMs(int factionId, String channel) {
+        Long at = chatAtByKey.get(chatKey(factionId, channel));
+        return at == null || at <= 0L ? -1L : Math.max(0L, System.currentTimeMillis() - at);
+    }
+
     public static JSONObject latestVisibleNotice(Context context, int factionId) {
         JSONArray rows = notices(context, factionId, NOTICE_PERSIST_MS); if (rows == null) return null;
         long now = System.currentTimeMillis() / 1000L;
@@ -111,6 +161,11 @@ public final class StartupWarmCache {
         if (context == null || id == null || id.isBlank()) return;
         context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("dismissed_notice_id", id).apply();
         FactionAnnouncementOverlay.refreshVisible();
+    }
+
+    private static String chatKey(int factionId, String channel) {
+        String safe = channel == null || channel.isBlank() ? "general" : channel.trim().toLowerCase(java.util.Locale.US);
+        return factionId + ":" + safe;
     }
 
     private static JSONObject copy(JSONObject value) { if (value == null) return null; try { return new JSONObject(value.toString()); } catch (Exception e) { return null; } }
