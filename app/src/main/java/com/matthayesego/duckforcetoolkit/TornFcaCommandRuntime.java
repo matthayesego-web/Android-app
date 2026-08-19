@@ -43,11 +43,14 @@ public final class TornFcaCommandRuntime {
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks(){
             @Override public void onActivityCreated(Activity activity,Bundle state){}
             @Override public void onActivityStarted(Activity activity){}
-            @Override public void onActivityResumed(Activity activity){if(activity instanceof BetaCommandActivity)attachBrandNormalizer(activity);}
-            @Override public void onActivityPaused(Activity activity){}
+            @Override public void onActivityResumed(Activity activity){
+                if(activity instanceof BetaCommandActivity)attachBrandNormalizer(activity);
+                FactionAnnouncementOverlay.attach(activity);
+            }
+            @Override public void onActivityPaused(Activity activity){FactionAnnouncementOverlay.detach(activity);}
             @Override public void onActivityStopped(Activity activity){}
             @Override public void onActivitySaveInstanceState(Activity activity,Bundle state){}
-            @Override public void onActivityDestroyed(Activity activity){}
+            @Override public void onActivityDestroyed(Activity activity){FactionAnnouncementOverlay.detach(activity);}
         });
     }
 
