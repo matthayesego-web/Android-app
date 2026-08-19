@@ -4,7 +4,9 @@ on:
   push:
     branches: [ work/v0.10.12-stability-polish ]
   pull_request:
-    branches: [ v0.9-faction-automation ]
+    branches:
+      - v0.9-faction-automation
+      - restore/v0.10.1-source-hardened-2026-08-17
   workflow_dispatch:
 
 permissions:
