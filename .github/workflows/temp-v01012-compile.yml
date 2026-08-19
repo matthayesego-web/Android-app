@@ -4,7 +4,7 @@ on:
   push:
     branches: [ work/v0.10.12-stability-polish ]
   pull_request:
-    branches: [ restore/v0.10.1-source-hardened-2026-08-17 ]
+    branches: [ v0.9-faction-automation ]
   workflow_dispatch:
 
 permissions:
@@ -29,9 +29,16 @@ jobs:
           grep -q 'versionCode = 67' app/build.gradle.kts
           grep -q 'class DataFreshness' app/src/main/java/com/matthayesego/duckforcetoolkit/DataFreshness.java
           grep -q 'putChat' app/src/main/java/com/matthayesego/duckforcetoolkit/StartupWarmCache.java
+          grep -q 'FactionMemberCache.save' app/src/main/java/com/matthayesego/duckforcetoolkit/StartupWarmup.java
+          grep -q 'WAR_CACHE_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q 'Executors.newFixedThreadPool' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberFactionActivity.java
+          grep -q 'DataFreshness.label' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDirectoryActivity.java
           grep -q 'onPause' app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java
           grep -q 'WAR_CACHE_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
           grep -q 'CHAT_CACHE_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
+          grep -q 'openRelated' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
+          grep -q 'root.post' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
+          grep -q 'android:translateX="6"' app/src/main/res/drawable/tornfca_launcher_mark.xml
       - name: Syntax check backends
         run: |
           set -euo pipefail
