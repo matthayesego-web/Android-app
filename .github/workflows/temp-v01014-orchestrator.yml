@@ -25,42 +25,109 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.13'
-      - name: Apply staged implementation transform
+
+      - name: Bind Banking push to a real queue request
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import textwrap
-          raw=Path('.github/workflows/temp-v01014-push-build.yml').read_text()
-          start="python3 - <<'PY'\n"
-          if start not in raw: raise SystemExit('Embedded transform start marker missing')
-          script=raw.split(start,1)[1].split('\n          PY',1)[0]
-          exec(textwrap.dedent(script),{})
+
+          def replace_once(path, old, new):
+              p=Path(path); text=p.read_text()
+              if old not in text:
+                  raise SystemExit(f'Missing expected marker in {path}: {old[:120]}')
+              p.write_text(text.replace(old,new,1))
+
+          replace_once(
+              'app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java',
+              'public static JSONObject publishBankingRequest(String key,String summary,String note)throws IOException{JSONObject b=request("banking_request_push",key);put(b,"summary",summary);put(b,"note",note);return postChecked(b,"Unable to alert faction leadership about this banking request.");}',
+              'public static JSONObject publishBankingRequest(String key,String requestId)throws IOException{JSONObject b=request("banking_request_push",key);put(b,"request_id",requestId);return postChecked(b,"Unable to alert faction leadership about this banking request.");}'
+          )
+
+          replace_once(
+              'app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java',
+              'String summary=requestedFull?(resolved>0L?"Full balance request: "+money(resolved):"Full balance requested"):("Requested "+raw);\n                    if(CommunityBackendClient.isConfigured())new Thread(()->{try{CommunityBackendClient.publishBankingRequest(key,summary,noteValue);}catch(Exception ignored){}},"TornFCA-BankingAlert").start();',
+              'String requestId=request==null?"":request.optString("id","");\n                    if(CommunityBackendClient.isConfigured()&&!requestId.isBlank())new Thread(()->{try{CommunityBackendClient.publishBankingRequest(key,requestId);}catch(Exception ignored){}},"TornFCA-BankingAlert").start();'
+          )
+
+          backend='backend/TornFcaCommunityBackend.gs'
+          replace_once(
+              backend,
+              "const TC_CHAT_CHUNK=500;",
+              "const TC_CHAT_CHUNK=500;\nconst TC_FACTION_BACKEND_URL='https://script.google.com/macros/s/AKfycbzR8zjFVYaDoIZaxFdJV4yBaM4mLSv-iqZL8146HCzq6vRzJgeYr1Y0TKkPGrdASjQj/exec';"
+          )
+
+          old_route="""    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',30);
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+    }
+"""
+          new_route="""    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',3);
+      const requestId=String(body.request_id||'').trim();
+      tcVerifyBankingRequest_(key,user,requestId);
+      const pushCache=CacheService.getScriptCache(),dedupe='banking_push:'+user.faction_id+':'+requestId;
+      if(pushCache.get(dedupe))return tcJson_({ok:true,push:{duplicate:true,configured:tcFirebaseConfigured_(),sent:0,failed:0}});
+      pushCache.put(dedupe,'1',600);
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',request_id:requestId,requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+    }
+"""
+          replace_once(backend,old_route,new_route)
+
+          marker='function tcRegisterDevice_(apiKey,user,body){'
+          verify_func="""function tcVerifyBankingRequest_(apiKey,user,requestId){
+  if(!requestId)throw new Error('Banking request ID required.');
+  const response=UrlFetchApp.fetch(TC_FACTION_BACKEND_URL,{method:'post',muteHttpExceptions:true,contentType:'text/plain;charset=UTF-8',payload:JSON.stringify({action:'banking_list',apiKey:apiKey,reconcile:false}),headers:{'User-Agent':'TornFCA-Community/'+TC_VERSION+' BankingPushVerify'}});
+  let data;try{data=JSON.parse(response.getContentText());}catch(_){throw new Error('Unable to verify the banking request.');}
+  if(response.getResponseCode()<200||response.getResponseCode()>=300||!data||!data.ok)throw new Error(String(data&&data.error||'Unable to verify the banking request.'));
+  const remoteUser=data.user||{};
+  if(Number(remoteUser.id||0)!==Number(user.id)||Number(remoteUser.faction_id||0)!==Number(user.faction_id))throw new Error('Banking request identity verification failed.');
+  const rows=Array.isArray(data.requests)?data.requests:[],now=Math.floor(Date.now()/1000);
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i]||{};
+    if(String(row.id||'')!==requestId)continue;
+    if(Number(row.requester_id||0)!==Number(user.id))throw new Error('Banking request does not belong to this player.');
+    if(String(row.status||'PENDING').toUpperCase()!=='PENDING')throw new Error('Banking request is no longer pending.');
+    const created=Number(row.requested_at||row.detected_at||0);
+    if(created>0&&now-created>15*60)throw new Error('Banking request is too old to trigger a new alert.');
+    return row;
+  }
+  throw new Error('Banking request was not found in the verified faction queue.');
+}
+
+"""
+          replace_once(backend,marker,verify_func+marker)
           PY
+
       - name: Validate and compile
         run: |
           set -euo pipefail
           grep -q 'versionName = "0.10.14"' app/build.gradle.kts
           grep -q 'versionCode = 69' app/build.gradle.kts
           grep -q "const TC_VERSION='1.8.0'" backend/TornFcaCommunityBackend.gs
-          grep -q "banking_request_push" backend/TornFcaCommunityBackend.gs
-          grep -q '_server_can_banking' backend/TornFcaCommunityBackend.gs
+          grep -q 'tcVerifyBankingRequest_' backend/TornFcaCommunityBackend.gs
+          grep -q 'request_id' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
           grep -q 'CH_BANKING="tornfca_banking"' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java
+          grep -q 'bankingAlerts' app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java
+          grep -q 'Banking requests' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
           cp backend/TornFcaCommunityBackend.gs /tmp/community.js
           node --check /tmp/community.js
           gradle --no-daemon :app:assembleBeta
+
       - name: Commit validated isolated source
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/build.gradle.kts backend/TornFcaCommunityBackend.gs \
+          git add backend/TornFcaCommunityBackend.gs \
             app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java \
-            app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java \
-            app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java \
-            app/src/main/java/com/matthayesego/duckforcetoolkit/AppSettingsStore.java \
-            app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
-          git commit -m 'Implement v0.10.14 banking push infrastructure'
+            app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
+          git commit -m 'Secure v0.10.14 banking push request binding'
           git push origin HEAD:work/v0.10.14-push-infrastructure
+
       - name: Upload unsigned candidate
         uses: actions/upload-artifact@v7
         with:
@@ -68,6 +135,7 @@ jobs:
           path: app/build/outputs/apk/beta/app-beta-unsigned.apk
           if-no-files-found: error
           retention-days: 7
+
       - name: Publish status
         if: always()
         env:
@@ -83,7 +151,7 @@ jobs:
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           RESULT=failure
           if [ -f "$GITHUB_WORKSPACE/app/build/outputs/apk/beta/app-beta-unsigned.apk" ]; then RESULT=success; fi
-          printf 'version=0.10.14\nversion_code=69\nrun_id=%s\nsource_branch=work/v0.10.14-push-infrastructure\ncompile=%s\n' "$GITHUB_RUN_ID" "$RESULT" > status.txt
+          printf 'version=0.10.14\nversion_code=69\nrun_id=%s\nsource_branch=work/v0.10.14-push-infrastructure\nsource_commit=%s\ncompile=%s\n' "$GITHUB_RUN_ID" "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD 2>/dev/null || true)" "$RESULT" > status.txt
           git add status.txt
           git commit -m 'Publish v0.10.14 push status'
           git push --force origin HEAD:v01014-push-status
