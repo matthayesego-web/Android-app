@@ -15,7 +15,6 @@ import java.nio.charset.StandardCharsets;
 public final class WarPayBackendClient {
     private static final String BACKEND_URL=BuildConfig.WARPAY_BACKEND_URL==null?"":BuildConfig.WARPAY_BACKEND_URL.trim();
     private static final String USER_AGENT="TornFCA/"+TornFcaBrand.VERSION+" Android WarPay";
-    private static long nextRequestAtMs=0L;
 
     private WarPayBackendClient(){}
     public static boolean isConfigured(){return BACKEND_URL.startsWith("https://")&&!BACKEND_URL.contains("###");}
@@ -40,10 +39,10 @@ public final class WarPayBackendClient {
     private static JSONObject post(JSONObject body)throws IOException{
         if(!isConfigured())throw new IOException("WarPay backend is not configured in this build.");
         String apiKey=body.optString("apiKey","");if(apiKey.isEmpty())throw new IOException("Signed-in Torn API key required.");
-        TornApiClient.validateKey(apiKey);waitForSlot();
+        TornApiClient.validateKey(apiKey);BackendRequestGovernor.acquire();
         HttpURLConnection c=(HttpURLConnection)new URL(BACKEND_URL).openConnection();
         try{
-            c.setRequestMethod("POST");c.setConnectTimeout(12000);c.setReadTimeout(22000);c.setUseCaches(false);c.setDoOutput(true);
+            c.setRequestMethod("POST");c.setConnectTimeout(10000);c.setReadTimeout(20000);c.setUseCaches(false);c.setDoOutput(true);
             c.setRequestProperty("Content-Type","text/plain;charset=UTF-8");c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent",USER_AGENT);
             byte[] payload=body.toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=c.getOutputStream()){out.write(payload);}
             int code=c.getResponseCode();InputStream in=code>=400?c.getErrorStream():c.getInputStream();String raw=in==null?"":read(in);JSONObject response;
@@ -54,6 +53,5 @@ public final class WarPayBackendClient {
         }finally{c.disconnect();}
     }
 
-    private static synchronized void waitForSlot(){long now=System.currentTimeMillis(),wait=Math.max(0L,nextRequestAtMs-now);if(wait>0)try{Thread.sleep(wait);}catch(InterruptedException e){Thread.currentThread().interrupt();}nextRequestAtMs=System.currentTimeMillis()+3000L;}
     private static String read(InputStream input)throws IOException{try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return out.toString(StandardCharsets.UTF_8.name());}}
 }
