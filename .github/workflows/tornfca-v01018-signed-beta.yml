@@ -62,18 +62,9 @@ jobs:
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
-      - name: Validate beta inputs
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Validate beta source inputs
         run: |
           set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-          test -n "$ANDROID_KEY_PASSWORD"
           test -n "$TORNFCA_FIREBASE_APP_ID"
           test -n "$TORNFCA_FIREBASE_API_KEY"
           test -n "$TORNFCA_FIREBASE_PROJECT_ID"
@@ -83,7 +74,11 @@ jobs:
           grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
           grep -q 'days.setText("7")' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
           grep -q 'Complimentary Premium' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
+          grep -q 'grantComplimentary' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
           grep -q '7-DAY PACE' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.3.0'" backend/TornFcaPremiumBackend.gs
+          grep -q 'TORNFCA_DEFAULT_DAYS_PER_XANAX=7' backend/TornFcaPremiumBackend.gs
+          grep -q "COMPLIMENTARY_GRANT" backend/TornFcaPremiumBackend.gs
 
       - name: Syntax-check Apps Script backends
         run: |
@@ -96,7 +91,28 @@ jobs:
       - name: Compile unsigned beta APK
         run: gradle --no-daemon :app:assembleBeta
 
+      - name: Check signing secret availability
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          available=true
+          for value in "$ANDROID_KEYSTORE_BASE64" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD"; do
+            if [ -z "$value" ]; then available=false; fi
+          done
+          echo "available=$available" >> "$GITHUB_OUTPUT"
+          if [ "$available" = true ]; then
+            echo 'Permanent signing secrets are available.'
+          else
+            echo 'Permanent signing secrets are not configured in GitHub Actions yet; compile validation will still complete and upload the unsigned APK.'
+          fi
+
       - name: Reconstruct permanent keystore
+        if: steps.signing.outputs.available == 'true'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -105,6 +121,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/tornfca-release.jks"
 
       - name: Sign and verify beta APK
+        if: steps.signing.outputs.available == 'true'
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -136,16 +153,17 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "TornFCA Signed Beta"
+            echo "TornFCA Beta Build"
             echo "versionName=${VERSION_NAME}-beta"
             echo "versionCode=${VERSION_CODE}"
             echo "package=com.matthayesego.duckforcetoolkit.beta"
             echo "run=${GITHUB_RUN_ID}"
             echo "source=${GITHUB_SHA}"
-            echo "permanent-certificate=true"
+            echo "signed=${{ steps.signing.outputs.available }}"
           } | tee beta-build-metadata.txt
 
       - name: Upload signed beta artifact
+        if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: TornFCA-v${{ env.VERSION_NAME }}-SIGNED-BETA
@@ -156,6 +174,17 @@ jobs:
             signer-verification.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload unsigned compile artifact
+        if: steps.signing.outputs.available != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v${{ env.VERSION_NAME }}-UNSIGNED-BETA-COMPILE
+          path: |
+            app/build/outputs/apk/beta/app-beta-unsigned.apk
+            beta-build-metadata.txt
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Remove temporary keystore
         if: always()
