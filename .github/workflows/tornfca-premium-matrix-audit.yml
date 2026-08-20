@@ -21,6 +21,7 @@ jobs:
           set -euo pipefail
 
           GRADLE=app/build.gradle.kts
+          MANIFEST=app/src/main/AndroidManifest.xml
           ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAccess.java
           STORE=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumEntitlementStore.java
           DEV=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
@@ -30,6 +31,8 @@ jobs:
           QUICK=app/src/main/java/com/matthayesego/duckforcetoolkit/QuickIntelActivity.java
           TOOLHOST=app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java
           INSIGHTS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+          TRAINING=app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          TRENDS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumActivityTrendsActivity.java
           ALERTS=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
           SETTINGS=app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           PREVIEW=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
@@ -64,6 +67,7 @@ jobs:
           grep -q 'MEMBER_DOSSIER="member_dossier"' "$ACCESS"
           grep -q 'ADVANCED_ALERTS="advanced_alerts"' "$ACCESS"
           grep -q 'PERSONAL_INSIGHTS="personal_insights"' "$ACCESS"
+          grep -q 'TRAINING_GOALS="training_goals"' "$ACCESS"
 
           # Free leadership keeps 7-day Activity; Premium may request deeper windows.
           grep -q 'return PremiumAccess.has(context, playerId, PremiumAccess.EXTENDED_ACTIVITY) ? requested : 7;' "$DEV"
@@ -87,12 +91,26 @@ jobs:
           ! grep -q 'TARGET_OC' /tmp/premium-router.txt
           ! grep -q 'TARGET_STRENGTH' /tmp/premium-router.txt
 
+          # Personal Premium additions cannot remove the existing Free surfaces.
           grep -q 'PremiumAccess.has(this,session.playerId,PremiumAccess.PERSONAL_INSIGHTS)' "$INSIGHTS"
           grep -q '7-DAY PACE' "$INSIGHTS"
           grep -q 'previous 23-day pace' "$INSIGHTS"
+          grep -q 'PremiumAccess.has(this,session.playerId,PremiumAccess.TRAINING_GOALS)' "$TRAINING"
+          grep -q 'Training Goal Pacing' "$TRAINING"
+          grep -q 'Reset progress baseline' "$TRAINING"
+          grep -q 'premium_goal_total' "$TRAINING"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.ADVANCED_ALERTS)' "$ALERTS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$SETTINGS"
-          grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$PREVIEW"
+          grep -q 'TRAINING GOAL PACING' "$PREVIEW"
+
+          # Premium Activity Trends re-verifies leadership and Premium independently.
+          grep -q 'authenticateFreshFaction' "$TRENDS"
+          grep -q '!AccessPolicy.isLeaderPosition(verified.position)' "$TRENDS"
+          grep -q 'PremiumAccess.has(this,verified.playerId,PremiumAccess.EXTENDED_ACTIVITY)' "$TRENDS"
+          grep -q 'previous 23' "$TRENDS"
+          grep -q 'Free Activity Tracker' "$TRENDS"
+          grep -q 'PremiumActivityTrendsActivity' "$MANIFEST"
+          grep -q 'android:name=".PremiumActivityTrendsActivity" android:exported="false"' "$MANIFEST"
 
           # Complimentary Premium is an owner-only backend grant, not a client entitlement shortcut.
           grep -q 'Complimentary Premium' "$ADMIN"
@@ -126,7 +144,7 @@ jobs:
           grep -q 'Banking' "$MATRIX"
           grep -q 'FFScouter' "$MATRIX"
           grep -q 'TornStats' "$MATRIX"
-          grep -q 'Provider data is not a TornFCA paywall' "$MATRIX"
+          grep -q 'Training Goal Pacing' "$MATRIX"
           grep -q 'Premium leadership view: 30-day review' "$PLAN"
           grep -q 'A separate faction-wide paid tier is \*\*deferred beyond v1.0\*\*' "$PLAN"
 
