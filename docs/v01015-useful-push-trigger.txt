@@ -1,0 +1,1 @@
+Trigger TornFCA v0.10.15 useful push build: verified banking alerts plus faction notice push.
