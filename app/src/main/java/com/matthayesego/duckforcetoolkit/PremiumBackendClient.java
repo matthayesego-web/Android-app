@@ -59,7 +59,11 @@ public final class PremiumBackendClient {
     @Deprecated public static JSONObject updateConfig(String developerPassword,int daysPerXanax,String requiredMessage)throws Exception{throw new Exception("Verified developer Torn identity is required for premium administration.");}
 
     public static JSONObject grant(String apiKey,String developerPassword,int playerId,int days)throws Exception{
-        JSONObject request=request("admin_grant",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);return checked(post(request));
+        JSONObject request=request("admin_grant",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);request.put("grant_type","developer");return checked(post(request));
+    }
+
+    public static JSONObject grantComplimentary(String apiKey,String developerPassword,int playerId,int days)throws Exception{
+        JSONObject request=request("admin_grant",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);request.put("grant_type","complimentary");return checked(post(request));
     }
 
     /** Retained for source compatibility; server-side admin changes require verified developer identity. */
