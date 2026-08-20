@@ -3,3 +3,4 @@ Security binding: Banking push must map to a real recent faction Banking request
 Authoritative compiler pass.
 Known-good unsigned export workflow trigger.
 Actor guard removed; run secured v0.10.14 compiler now.
+Firebase secret-enabled rebuild trigger 2026-08-20T02:05Z.
