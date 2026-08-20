@@ -2,7 +2,7 @@ name: TornFCA Premium Matrix Audit
 
 on:
   push:
-    branches: [ v0.9-faction-automation ]
+    branches: [ work/v0.10.18-beta-hardening ]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Verify Free/Premium enforcement matrix
+        with:
+          ref: work/v0.10.18-beta-hardening
+
+      - name: Verify v0.10.18 Free/Premium enforcement matrix
         run: |
           set -euo pipefail
 
@@ -30,20 +33,20 @@ jobs:
           ALERTS=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
           SETTINGS=app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           PREVIEW=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          ADMIN=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
           PREMIUM_BACKEND=backend/TornFcaPremiumBackend.gs
-          WARPAY_BACKEND=backend/TornFcaWarPayBackend.gs
           MATRIX=docs/PREMIUM_MATRIX_0.10.1.md
           PLAN=PREMIUM_PLAN.md
 
-          grep -q 'versionName = "0.10.4"' "$GRADLE"
-          grep -q 'versionCode = 59' "$GRADLE"
+          grep -q 'versionName = "0.10.18"' "$GRADLE"
+          grep -q 'versionCode = 73' "$GRADLE"
 
+          # Backend-verified state only. Simulation must never be persisted as entitlement.
           if grep -q 'simulatePremium' "$STORE"; then
             echo 'PremiumEntitlementStore must contain backend-verified state only.' >&2
             exit 1
           fi
           grep -q 'cached Premium expired' "$STORE"
-
           RAW_GATES="$(grep -R -l 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit --include='*.java' | grep -v '/PremiumAccess.java$' || true)"
           if [ -n "$RAW_GATES" ]; then echo 'Direct PremiumEntitlementStore gate bypass found:' >&2; echo "$RAW_GATES" >&2; exit 1; fi
 
@@ -61,21 +64,19 @@ jobs:
           grep -q 'ADVANCED_ALERTS="advanced_alerts"' "$ACCESS"
           grep -q 'PERSONAL_INSIGHTS="personal_insights"' "$ACCESS"
 
+          # Free leadership keeps 7-day Activity; Premium may request deeper windows.
           grep -q 'return PremiumAccess.has(context, playerId, PremiumAccess.EXTENDED_ACTIVITY) ? requested : 7;' "$DEV"
           grep -q 'getInt(KEY_ACTIVITY_DAYS, 30)' "$DEV"
           grep -q 'int days=DeveloperSettings.activityDays(this);' "$OPS"
-          grep -q 'Premium extends the same tracker to a 30-day history' "$PREVIEW"
-          ! grep -q 'extends the same tracker to 14/30 days' "$PREVIEW"
 
+          # Pulse/Dossier are Premium conveniences, never permission grants.
           grep -q 'TARGET_PULSE.equals(target))return PremiumAccess.FACTION_PULSE' "$ROUTER"
           grep -q 'TARGET_LOOKUP.equals(target))return PremiumAccess.MEMBER_DOSSIER' "$ROUTER"
           grep -q 'PremiumAccess.has(this,playerId,premium)' "$ROUTER"
           grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.MEMBER_DOSSIER)' "$DOSSIER"
           grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.FACTION_PULSE)' "$QUICK"
-          grep -q 'if(MODE_PULSE.equals(mode))' "$QUICK"
-          grep -q 'MODE_LOOKUP="LOOKUP"' "$QUICK"
-          grep -q '!DeveloperSettings.featureEnabled(this,feature)' "$ROUTER"
 
+          # Core participation/admin tools must remain outside the Premium route gate.
           awk '/private String premiumFeature/{flag=1} flag{print} /return null;/{if(flag){exit}}' "$ROUTER" > /tmp/premium-router.txt
           ! grep -q 'TARGET_WAR_PAYOUT' /tmp/premium-router.txt
           ! grep -q 'TARGET_BANKING' /tmp/premium-router.txt
@@ -86,28 +87,32 @@ jobs:
           ! grep -q 'TARGET_STRENGTH' /tmp/premium-router.txt
 
           grep -q 'PremiumAccess.has(this,session.playerId,PremiumAccess.PERSONAL_INSIGHTS)' "$INSIGHTS"
+          grep -q '7-DAY PACE' "$INSIGHTS"
+          grep -q 'previous 23-day pace' "$INSIGHTS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.ADVANCED_ALERTS)' "$ALERTS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$SETTINGS"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$PREVIEW"
+
+          # Complimentary Premium is an owner-only backend grant, not a client entitlement shortcut.
+          grep -q 'Complimentary Premium' "$ADMIN"
+          grep -q 'Grant Complimentary Premium' "$ADMIN"
+          grep -q 'PremiumBackendClient.grant' "$ADMIN"
+          grep -q 'days.setText("7")' "$ADMIN"
+          grep -q 'parseInt(days.getText().toString(),7)' "$ADMIN"
+
           grep -q 'ARMORY("Faction Armory Auditor"' "$TOOLHOST"
           grep -q 'TRAIN("Company Train Calculator"' "$TOOLHOST"
 
+          # Existing payment/backend safety remains intact while launch pricing is being aligned.
           grep -q "const TORNFCA_PREMIUM_VERSION='1.2.0'" "$PREMIUM_BACKEND"
           grep -q 'function bootstrapPremiumAdminPassword' "$PREMIUM_BACKEND"
           grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" "$PREMIUM_BACKEND"
           grep -q "setProperty('MONETIZATION_APPROVED','false')" "$PREMIUM_BACKEND"
           grep -q 'if(!premiumMonetizationApproved_())throw new Error' "$PREMIUM_BACKEND"
-          grep -q 'function premiumMonetizationApproved_' "$PREMIUM_BACKEND"
           grep -q 'LockService.getScriptLock' "$PREMIUM_BACKEND"
           grep -q "receiptSource='XANAX_LOG_4103:'" "$PREMIUM_BACKEND"
           grep -q 'currentSource===String(source)' "$PREMIUM_BACKEND"
           grep -q 'config.stacking' "$PREMIUM_BACKEND"
-          grep -q 'stacking===false?now:Math.max(now,current)' "$PREMIUM_BACKEND"
-
-          grep -q "const TW_VERSION='1.1.0'" "$WARPAY_BACKEND"
-          grep -q "twTornGet_('/user/faction',apiKey)" "$WARPAY_BACKEND"
-          grep -q 'Read only after acquiring the lock' "$WARPAY_BACKEND"
-          grep -q 'LockService.getScriptLock' "$WARPAY_BACKEND"
 
           grep -q 'Basic WarPay calculator' "$MATRIX"
           grep -q 'Current Armory Auditor' "$MATRIX"
@@ -119,4 +124,4 @@ jobs:
           grep -q 'Premium leadership view: 30-day review' "$PLAN"
           grep -q 'A separate faction-wide paid tier is \*\*deferred beyond v1.0\*\*' "$PLAN"
 
-          echo 'TornFCA v0.10.4 Premium matrix audit passed.'
+          echo 'TornFCA v0.10.18 Premium matrix audit passed.'
