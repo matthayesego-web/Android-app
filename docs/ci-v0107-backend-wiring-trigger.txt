@@ -3,3 +3,4 @@ Hidden developer entry now authorizes verified Torn player IDs.
 Owner Torn ID is permanent Root; Root may add/remove delegated Developer IDs.
 Hardened password/TOTP infrastructure remains preserved for future reactivation.
 Live Developer v1.5.0 redeploy verification requested 2026-08-19.
+Community Backend v1.8.0 redeploy verification requested 2026-08-19.
