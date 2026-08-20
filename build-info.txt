@@ -1,0 +1,8 @@
+version_name=0.10.14
+version_code=69
+package=com.matthayesego.duckforcetoolkit.beta
+parts=25
+chunk_bytes=180000
+sha256=5b8a428afe2063f7e12022ce4639a91484370784e3acac079da9087e527b499d
+source_commit=2c8d7c921a663cb37bacf747fde197dfbde4cfed
+run_id=32326249328
