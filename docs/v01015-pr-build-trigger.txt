@@ -1,1 +1,2 @@
 Trigger same-repository pull request build for TornFCA v0.10.15 useful push candidate.
+Retrigger after PR compiler workflow was added to the Beta branch.
