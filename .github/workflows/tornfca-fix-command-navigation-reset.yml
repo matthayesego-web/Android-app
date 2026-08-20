@@ -117,4 +117,6 @@ jobs:
           git diff --cached --check
           git diff --cached --quiet && exit 0
           git commit -m 'Fix command screen reset to Home'
+          git fetch origin work/v0.10.18-beta-hardening
+          git rebase origin/work/v0.10.18-beta-hardening
           git push origin HEAD:work/v0.10.18-beta-hardening
