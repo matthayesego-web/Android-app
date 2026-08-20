@@ -46,6 +46,7 @@
         <activity android:name=".TerritoryWarActivity" android:exported="false"/>
         <activity android:name=".TerritoryWarDetailActivity" android:exported="false"/>
         <activity android:name=".PremiumInsightsActivity" android:exported="false"/>
+        <activity android:name=".PremiumActivityTrendsActivity" android:exported="false"/>
         <activity android:name=".FactionChatActivity" android:exported="false"/>
         <activity android:name=".CommunityModerationActivity" android:exported="false"/>
         <activity android:name=".FeedbackActivity" android:exported="false"/>
