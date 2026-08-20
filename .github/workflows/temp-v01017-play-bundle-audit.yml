@@ -11,6 +11,11 @@ jobs:
   play-bundle-audit:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    env:
+      TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+      TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+      TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+      TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -33,9 +38,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.13'
-      - name: Validate Play package metadata
+      - name: Validate Play package metadata and Firebase config
         run: |
           set -euo pipefail
+          test -n "$TORNFCA_FIREBASE_APP_ID"
+          test -n "$TORNFCA_FIREBASE_API_KEY"
+          test -n "$TORNFCA_FIREBASE_PROJECT_ID"
+          test -n "$TORNFCA_FIREBASE_SENDER_ID"
           grep -q 'applicationId = "com.matthayesego.duckforcetoolkit"' app/build.gradle.kts
           grep -q 'targetSdk = 36' app/build.gradle.kts
           grep -q 'versionCode = 72' app/build.gradle.kts
@@ -47,7 +56,7 @@ jobs:
       - name: Upload unsigned Play bundle audit artifact
         uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-v0.10.17-normal-package-UNSIGNED-Play-AAB-AUDIT
+          name: TornFCA-v0.10.17-normal-package-Firebase-UNSIGNED-Play-AAB-AUDIT
           path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 7
