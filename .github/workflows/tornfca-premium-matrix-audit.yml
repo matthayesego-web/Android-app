@@ -34,6 +34,7 @@ jobs:
           SETTINGS=app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           PREVIEW=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
           ADMIN=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
+          CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
           PREMIUM_BACKEND=backend/TornFcaPremiumBackend.gs
           MATRIX=docs/PREMIUM_MATRIX_0.10.1.md
           PLAN=PREMIUM_PLAN.md
@@ -96,15 +97,20 @@ jobs:
           # Complimentary Premium is an owner-only backend grant, not a client entitlement shortcut.
           grep -q 'Complimentary Premium' "$ADMIN"
           grep -q 'Grant Complimentary Premium' "$ADMIN"
-          grep -q 'PremiumBackendClient.grant' "$ADMIN"
+          grep -q 'PremiumBackendClient.grantComplimentary' "$ADMIN"
           grep -q 'days.setText("7")' "$ADMIN"
           grep -q 'parseInt(days.getText().toString(),7)' "$ADMIN"
+          grep -q 'grantComplimentary' "$CLIENT"
+          grep -q 'request.put("grant_type","complimentary")' "$CLIENT"
 
           grep -q 'ARMORY("Faction Armory Auditor"' "$TOOLHOST"
           grep -q 'TRAIN("Company Train Calculator"' "$TOOLHOST"
 
-          # Existing payment/backend safety remains intact while launch pricing is being aligned.
-          grep -q "const TORNFCA_PREMIUM_VERSION='1.2.0'" "$PREMIUM_BACKEND"
+          # Premium backend v1.3.0: seven-day launch price + distinct complimentary audit source.
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.3.0'" "$PREMIUM_BACKEND"
+          grep -q 'TORNFCA_DEFAULT_DAYS_PER_XANAX=7' "$PREMIUM_BACKEND"
+          grep -q 'function applyPremiumSevenDayLaunchPricing' "$PREMIUM_BACKEND"
+          grep -q "grantType==='complimentary'?'COMPLIMENTARY_GRANT':'DEVELOPER_GRANT'" "$PREMIUM_BACKEND"
           grep -q 'function bootstrapPremiumAdminPassword' "$PREMIUM_BACKEND"
           grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" "$PREMIUM_BACKEND"
           grep -q "setProperty('MONETIZATION_APPROVED','false')" "$PREMIUM_BACKEND"
