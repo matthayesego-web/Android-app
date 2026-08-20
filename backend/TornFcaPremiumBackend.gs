@@ -1,5 +1,5 @@
 /**
- * TornFCA global premium entitlement backend v1.2.0.
+ * TornFCA global premium entitlement backend v1.3.0.
  * Deploy as a SEPARATE Apps Script web app from faction/community/developer backends.
  *
  * Security:
@@ -15,10 +15,11 @@
  * - scanPremiumPayments() is intended to run once per minute only after monetization approval: one Torn /user log request/minute.
  * - entitlement identity verification is cached briefly by API-key fingerprint.
  */
-const TORNFCA_PREMIUM_VERSION='1.2.0';
+const TORNFCA_PREMIUM_VERSION='1.3.0';
 const TORNFCA_PREMIUM_DEVELOPER_ID=3987363;
 const TORNFCA_XANAX_ITEM_ID=206;
 const TORNFCA_ITEM_RECEIVE_LOG=4103;
+const TORNFCA_DEFAULT_DAYS_PER_XANAX=7;
 const P_SHEETS=Object.freeze({SETTINGS:'PremiumSettings',ENTITLEMENTS:'PremiumEntitlements',PAYMENTS:'PremiumPayments'});
 
 function setupTornFcaPremiumBackend(){
@@ -26,12 +27,19 @@ function setupTornFcaPremiumBackend(){
   props.setProperty('PREMIUM_SHEET_ID',ss.getId());
   if(!props.getProperty('MONETIZATION_APPROVED'))props.setProperty('MONETIZATION_APPROVED','false');
   const settings=ensurePremiumSheet_(ss,P_SHEETS.SETTINGS,['key','value']);
-  setPremiumSettingIfMissing_(settings,'days_per_xanax','15');
+  setPremiumSettingIfMissing_(settings,'days_per_xanax',String(TORNFCA_DEFAULT_DAYS_PER_XANAX));
   setPremiumSettingIfMissing_(settings,'required_message','TORNFCA');
   setPremiumSettingIfMissing_(settings,'stacking','true');
   ensurePremiumSheet_(ss,P_SHEETS.ENTITLEMENTS,['player_id','tier','expires_at','updated_at','source','total_xanax']);
   ensurePremiumSheet_(ss,P_SHEETS.PAYMENTS,['log_id','timestamp','sender_id','xanax_qty','days_added','message','processed_at']);
-  return {ok:true,version:TORNFCA_PREMIUM_VERSION,monetization_approved:premiumMonetizationApproved_(),next:'Set the one-time PREMIUM_ADMIN_PASSWORD_SETUP property and bootstrap the admin password. Automatic payment scanning remains disabled until MONETIZATION_APPROVED=true is deliberately set after required Torn/distribution approval.'};
+  return {ok:true,version:TORNFCA_PREMIUM_VERSION,monetization_approved:premiumMonetizationApproved_(),days_per_xanax:readPremiumConfig_().days_per_xanax,next:'Set the one-time PREMIUM_ADMIN_PASSWORD_SETUP property and bootstrap the admin password. Existing deployments should confirm days_per_xanax is 7 in Premium Admin before enabling paid scanning. Automatic payment scanning remains disabled until MONETIZATION_APPROVED=true is deliberately set after required Torn/distribution approval.'};
+}
+
+/** One-time helper for an existing Premium sheet created before the 7-day launch price was finalized. */
+function applyPremiumSevenDayLaunchPricing(){
+  const settings=premiumDb_().getSheetByName(P_SHEETS.SETTINGS);
+  setPremiumSetting_(settings,'days_per_xanax',String(TORNFCA_DEFAULT_DAYS_PER_XANAX));
+  return {ok:true,config:readPremiumConfig_()};
 }
 
 function installPremiumScanTrigger(){
@@ -76,7 +84,7 @@ function doPost(e){
       requirePremiumDeveloper_(user);
       requirePremiumAdmin_(String(body.admin_password||''));
       const current=readPremiumConfig_();
-      const days=Math.max(1,Math.min(365,Number(body.days_per_xanax||current.days_per_xanax||15)));
+      const days=Math.max(1,Math.min(365,Number(body.days_per_xanax||current.days_per_xanax||TORNFCA_DEFAULT_DAYS_PER_XANAX)));
       const required=String(body.required_message==null?current.required_message:body.required_message).trim().slice(0,80);
       const stacking=body.stacking==null?current.stacking:premiumBool_(body.stacking);
       const settings=premiumDb_().getSheetByName(P_SHEETS.SETTINGS);
@@ -90,7 +98,9 @@ function doPost(e){
       requirePremiumAdmin_(String(body.admin_password||''));
       const playerId=Number(body.player_id||0),days=Math.max(1,Math.min(3650,Number(body.days||0)));
       if(!playerId||!days)throw new Error('Valid player_id and days required.');
-      return premiumJson_({ok:true,entitlement:extendEntitlement_(playerId,days,'DEVELOPER_GRANT',0,true)});
+      const grantType=String(body.grant_type||'developer').trim().toLowerCase();
+      const source=grantType==='complimentary'?'COMPLIMENTARY_GRANT':'DEVELOPER_GRANT';
+      return premiumJson_({ok:true,grant_type:grantType,entitlement:extendEntitlement_(playerId,days,source,0,true)});
     }
     throw new Error('Unknown action.');
   }catch(err){return premiumJson_({ok:false,error:String(err&&err.message||err)});}
@@ -194,7 +204,7 @@ function paymentIds_(){
 function paymentSeen_(logId){return paymentIds_().has(String(logId));}
 function recordPayment_(logId,timestamp,sender,qty,days,message){premiumDb_().getSheetByName(P_SHEETS.PAYMENTS).appendRow([safePremiumText_(logId),timestamp,sender,qty,days,safePremiumText_(message),Math.floor(Date.now()/1000)]);}
 
-function readPremiumConfig_(){const s=premiumSettings_();return {days_per_xanax:Math.max(1,Number(s.days_per_xanax||15)),required_message:String(s.required_message==null?'TORNFCA':s.required_message),stacking:premiumBool_(s.stacking==null?'true':s.stacking)};}
+function readPremiumConfig_(){const s=premiumSettings_();return {days_per_xanax:Math.max(1,Number(s.days_per_xanax||TORNFCA_DEFAULT_DAYS_PER_XANAX)),required_message:String(s.required_message==null?'TORNFCA':s.required_message),stacking:premiumBool_(s.stacking==null?'true':s.stacking)};}
 function premiumSettings_(){const values=premiumDb_().getSheetByName(P_SHEETS.SETTINGS).getDataRange().getValues(),out={};for(let i=1;i<values.length;i++){const k=String(values[i][0]||'');if(k)out[k]=values[i][1];}return out;}
 function setPremiumSetting_(sheet,key,value){const values=sheet.getDataRange().getValues();for(let i=1;i<values.length;i++)if(String(values[i][0])===key){sheet.getRange(i+1,2).setValue(value);return;}sheet.appendRow([key,value]);}
 function setPremiumSettingIfMissing_(sheet,key,value){const values=sheet.getDataRange().getValues();for(let i=1;i<values.length;i++)if(String(values[i][0])===key)return;sheet.appendRow([key,value]);}
