@@ -21,6 +21,16 @@ jobs:
         with:
           ref: work/v0.10.17-announcement-nav-fixes
           fetch-depth: 0
+      - name: Record artifact run
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01017-last-artifact-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v01017-last-artifact-run.txt
+          git commit -m 'Record v0.10.17 test artifact run'
+          git push origin HEAD:work/v0.10.17-announcement-nav-fixes
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -40,16 +50,6 @@ jobs:
           grep -q 'AUTO_DISMISS_MS = 3200L' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionAnnouncementOverlay.java
       - name: Compile Beta
         run: gradle --no-daemon :app:assembleBeta
-      - name: Record artifact run
-        run: |
-          set -euo pipefail
-          mkdir -p docs
-          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01017-last-artifact-run.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/v01017-last-artifact-run.txt
-          git commit -m 'Record v0.10.17 test artifact run'
-          git push origin HEAD:work/v0.10.17-announcement-nav-fixes
       - name: Upload unsigned candidate
         uses: actions/upload-artifact@v7
         with:
