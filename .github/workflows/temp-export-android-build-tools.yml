@@ -1,14 +1,14 @@
-name: TEMP TornFCA v0.10.15 Announcement Push Compiler
+name: TEMP TornFCA v0.10.16 Push Dedupe Compiler
 
 on:
   pull_request:
     branches: [ v0.9-faction-automation ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-v01015:
+  build-v01016:
     runs-on: ubuntu-latest
     env:
       TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
@@ -19,8 +19,7 @@ jobs:
       - name: Checkout isolated source
         uses: actions/checkout@v6
         with:
-          ref: work/v0.10.15-useful-push
-          fetch-depth: 0
+          ref: work/v0.10.16-push-dedupe-banking
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -33,51 +32,26 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Add faction announcement push
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          gradle=Path('app/build.gradle.kts')
-          g=gradle.read_text().replace('versionCode = 69','versionCode = 70',1).replace('versionName = "0.10.14"','versionName = "0.10.15"',1)
-          gradle.write_text(g)
-          p=Path('app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java')
-          text=p.read_text()
-          marker='CompanionBackendClient.publishNotice(key,titleValue,messageValue,expiresAt);'
-          extra=marker+'\n                if(CommunityBackendClient.isConfigured()){try{CommunityBackendClient.publishAnnouncement(key,titleValue,messageValue);}catch(Exception ignored){}}'
-          if 'CommunityBackendClient.publishAnnouncement(key,titleValue,messageValue)' not in text:
-              if marker not in text: raise SystemExit('Faction notice publish marker missing')
-              text=text.replace(marker,extra,1)
-          p.write_text(text)
-          PY
-
-      - name: Validate Firebase and source
+      - name: Validate Firebase and dedupe source
         run: |
           set -euo pipefail
           test -n "$TORNFCA_FIREBASE_APP_ID"
           test -n "$TORNFCA_FIREBASE_API_KEY"
           test -n "$TORNFCA_FIREBASE_PROJECT_ID"
           test -n "$TORNFCA_FIREBASE_SENDER_ID"
-          grep -q 'versionName = "0.10.15"' app/build.gradle.kts
-          grep -q 'versionCode = 70' app/build.gradle.kts
+          grep -q 'versionName = "0.10.16"' app/build.gradle.kts
+          grep -q 'versionCode = 71' app/build.gradle.kts
+          grep -q 'DEDUPE_WINDOW_MS=5000L' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationCenter.java
           grep -q 'publishAnnouncement(key,titleValue,messageValue)' app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java
+          grep -q 'publishBankingRequest(key,summary,noteValue)' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
 
       - name: Compile Beta
         run: gradle --no-daemon :app:assembleBeta
 
-      - name: Commit validated source
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/build.gradle.kts app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java
-          if ! git diff --cached --quiet; then
-            git commit -m 'Enable faction notice push notifications'
-            git push origin HEAD:work/v0.10.15-useful-push
-          fi
-
       - name: Upload unsigned candidate
         uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-Beta-v0.10.15-Announcement-Push-unsigned
+          name: TornFCA-Beta-v0.10.16-Push-Dedupe-Banking-unsigned
           path: app/build/outputs/apk/beta/app-beta-unsigned.apk
           if-no-files-found: error
           retention-days: 7
