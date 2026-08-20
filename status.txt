@@ -1,0 +1,11 @@
+faction http=200 expected_version=1.1.0 result=true
+community http=200 expected_version=1.7.0 result=false
+  response={"ok":true,"app":"TornFCA Community Backend","version":"1.8.0","authenticated_actions":"POST only"}
+  curl_error=
+premium http=200 expected_version=1.2.0 result=true
+developer http=200 expected_version=1.5.0 result=true
+warpay http=200 expected_version=1.1.0 result=true
+feedback http=200 expected_version=1.0.0 result=true
+developer_id_post http=200 readable_json=true
+
+source_commit=2c8d7c921a663cb37bacf747fde197dfbde4cfed
