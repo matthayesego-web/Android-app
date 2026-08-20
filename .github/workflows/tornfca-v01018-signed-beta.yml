@@ -1,0 +1,162 @@
+name: TornFCA v0.10.18 Signed Beta
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tornfca-v01018-signed-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  signed-beta:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+      TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+      TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+      TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+    steps:
+      - name: Checkout v0.10.18 working branch
+        uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.18-beta-hardening
+          fetch-depth: 0
+
+      - name: Record signed-beta run ID
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01018-last-signed-beta-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- docs/v01018-last-signed-beta-run.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record v0.10.18 signed beta run'
+            git push origin HEAD:work/v0.10.18-beta-hardening
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Read candidate version
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - name: Validate beta inputs
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          test -n "$TORNFCA_FIREBASE_APP_ID"
+          test -n "$TORNFCA_FIREBASE_API_KEY"
+          test -n "$TORNFCA_FIREBASE_PROJECT_ID"
+          test -n "$TORNFCA_FIREBASE_SENDER_ID"
+          grep -q 'versionName = "0.10.18"' app/build.gradle.kts
+          grep -q 'versionCode = 73' app/build.gradle.kts
+          grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
+          grep -q 'days.setText("7")' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
+          grep -q 'Complimentary Premium' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
+          grep -q '7-DAY PACE' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+
+      - name: Syntax-check Apps Script backends
+        run: |
+          set -euo pipefail
+          for file in backend/*.gs; do
+            cp "$file" "/tmp/$(basename "$file").js"
+            node --check "/tmp/$(basename "$file").js"
+          done
+
+      - name: Compile unsigned beta APK
+        run: gradle --no-daemon :app:assembleBeta
+
+      - name: Reconstruct permanent keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tornfca-release.jks"
+          chmod 600 "$RUNNER_TEMP/tornfca-release.jks"
+
+      - name: Sign and verify beta APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          APK_SIGNER="$BUILD_TOOLS/apksigner"
+          AAPT="$BUILD_TOOLS/aapt"
+          INPUT=app/build/outputs/apk/beta/app-beta-unsigned.apk
+          OUTPUT="TornFCA-v${VERSION_NAME}-beta-signed.apk"
+          test -f "$INPUT"
+          "$APK_SIGNER" sign \
+            --ks "$RUNNER_TEMP/tornfca-release.jks" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out "$OUTPUT" \
+            "$INPUT"
+          "$APK_SIGNER" verify --verbose --print-certs "$OUTPUT" | tee signer-verification.txt
+          grep -qi 'c3ecc35a64f8e7ecedda1ca46d5fe0841b890eed9c78ccb6716d61a9237f0322' signer-verification.txt
+          "$AAPT" dump badging "$OUTPUT" | tee apk-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit.beta'" apk-badging.txt
+
+      - name: Record beta metadata
+        run: |
+          set -euo pipefail
+          {
+            echo "TornFCA Signed Beta"
+            echo "versionName=${VERSION_NAME}-beta"
+            echo "versionCode=${VERSION_CODE}"
+            echo "package=com.matthayesego.duckforcetoolkit.beta"
+            echo "run=${GITHUB_RUN_ID}"
+            echo "source=${GITHUB_SHA}"
+            echo "permanent-certificate=true"
+          } | tee beta-build-metadata.txt
+
+      - name: Upload signed beta artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v${{ env.VERSION_NAME }}-SIGNED-BETA
+          path: |
+            TornFCA-v${{ env.VERSION_NAME }}-beta-signed.apk
+            beta-build-metadata.txt
+            apk-badging.txt
+            signer-verification.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/tornfca-release.jks"
