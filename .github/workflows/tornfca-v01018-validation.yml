@@ -1,0 +1,93 @@
+name: TornFCA v0.10.18 Validation
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tornfca-v01018-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout v0.10.18 source
+        uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.18-beta-hardening
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Verify candidate identity and Premium boundaries
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.10.18"' app/build.gradle.kts
+          grep -q 'versionCode = 73' app/build.gradle.kts
+          grep -q 'applicationId = "com.matthayesego.duckforcetoolkit"' app/build.gradle.kts
+          grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
+
+          ADMIN=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
+          INSIGHTS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAccess.java
+          ROUTER=app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+
+          grep -q 'days.setText("7")' "$ADMIN"
+          grep -q 'Complimentary Premium' "$ADMIN"
+          grep -q 'Grant Complimentary Premium' "$ADMIN"
+          grep -q '7-DAY PACE' "$INSIGHTS"
+          grep -q 'previous 23-day pace' "$INSIGHTS"
+
+          grep -q 'RemoteFeaturePolicy.featureDisabled(context,"premium")' "$ACCESS"
+          grep -q 'RemoteFeaturePolicy.maintenanceMode(context)' "$ACCESS"
+          grep -q 'RemoteFeaturePolicy.versionBlocked(context)' "$ACCESS"
+          grep -q 'TARGET_PULSE.equals(target))return PremiumAccess.FACTION_PULSE' "$ROUTER"
+          grep -q 'TARGET_LOOKUP.equals(target))return PremiumAccess.MEMBER_DOSSIER' "$ROUTER"
+
+          # Core tools must not accidentally become Premium-routed.
+          awk '/private String premiumFeature/{flag=1} flag{print} /return null;/{if(flag){exit}}' "$ROUTER" > /tmp/premium-router.txt
+          ! grep -q 'TARGET_WAR_PAYOUT' /tmp/premium-router.txt
+          ! grep -q 'TARGET_BANKING' /tmp/premium-router.txt
+          ! grep -q 'TARGET_ACTIVITY' /tmp/premium-router.txt
+          ! grep -q 'TARGET_WAR.equals' /tmp/premium-router.txt
+          ! grep -q 'TARGET_CHAIN' /tmp/premium-router.txt
+          ! grep -q 'TARGET_OC' /tmp/premium-router.txt
+          ! grep -q 'TARGET_STRENGTH' /tmp/premium-router.txt
+
+          grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
+          grep -q 'android:usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
+          grep -q 'PlayReviewActivity' app/src/main/AndroidManifest.xml
+
+      - name: Syntax-check Apps Script backends
+        run: |
+          set -euo pipefail
+          for file in backend/*.gs; do
+            cp "$file" "/tmp/$(basename "$file").js"
+            node --check "/tmp/$(basename "$file").js"
+          done
+
+      - name: Compile debug and beta variants
+        run: gradle --no-daemon :app:assembleDebug :app:assembleBeta
+
+      - name: Upload compile artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v0.10.18-validation-builds
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/beta/*.apk
+          if-no-files-found: error
+          retention-days: 7
