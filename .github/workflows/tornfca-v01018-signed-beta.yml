@@ -76,6 +76,8 @@ jobs:
           grep -q 'Complimentary Premium' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
           grep -q 'grantComplimentary' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
           grep -q '7-DAY PACE' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
+          grep -q 'Training Goal Pacing' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          grep -q 'Premium Activity Trends' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumActivityTrendsActivity.java
           grep -q "const TORNFCA_PREMIUM_VERSION='1.3.0'" backend/TornFcaPremiumBackend.gs
           grep -q 'TORNFCA_DEFAULT_DAYS_PER_XANAX=7' backend/TornFcaPremiumBackend.gs
           grep -q "COMPLIMENTARY_GRANT" backend/TornFcaPremiumBackend.gs
@@ -88,8 +90,8 @@ jobs:
             node --check "/tmp/$(basename "$file").js"
           done
 
-      - name: Compile unsigned beta APK
-        run: gradle --no-daemon :app:assembleBeta
+      - name: Compile beta and installable internal APKs
+        run: gradle --no-daemon :app:assembleBeta :app:assembleDebug
 
       - name: Check signing secret availability
         id: signing
@@ -108,7 +110,7 @@ jobs:
           if [ "$available" = true ]; then
             echo 'Permanent signing secrets are available.'
           else
-            echo 'Permanent signing secrets are not configured in GitHub Actions yet; compile validation will still complete and upload the unsigned APK.'
+            echo 'Permanent signing secrets are not configured yet. The workflow will still upload an installable debug-signed Internal APK plus the unsigned beta compile.'
           fi
 
       - name: Reconstruct permanent keystore
@@ -156,13 +158,14 @@ jobs:
             echo "TornFCA Beta Build"
             echo "versionName=${VERSION_NAME}-beta"
             echo "versionCode=${VERSION_CODE}"
-            echo "package=com.matthayesego.duckforcetoolkit.beta"
+            echo "betaPackage=com.matthayesego.duckforcetoolkit.beta"
+            echo "internalPackage=com.matthayesego.duckforcetoolkit.internal"
             echo "run=${GITHUB_RUN_ID}"
             echo "source=${GITHUB_SHA}"
-            echo "signed=${{ steps.signing.outputs.available }}"
+            echo "permanentSignedBeta=${{ steps.signing.outputs.available }}"
           } | tee beta-build-metadata.txt
 
-      - name: Upload signed beta artifact
+      - name: Upload permanently signed beta artifact
         if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v7
         with:
@@ -175,12 +178,13 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload unsigned compile artifact
+      - name: Upload installable internal test artifact
         if: steps.signing.outputs.available != 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-v${{ env.VERSION_NAME }}-UNSIGNED-BETA-COMPILE
+          name: TornFCA-v${{ env.VERSION_NAME }}-INSTALLABLE-INTERNAL-TEST
           path: |
+            app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/beta/app-beta-unsigned.apk
             beta-build-metadata.txt
           if-no-files-found: error
