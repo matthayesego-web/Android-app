@@ -32,23 +32,76 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Validate Firebase inputs
+      - name: Validate Firebase and signing inputs
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$TORNFCA_FIREBASE_APP_ID"
           test -n "$TORNFCA_FIREBASE_API_KEY"
           test -n "$TORNFCA_FIREBASE_PROJECT_ID"
           test -n "$TORNFCA_FIREBASE_SENDER_ID"
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
           grep -q 'versionName = "0.10.14"' app/build.gradle.kts
           grep -q 'versionCode = 69' app/build.gradle.kts
 
       - name: Compile Firebase Beta APK
         run: gradle --no-daemon :app:assembleBeta
 
-      - name: Upload unsigned Firebase Beta
+      - name: Reconstruct permanent keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/duckforce-release.jks"
+          chmod 600 "$RUNNER_TEMP/duckforce-release.jks"
+
+      - name: Sign and verify Firebase Beta APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          APK_SIGNER="$BUILD_TOOLS/apksigner"
+          AAPT="$BUILD_TOOLS/aapt"
+          test -x "$APK_SIGNER"
+          test -x "$AAPT"
+          OUT="TornFCA-Beta-v0.10.14-Firebase-SIGNED.apk"
+          "$APK_SIGNER" sign \
+            --ks "$RUNNER_TEMP/duckforce-release.jks" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out "$OUT" \
+            app/build/outputs/apk/beta/app-beta-unsigned.apk
+          "$APK_SIGNER" verify --verbose --print-certs "$OUT" | tee signer-verification.txt
+          grep -qi "c3ecc35a64f8e7ecedda1ca46d5fe0841b890eed9c78ccb6716d61a9237f0322" signer-verification.txt
+          "$AAPT" dump badging "$OUT" | tee apk-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit.beta'" apk-badging.txt
+          sha256sum "$OUT" | tee apk-sha256.txt
+
+      - name: Upload signed Firebase Beta
         uses: actions/upload-artifact@v7
         with:
-          name: TornFCA-Beta-v0.10.14-Firebase-unsigned
-          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          name: TornFCA-Beta-v0.10.14-Firebase-SIGNED
+          path: |
+            TornFCA-Beta-v0.10.14-Firebase-SIGNED.apk
+            signer-verification.txt
+            apk-badging.txt
+            apk-sha256.txt
           if-no-files-found: error
           retention-days: 7
+
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/duckforce-release.jks"
