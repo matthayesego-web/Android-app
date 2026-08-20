@@ -1,32 +1,155 @@
-name: TEMP Export Android Build Tools
+name: TEMP TornFCA v0.10.15 Useful Push Compiler
 
 on:
   pull_request:
     branches: [ v0.9-faction-automation ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export-build-tools:
+  build-v01015:
     runs-on: ubuntu-latest
+    env:
+      TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+      TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+      TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+      TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
     steps:
-      - name: Locate latest Android build-tools
+      - name: Checkout isolated v0.10.15 source
+        uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.15-useful-push
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Apply v0.10.15 implementation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path); text=p.read_text()
+              if old in text:
+                  p.write_text(text.replace(old,new,1)); return
+              if new in text: return
+              raise SystemExit(f'Missing expected marker in {path}: {old[:100]}')
+
+          replace_once('app/build.gradle.kts','versionCode = 69','versionCode = 70')
+          replace_once('app/build.gradle.kts','versionName = "0.10.14"','versionName = "0.10.15"')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java',
+              'public static JSONObject publishBankingRequest(String key,String summary,String note)throws IOException{JSONObject b=request("banking_request_push",key);put(b,"summary",summary);put(b,"note",note);return postChecked(b,"Unable to alert faction leadership about this banking request.");}',
+              'public static JSONObject publishBankingRequest(String key,String requestId)throws IOException{JSONObject b=request("banking_request_push",key);put(b,"request_id",requestId);return postChecked(b,"Unable to alert faction leadership about this banking request.");}')
+          replace_once('app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java',
+              'String summary=requestedFull?(resolved>0L?"Full balance request: "+money(resolved):"Full balance requested"):("Requested "+raw);\n                    if(CommunityBackendClient.isConfigured())new Thread(()->{try{CommunityBackendClient.publishBankingRequest(key,summary,noteValue);}catch(Exception ignored){}},"TornFCA-BankingAlert").start();',
+              'String requestId=request==null?"":request.optString("id","");\n                    if(CommunityBackendClient.isConfigured()&&!requestId.isBlank())new Thread(()->{try{CommunityBackendClient.publishBankingRequest(key,requestId);}catch(Exception ignored){}},"TornFCA-BankingAlert").start();')
+
+          war=Path('app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java')
+          w=war.read_text(); anchor='CompanionBackendClient.publishNotice(key,titleValue,messageValue,expiresAt);'
+          if 'CommunityBackendClient.publishAnnouncement(key,titleValue,messageValue)' not in w:
+              if anchor not in w: raise SystemExit('Faction notice marker missing')
+              w=w.replace(anchor,anchor+'\n                if(CommunityBackendClient.isConfigured()){try{CommunityBackendClient.publishAnnouncement(key,titleValue,messageValue);}catch(Exception ignored){}}',1)
+              war.write_text(w)
+
+          backend=Path('backend/TornFcaCommunityBackend.gs'); text=backend.read_text()
+          text=text.replace('TornFCA Community Backend v1.8.0.','TornFCA Community Backend v1.8.1.',1)
+          text=text.replace("const TC_VERSION='1.8.0';","const TC_VERSION='1.8.1';",1)
+          if 'const TC_FACTION_BACKEND_URL=' not in text:
+              marker='const TC_CHAT_CHUNK=500;'
+              if marker not in text: raise SystemExit('Community constant marker missing')
+              text=text.replace(marker,marker+"\nconst TC_FACTION_BACKEND_URL='https://script.google.com/macros/s/AKfycbzR8zjFVYaDoIZaxFdJV4yBaM4mLSv-iqZL8146HCzq6vRzJgeYr1Y0TKkPGrdASjQj/exec';",1)
+          old="""    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',30);
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+    }
+"""
+          new="""    if(action==='banking_request_push'){
+      tcRate_(user.id,'banking_request_push',3);
+      const requestId=String(body.request_id||'').trim();
+      tcVerifyBankingRequest_(key,user,requestId);
+      const pushCache=CacheService.getScriptCache(),dedupe='banking_push:'+user.faction_id+':'+requestId;
+      if(pushCache.get(dedupe))return tcJson_({ok:true,push:{duplicate:true,configured:tcFirebaseConfigured_(),sent:0,failed:0}});
+      pushCache.put(dedupe,'1',600);
+      const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
+      const message='A faction member submitted a banking request. Tap to review the queue.';
+      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',request_id:requestId,requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+    }
+"""
+          if old in text: text=text.replace(old,new,1)
+          elif new not in text: raise SystemExit('Banking push route missing')
+          if 'function tcVerifyBankingRequest_' not in text:
+              marker='function tcRegisterDevice_(apiKey,user,body){'
+              helper="""function tcVerifyBankingRequest_(apiKey,user,requestId){
+  if(!requestId)throw new Error('Banking request ID required.');
+  const response=UrlFetchApp.fetch(TC_FACTION_BACKEND_URL,{method:'post',muteHttpExceptions:true,contentType:'text/plain;charset=UTF-8',payload:JSON.stringify({action:'banking_list',apiKey:apiKey,reconcile:false}),headers:{'User-Agent':'TornFCA-Community/'+TC_VERSION+' BankingPushVerify'}});
+  let data;try{data=JSON.parse(response.getContentText());}catch(_){throw new Error('Unable to verify the banking request.');}
+  if(response.getResponseCode()<200||response.getResponseCode()>=300||!data||!data.ok)throw new Error(String(data&&data.error||'Unable to verify the banking request.'));
+  const remoteUser=data.user||{};
+  if(Number(remoteUser.id||0)!==Number(user.id)||Number(remoteUser.faction_id||0)!==Number(user.faction_id))throw new Error('Banking request identity verification failed.');
+  const rows=Array.isArray(data.requests)?data.requests:[],now=Math.floor(Date.now()/1000);
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i]||{};
+    if(String(row.id||'')!==requestId)continue;
+    if(Number(row.requester_id||0)!==Number(user.id))throw new Error('Banking request does not belong to this player.');
+    if(String(row.status||'PENDING').toUpperCase()!=='PENDING')throw new Error('Banking request is no longer pending.');
+    const created=Number(row.requested_at||row.detected_at||0);
+    if(created>0&&now-created>15*60)throw new Error('Banking request is too old to trigger a new alert.');
+    return row;
+  }
+  throw new Error('Banking request was not found in the verified faction queue.');
+}
+
+"""
+              if marker not in text: raise SystemExit('Push registration marker missing')
+              text=text.replace(marker,helper+marker,1)
+          backend.write_text(text)
+          PY
+
+      - name: Validate Firebase and source
         run: |
           set -euo pipefail
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          test -x "$BUILD_TOOLS/apksigner"
-          test -x "$BUILD_TOOLS/aapt"
-          echo "BUILD_TOOLS=$BUILD_TOOLS" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/android-build-tools"
-          cp "$BUILD_TOOLS/apksigner" "$RUNNER_TEMP/android-build-tools/"
-          cp "$BUILD_TOOLS/aapt" "$RUNNER_TEMP/android-build-tools/"
-          cp -R "$BUILD_TOOLS/lib" "$RUNNER_TEMP/android-build-tools/"
+          test -n "$TORNFCA_FIREBASE_APP_ID"
+          test -n "$TORNFCA_FIREBASE_API_KEY"
+          test -n "$TORNFCA_FIREBASE_PROJECT_ID"
+          test -n "$TORNFCA_FIREBASE_SENDER_ID"
+          grep -q 'versionName = "0.10.15"' app/build.gradle.kts
+          grep -q 'versionCode = 70' app/build.gradle.kts
+          grep -q "const TC_VERSION='1.8.1'" backend/TornFcaCommunityBackend.gs
+          grep -q 'tcVerifyBankingRequest_' backend/TornFcaCommunityBackend.gs
+          grep -q 'publishAnnouncement(key,titleValue,messageValue)' app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java
+          cp backend/TornFcaCommunityBackend.gs /tmp/community.js
+          node --check /tmp/community.js
 
-      - name: Upload build tools
+      - name: Compile Beta
+        run: gradle --no-daemon :app:assembleBeta
+
+      - name: Commit validated source
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle.kts app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java app/src/main/java/com/matthayesego/duckforcetoolkit/WarNoticeActivity.java backend/TornFcaCommunityBackend.gs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Add verified banking and faction announcement push'
+            git push origin HEAD:work/v0.10.15-useful-push
+          fi
+
+      - name: Upload unsigned candidate
         uses: actions/upload-artifact@v7
         with:
-          name: android-build-tools-apksigner
-          path: ${{ runner.temp }}/android-build-tools
+          name: TornFCA-Beta-v0.10.15-Useful-Push-unsigned
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
