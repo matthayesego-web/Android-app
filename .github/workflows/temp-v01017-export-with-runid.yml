@@ -48,6 +48,8 @@ jobs:
           grep -q 'versionName = "0.10.17"' app/build.gradle.kts
           grep -q 'currentShellInstalled' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
           grep -q 'AUTO_DISMISS_MS = 3200L' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionAnnouncementOverlay.java
+          grep -q "const DF_TOOLKIT_VERSION='1.1.1'" backend/AccessBackend.gs
+          grep -q "action==='delete_notice'" backend/AccessBackend.gs
       - name: Compile Beta
         run: gradle --no-daemon :app:assembleBeta
       - name: Upload unsigned candidate
@@ -57,3 +59,10 @@ jobs:
           path: app/build/outputs/apk/beta/app-beta-unsigned.apk
           if-no-files-found: error
           retention-days: 7
+      - name: Upload faction backend morning handoff
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Faction-Backend-v1.1.1-REPLACE-CODE
+          path: backend/AccessBackend.gs
+          if-no-files-found: error
+          retention-days: 14
