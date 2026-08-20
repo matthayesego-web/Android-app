@@ -9,6 +9,7 @@ public final class PremiumAccess {
     public static final String EXTENDED_ACTIVITY="extended_activity";
     public static final String FACTION_PULSE="faction_pulse";
     public static final String MEMBER_DOSSIER="member_dossier";
+    public static final String TRAINING_GOALS="training_goals";
     public static final String PERSONALIZATION="personalization";
 
     private PremiumAccess(){}
