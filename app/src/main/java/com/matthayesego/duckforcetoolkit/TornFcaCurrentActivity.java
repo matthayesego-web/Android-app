@@ -34,6 +34,7 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
     private Identity identity;
     private String currentSection="Home";
     private Runnable submenuBack;
+    private boolean currentShellInstalled;
 
     @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);}
 
@@ -76,6 +77,7 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
     }
 
     private void installCurrentShell(ViewGroup host){
+        String requested=currentShellInstalled?currentSection:(getIntent()==null?null:getIntent().getStringExtra(EXTRA_SECTION));
         identity=resolveIdentity();
         host.removeAllViews();
 
@@ -112,7 +114,7 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
         scroll.requestApplyInsets();
         bottomNav.requestApplyInsets();
 
-        String requested=getIntent()==null?null:getIntent().getStringExtra(EXTRA_SECTION);
+        currentShellInstalled=true;
         renderTop(requested);
     }
 
@@ -308,6 +310,7 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
         beginTop("Home","HOME","Your faction companion","A simple starting point. Open My Day for the full personal summary, or jump straight to the one thing you need.");
         addMenu("TODAY","My Day","Bars, cooldowns, OC, chain and warfare readiness in one personal view.",TornFcaUi.GREEN,"Open My Day",()->openActivity(MemberDailyActivity.class));
         addMenu("READY","My War Prep","Use your personal warfare checklist before Ranked War or territory activity.",TornFcaUi.RED,"Open War Prep",()->openActivity(WarPrepActivity.class));
+        addMenu("ANNOUNCEMENTS","Faction Announcements","Read current leadership announcements and important faction messages.",TornFcaUi.GOLD,"Open announcements",this::openAnnouncements);
         addMenu("ALERTS","Notification Inbox","Review saved TornFCA alerts after Android clears them.",TornFcaUi.GOLD,"Open alerts",()->openActivity(NotificationInboxActivity.class));
         if(identity!=null&&identity.leader){
             addMenu("LEADERSHIP","Needs Attention","Review the faction members and exceptions that may need action.",TornFcaUi.GOLD,"Review attention",()->openActivity(LeadershipAttentionActivity.class));
@@ -317,6 +320,7 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
 
     private void renderFaction(){
         beginTop("Faction","FACTION","Faction","Shared faction information stays here. Extra status and community tools are grouped one level deeper.");
+        addMenu("ANNOUNCEMENTS","Faction Announcements","Current leadership announcements stay here until they are deleted.",TornFcaUi.GOLD,"Open announcements",this::openAnnouncements);
         addMenu("OVERVIEW","Faction Overview","Current faction information available to members.",TornFcaUi.GOLD,"Open overview",()->openActivity(MemberFactionActivity.class));
         addMenu("DIRECTORY","Faction Directory","Search the roster and open basic member status cards.",TornFcaUi.BLUE,"Open directory",()->openActivity(MemberDirectoryActivity.class));
         addMenu("RESOURCES","Faction Resources","Onboarding, rules, guides and useful faction shortcuts.",TornFcaUi.GOLD,"Open resources",()->openActivity(FactionResourcesActivity.class));
@@ -414,6 +418,15 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
         fp.topMargin=TornFcaUi.dp(this,5);
         fp.bottomMargin=TornFcaUi.dp(this,7);
         pageHost.addView(footer,fp);
+    }
+
+    private void openAnnouncements(){
+        if(identity==null)identity=resolveIdentity();
+        Intent i=new Intent(this,WarNoticeActivity.class);
+        i.putExtra(WarNoticeActivity.EXTRA_FACTION_ID,identity.factionId);
+        i.putExtra(WarNoticeActivity.EXTRA_FACTION_NAME,identity.factionName);
+        i.putExtra(WarNoticeActivity.EXTRA_CAN_PUBLISH,identity.leader);
+        startActivity(i);
     }
 
     private void openActivity(Class<?> target){

@@ -161,7 +161,6 @@ public final class FactionAnnouncementOverlay {
     private static void removeVisible(Activity activity, FrameLayout content) {
         View existing = VISIBLE.remove(activity);
         VISIBLE_IDS.remove(activity);
-        if (existing != null) existing.removeCallbacks(null);
         if (existing != null && existing.getParent() == content) content.removeView(existing);
         for (int i = content.getChildCount() - 1; i >= 0; i--) {
             View child = content.getChildAt(i);

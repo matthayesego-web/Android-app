@@ -1,5 +1,5 @@
 /**
- * TornFCA shared faction backend v1.1.0.
+ * TornFCA shared faction backend v1.1.1.
  * API keys verify requests and are never stored. Shared data is tenant-scoped by verified Torn faction ID.
  * Faction membership and position are read fresh from Torn on every authenticated request; only stable basic player
  * identity may be cached briefly by a SHA-256 API-key fingerprint.
@@ -8,7 +8,7 @@
  * are honored when present. New deployments default to unrestricted multi-faction tenancy, with every shared row
  * keyed by faction_id.
  */
-const DF_TOOLKIT_VERSION='1.1.0';
+const DF_TOOLKIT_VERSION='1.1.1';
 const DF_SHEETS=Object.freeze({
   SETTINGS:'Settings',
   RANKS:'RankAccess',
@@ -92,6 +92,11 @@ function doPost(e){
     if(action==='post_notice'){
       if(!hasCurrentPermission_(apiKey,user,'Announcement Changes'))throw new Error('Announcement Changes permission (or Leader/Co-leader) required.');
       return json_({ok:true,notice:createNotice_(user,body)});
+    }
+
+    if(action==='delete_notice'){
+      if(!hasCurrentPermission_(apiKey,user,'Announcement Changes'))throw new Error('Announcement Changes permission (or Leader/Co-leader) required.');
+      return json_({ok:true,notice:deleteNotice_(user,body)});
     }
 
     if(action==='banking_submit')return json_({ok:true,request:createAppBankingRequest_(user,body)});
@@ -246,10 +251,24 @@ function createNotice_(user,body){
   if(!title||!message)throw new Error('Notice title and message are required.');
   if(title.length>120)throw new Error('Notice title is too long.');
   if(message.length>2000)throw new Error('Notice message is too long.');
-  const now=Math.floor(Date.now()/1000);let expiresAt=Number(body.expires_at||0);if(!expiresAt||expiresAt<=now)expiresAt=now+72*3600;
+  const now=Math.floor(Date.now()/1000);let expiresAt=Number(body.expires_at||0);if(!Number.isFinite(expiresAt)||expiresAt<=now)expiresAt=0;
   const notice={id:Utilities.getUuid(),faction_id:user.faction_id,title:title,message:message,created_at:now,expires_at:expiresAt,author_id:user.id,author_name:user.name,active:true};
   db_().getSheetByName(DF_SHEETS.NOTICES).appendRow([notice.id,notice.faction_id,safeCellText_(notice.title),safeCellText_(notice.message),notice.created_at,notice.expires_at,notice.author_id,safeCellText_(notice.author_name),true]);
   return notice;
+}
+
+function deleteNotice_(user,body){
+  const id=String(body.notice_id||'').trim();if(!id)throw new Error('Notice ID required.');
+  const sheet=db_().getSheetByName(DF_SHEETS.NOTICES),lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    const values=sheet.getDataRange().getValues();
+    for(let i=1;i<values.length;i++){
+      if(String(values[i][0]||'')!==id||Number(values[i][1]||0)!==Number(user.faction_id))continue;
+      sheet.getRange(i+1,9).setValue(false);
+      return{id:id,faction_id:user.faction_id,active:false};
+    }
+  }finally{lock.releaseLock();}
+  throw new Error('Announcement not found.');
 }
 
 function readActiveNotices_(factionId){

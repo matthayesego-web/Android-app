@@ -147,11 +147,14 @@ public final class StartupWarmCache {
     public static JSONObject latestVisibleNotice(Context context, int factionId) {
         JSONArray rows = notices(context, factionId, NOTICE_PERSIST_MS); if (rows == null) return null;
         long now = System.currentTimeMillis() / 1000L;
-        String dismissed = context == null ? "" : context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("dismissed_notice_id", "");
+        SharedPreferences noticePrefs = context == null ? null : context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String dismissed = noticePrefs == null ? "" : noticePrefs.getString("dismissed_notice_id", "");
+        String dismissedIds = noticePrefs == null ? "" : noticePrefs.getString("dismissed_notice_ids", "");
         for (int i = 0; i < rows.length(); i++) {
             JSONObject row = rows.optJSONObject(i); if (row == null) continue;
             long expires = row.optLong("expires_at", 0L); if (expires > 0L && expires <= now) continue;
             String id = row.optString("id", ""); if (!id.isEmpty() && id.equals(dismissed)) continue;
+            if (!id.isEmpty() && dismissedIds.contains("|" + id + "|")) continue;
             return copy(row);
         }
         return null;
@@ -159,7 +162,11 @@ public final class StartupWarmCache {
 
     public static void dismissNotice(Context context, String id) {
         if (context == null || id == null || id.isBlank()) return;
-        context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("dismissed_notice_id", id).apply();
+        SharedPreferences p = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String raw = p.getString("dismissed_notice_ids", ""), token = "|" + id + "|";
+        if (!raw.contains(token)) raw = token + raw;
+        if (raw.length() > 6000) raw = raw.substring(0, 6000);
+        p.edit().putString("dismissed_notice_id", id).putString("dismissed_notice_ids", raw).apply();
         FactionAnnouncementOverlay.refreshVisible();
     }
 
