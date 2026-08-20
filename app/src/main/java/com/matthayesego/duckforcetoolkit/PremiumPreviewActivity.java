@@ -15,7 +15,7 @@ public class PremiumPreviewActivity extends Activity {
     private void render(){
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
         TornFcaUi.header(this,r,"More","TornFCA Premium","Keep every essential faction tool. Add deeper history, personal goal pacing, smarter alerts and faster leadership intelligence on top.");
-        int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS);String state=premium?"PREMIUM ACTIVE":"FREE";String detail=premium?PremiumEntitlementStore.summary(this):(PremiumBackendClient.isConfigured()?"Your account currently has the complete free core. Premium is optional depth and convenience.":"You have the complete free core. Premium entitlement services are not enabled in this beta build.");
+        int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS),leader=currentLeader();String state=premium?"PREMIUM ACTIVE":"FREE";String detail=premium?PremiumEntitlementStore.summary(this):(PremiumBackendClient.isConfigured()?"Your account currently has the complete free core. Premium is optional depth and convenience.":"You have the complete free core. Premium entitlement services are not enabled in this beta build.");
         TornFcaUi.add(this,r,TornFcaUi.card(this,"YOUR PLAN",state,detail,premium?TornFcaUi.GOLD:TornFcaUi.GREEN));
 
         TornFcaUi.addSection(this,r,"Free — complete core");
@@ -31,7 +31,7 @@ public class PremiumPreviewActivity extends Activity {
         TornFcaUi.add(this,r,TornFcaUi.card(this,"SMART ALERTS","Choose when TornFCA gets your attention","Free keeps standard notification categories and the normal 15-minute war reminder. Premium lets you select 15/30/60-minute war lead times so alerts fit how you actually prepare.",TornFcaUi.GOLD));
 
         TornFcaUi.addSection(this,r,"Premium when you lead");
-        TornFcaUi.add(this,r,TornFcaUi.card(this,"EXTENDED ACTIVITY","30-day faction review","Free leadership keeps the useful 7-day faction-log tracker. Premium extends that review to 30 days for deeper participation patterns while leaving the core tracker available to every authorized leader.",TornFcaUi.GOLD));
+        LinearLayout activity=TornFcaUi.card(this,"ACTIVITY TRENDS","30-day participation momentum","Free leadership keeps the useful 7-day Activity Tracker. Premium adds a 30-day leadership analysis that compares each member's recent 7-day pace with the previous 23 days and surfaces improving or declining participation.",TornFcaUi.GOLD);if(leader){Button trends=TornFcaUi.button(this,premium?"Open Activity Trends":"Preview Activity Trends",TornFcaUi.GOLD);trends.setOnClickListener(v->startActivity(new Intent(this,PremiumActivityTrendsActivity.class)));LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));ap.topMargin=TornFcaUi.dp(this,9);activity.addView(trends,ap);}TornFcaUi.add(this,r,activity);
         TornFcaUi.add(this,r,TornFcaUi.card(this,"FACTION PULSE","One-screen command snapshot","Premium combines current availability, online state, hospital/jail/travel, OC gaps and territory-wall status into a fast leadership snapshot. The underlying roster/status information still exists in free tools.",TornFcaUi.GOLD));
         TornFcaUi.add(this,r,TornFcaUi.card(this,"MEMBER DOSSIER","All-in-one member intelligence","Premium combines Torn member status with separately opted-in FFScouter and TornStats intelligence in one dossier. Free keeps the Directory, basic status and raw provider tools.",TornFcaUi.GOLD));
 
@@ -41,4 +41,5 @@ public class PremiumPreviewActivity extends Activity {
         setContentView(s);s.requestApplyInsets();
     }
     private int currentPlayerId(){return PremiumAccess.currentPlayerId(this);}
+    private boolean currentLeader(){if(DeveloperPreviewStore.isMemberPreview(this))return false;String key=new SecureApiKeyStore(this).load();if(key==null||key.isBlank())return false;AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return AccessPolicy.isLeaderPosition(hot.position);FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);return scope!=null&&AccessPolicy.isLeaderPosition(scope.position);}
 }
