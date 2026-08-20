@@ -11,6 +11,11 @@ permissions:
 jobs:
   beta-build:
     runs-on: ubuntu-latest
+    env:
+      TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+      TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+      TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+      TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
     steps:
       - name: Checkout isolated v0.10.14 source
         uses: actions/checkout@v6
@@ -86,9 +91,13 @@ jobs:
               p.write_text(text)
           PY
 
-      - name: Validate v0.10.14 source
+      - name: Validate v0.10.14 source and Firebase build inputs
         run: |
           set -euo pipefail
+          test -n "$TORNFCA_FIREBASE_APP_ID"
+          test -n "$TORNFCA_FIREBASE_API_KEY"
+          test -n "$TORNFCA_FIREBASE_PROJECT_ID"
+          test -n "$TORNFCA_FIREBASE_SENDER_ID"
           grep -q 'versionName = "0.10.14"' app/build.gradle.kts
           grep -q 'versionCode = 69' app/build.gradle.kts
           grep -q "const TC_VERSION='1.8.0'" backend/TornFcaCommunityBackend.gs
