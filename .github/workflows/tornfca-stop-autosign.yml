@@ -1,0 +1,17 @@
+name: TornFCA Stop Auto Sign
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+    paths:
+      - '.github/workflows/tornfca-stop-autosign.yml'
+
+concurrency:
+  group: tornfca-v01018-signed-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cancel-prior-signing-run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Automatic signing paused while beta bug fixing continues.'
