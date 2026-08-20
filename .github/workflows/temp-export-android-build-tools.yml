@@ -1,0 +1,32 @@
+name: TEMP Export Android Build Tools
+
+on:
+  pull_request:
+    branches: [ v0.9-faction-automation ]
+
+permissions:
+  contents: read
+
+jobs:
+  export-build-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Locate latest Android build-tools
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/aapt"
+          echo "BUILD_TOOLS=$BUILD_TOOLS" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/android-build-tools"
+          cp "$BUILD_TOOLS/apksigner" "$RUNNER_TEMP/android-build-tools/"
+          cp "$BUILD_TOOLS/aapt" "$RUNNER_TEMP/android-build-tools/"
+          cp -R "$BUILD_TOOLS/lib" "$RUNNER_TEMP/android-build-tools/"
+
+      - name: Upload build tools
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-build-tools-apksigner
+          path: ${{ runner.temp }}/android-build-tools
+          if-no-files-found: error
+          retention-days: 1
