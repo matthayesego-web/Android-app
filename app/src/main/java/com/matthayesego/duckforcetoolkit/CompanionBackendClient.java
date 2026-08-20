@@ -30,7 +30,7 @@ public final class CompanionBackendClient {
     public static void publishNotice(String apiKey, String title, String message, long expiresAt) throws IOException {
         if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
         JSONObject body = request("post_notice", apiKey);
-        try { body.put("title", title == null ? "" : title.trim());body.put("message", message == null ? "" : message.trim());body.put("expires_at", expiresAt); }
+        try { body.put("title", title == null ? "" : title.trim());body.put("message", message == null ? "" : message.trim());body.put("expires_at", Math.max(0L, expiresAt)); }
         catch (Exception e) { throw new IOException("Unable to prepare faction notice."); }
         postChecked(body, "Unable to publish faction notice.");
         // The notice itself is authoritative. Cloud delivery is intentionally decoupled so a slow
@@ -39,6 +39,13 @@ public final class CompanionBackendClient {
             final String pushTitle=title,pushMessage=message,pushKey=apiKey;
             new Thread(()->{try{CommunityBackendClient.publishAnnouncement(pushKey,pushTitle,pushMessage);}catch(Exception ignored){}},"TornFCA-NoticePush").start();
         }
+    }
+    public static void deleteNotice(String apiKey, String noticeId) throws IOException {
+        if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");
+        JSONObject body=request("delete_notice",apiKey);
+        try { body.put("notice_id", noticeId == null ? "" : noticeId.trim()); }
+        catch (Exception e) { throw new IOException("Unable to prepare announcement deletion."); }
+        postChecked(body,"Unable to delete faction announcement.");
     }
     public static JSONObject getBankingRequests(String apiKey, boolean reconcile) throws IOException {if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");JSONObject body = request("banking_list", apiKey);try { body.put("reconcile", reconcile); }catch (Exception ignored) {}return postChecked(body, "Unable to load banking requests.");}
     public static JSONObject submitBankingRequest(String apiKey, String amount, String note) throws IOException {if (!isConfigured()) throw new IOException("Shared faction backend is not configured yet.");JSONObject body = request("banking_submit", apiKey);try {body.put("requested_amount", amount == null ? "" : amount.trim());body.put("note", note == null ? "" : note.trim());}catch (Exception e) {throw new IOException("Unable to prepare banking request.");}return postChecked(body, "Unable to submit banking request.");}
