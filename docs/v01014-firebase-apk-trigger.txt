@@ -1,2 +1,3 @@
 Trigger same-repo pull request build for TornFCA v0.10.14 Firebase-enabled Beta APK.
 Trigger signed Firebase Beta APK build using permanent signing key.
+Trigger temporary Android build-tools export for local signing fallback.
