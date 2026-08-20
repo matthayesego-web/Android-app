@@ -3,3 +3,4 @@ Retrigger after PR compiler workflow was added to the Beta branch.
 Run the registered v0.10.15 compiler now.
 Use the updated Firebase workflow path.
 Use the repurposed registered compiler workflow.
+Run against refreshed PR base snapshot.
