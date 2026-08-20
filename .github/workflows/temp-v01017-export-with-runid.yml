@@ -1,0 +1,59 @@
+name: TEMP TornFCA v0.10.17 Export With Run ID
+
+on:
+  push:
+    branches: [ work/v0.10.17-announcement-nav-fixes ]
+
+permissions:
+  contents: write
+
+jobs:
+  compile-export:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+      TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+      TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+      TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.17-announcement-nav-fixes
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - name: Validate candidate
+        run: |
+          set -euo pipefail
+          test -n "$TORNFCA_FIREBASE_APP_ID"
+          test -n "$TORNFCA_FIREBASE_API_KEY"
+          test -n "$TORNFCA_FIREBASE_PROJECT_ID"
+          test -n "$TORNFCA_FIREBASE_SENDER_ID"
+          grep -q 'versionName = "0.10.17"' app/build.gradle.kts
+          grep -q 'currentShellInstalled' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
+          grep -q 'AUTO_DISMISS_MS = 3200L' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionAnnouncementOverlay.java
+      - name: Compile Beta
+        run: gradle --no-daemon :app:assembleBeta
+      - name: Record artifact run
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01017-last-artifact-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v01017-last-artifact-run.txt
+          git commit -m 'Record v0.10.17 test artifact run'
+          git push origin HEAD:work/v0.10.17-announcement-nav-fixes
+      - name: Upload unsigned candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v0.10.17-Announcement-Nav-unsigned
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
