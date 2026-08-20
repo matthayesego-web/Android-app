@@ -1,5 +1,5 @@
 /**
- * TornFCA Community Backend v1.8.0.
+ * TornFCA Community Backend v1.8.1.
  * Deploy this file as its OWN Google Apps Script web app, separate from faction, premium and developer backends.
  * Torn API keys are used only to verify the current request and are never written to Sheets/Properties/Cache.
  * Faction membership/position is read fresh from Torn on every request; only stable basic player identity may be
@@ -13,7 +13,7 @@
  * and report lookups use TextFinder so old history does not make each active poll progressively more expensive.
  * War Prep configuration and completion rows are always keyed by freshly verified faction_id + war_id.
  */
-const TC_VERSION='1.8.0';
+const TC_VERSION='1.8.1';
 const TC_CHAT='ChatMessages';
 const TC_REPORTS='ChatReports';
 const TC_DEVICES='PushDevices';
@@ -51,7 +51,7 @@ function doPost(e){
 
     if(action==='config')return tcJson_({ok:true,user:tcPublicUser_(user),capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,war_prep:true,push:tcFirebaseConfigured_(),banking_push:true,announcement_push:true}});
     if(action==='chat_list')return tcJson_({ok:true,user:tcPublicUser_(user),messages:tcReadChat_(user,body)});
-    if(action==='chat_send')return tcJson_({ok:true,message:tcSendChat_(user,body)});
+    if(action==='chat_send')return tcJson_({ok:true,message:tcSendChat_(key,user,body)});
     if(action==='chat_report')return tcJson_({ok:true,report:tcReportChat_(user,body)});
     if(action==='moderation_list'){
       tcRequireModerator_(key,user);
@@ -94,20 +94,20 @@ function doPost(e){
       if(!tcCanAnnounce_(key,user))throw new Error('Announcement Changes permission is required.');
       const title=String(body.title||'Faction update').trim().slice(0,120),message=String(body.message||'').trim().slice(0,2000);
       if(!message)throw new Error('Announcement message required.');
-      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,0,'announcement',title,message,{destination:'announcements'})});
+      return tcJson_({ok:true,push:tcPushToFaction_(key,user.faction_id,0,'announcement',title,message,{destination:'announcements'})});
     }
     if(action==='banking_request_push'){
       tcRate_(user.id,'banking_request_push',30);
       const title='Banking request • '+String(user.name||'Faction member').slice(0,80);
       const message='A faction member submitted a banking request. Tap to review the queue.';
-      return tcJson_({ok:true,push:tcPushToFaction_(user.faction_id,user.id,'banking',title,message,{destination:'banking',requester_id:String(user.id),requester_name:String(user.name||'Member')})});
+      return tcJson_({ok:true,push:tcPushToFaction_(key,user.faction_id,user.id,'banking',title,message,{destination:'banking',requester_id:String(user.id),requester_name:String(user.name||'Member')})});
     }
     throw new Error('Unknown action.');
   }catch(err){return tcJson_({ok:false,error:String(err&&err.message||err)});}
 }
 
 function tcVerifyUser_(apiKey){
-  const factionData=tcTornGet_('/user/faction',apiKey),faction=factionData&&factionData.faction;
+  const ts=Math.floor(Date.now()/1000),factionData=tcTornGet_('/user/faction?timestamp='+ts,apiKey),faction=factionData&&factionData.faction;
   if(!faction||!Number(faction.id||0))throw new Error('Torn account is not currently in a faction.');
   const fp=tcHash_(apiKey),cache=CacheService.getScriptCache(),ck='basic:'+fp,cached=cache.get(ck);let profile=null;
   if(cached){try{profile=JSON.parse(cached);}catch(_){} }
@@ -141,7 +141,7 @@ function tcModerationPolicy_(){
 }
 
 function tcPositionAbilities_(apiKey,user){
-  const data=tcTornGet_('/faction/positions',apiKey),positions=data&&data.positions,current=String(user.position||'').trim().toLowerCase();
+  const ts=Math.floor(Date.now()/1000),data=tcTornGet_('/faction/positions?timestamp='+ts,apiKey),positions=data&&data.positions,current=String(user.position||'').trim().toLowerCase();
   if(!Array.isArray(positions))return[];
   for(let i=0;i<positions.length;i++){
     const p=positions[i]||{};
@@ -184,14 +184,14 @@ function tcReadChat_(user,body){
   out.reverse();return out;
 }
 
-function tcSendChat_(user,body){
+function tcSendChat_(apiKey,user,body){
   tcRate_(user.id,'chat_send',2);
   const channel=tcChannel_(user,body.channel),message=String(body.message||'').trim();
   if(!message)throw new Error('Message required.');
   if(message.length>1000)throw new Error('Messages are limited to 1,000 characters.');
   const row={id:Utilities.getUuid(),faction_id:user.faction_id,channel:channel,author_id:user.id,author_name:user.name,message:message,created_at:Math.floor(Date.now()/1000)};
   tcDb_().getSheetByName(TC_CHAT).appendRow([row.id,row.faction_id,row.channel,row.author_id,tcSafe_(row.author_name),tcSafe_(row.message),row.created_at]);
-  if(channel!=='leadership')tcPushToFaction_(user.faction_id,user.id,'chat',user.name+' • '+channel,message,{channel:channel,author_id:String(user.id)});
+  if(channel!=='leadership')tcPushToFaction_(apiKey,user.faction_id,user.id,'chat',user.name+' • '+channel,message,{channel:channel,author_id:String(user.id)});
   return row;
 }
 
@@ -400,11 +400,20 @@ function tcUnregisterDevice_(user,body){
   return removed;
 }
 
-function tcDevices_(factionId,playerId,type,excludePlayer){
+function tcCurrentFactionMemberIds_(apiKey,factionId){
+  const fid=Number(factionId||0);if(fid<=0)throw new Error('Valid faction ID required for push recipient verification.');
+  const ts=Math.floor(Date.now()/1000),data=tcTornGet_('/faction/'+fid+'/members?striptags=true&timestamp='+ts,apiKey),members=data&&data.members;
+  if(!Array.isArray(members))throw new Error('Unable to verify the current faction member list.');
+  const ids={};members.forEach(m=>{const id=Number(m&&m.id||0);if(id>0)ids[id]=true;});
+  if(!Object.keys(ids).length)throw new Error('Current faction member list was empty.');
+  return ids;
+}
+
+function tcDevices_(factionId,playerId,type,excludePlayer,currentMemberIds){
   const sheet=tcDb_().getSheetByName(TC_DEVICES),values=sheet.getDataRange().getValues(),out=[],now=Math.floor(Date.now()/1000),cutoff=now-90*86400,bankingAuthCutoff=now-7*86400;
   for(let i=1;i<values.length;i++){
     if(!tcBool_(values[i][7])||Number(values[i][1])!==Number(factionId)||Number(values[i][6]||0)<cutoff)continue;
-    const pid=Number(values[i][2]||0);if(playerId&&pid!==Number(playerId))continue;if(excludePlayer&&pid===Number(excludePlayer))continue;
+    const pid=Number(values[i][2]||0);if(currentMemberIds&&!currentMemberIds[pid])continue;if(playerId&&pid!==Number(playerId))continue;if(excludePlayer&&pid===Number(excludePlayer))continue;
     let prefs={};try{prefs=JSON.parse(String(values[i][4]||'{}'));}catch(_){}
     if(prefs.master===false)continue;if(type&&prefs[type]===false)continue;
     if(type==='banking'&&(!tcBool_(prefs._server_can_banking)||Number(prefs._server_verified_at||0)<bankingAuthCutoff))continue;
@@ -413,8 +422,12 @@ function tcDevices_(factionId,playerId,type,excludePlayer){
   return out;
 }
 
-function tcPushToFaction_(factionId,excludePlayer,type,title,body,data){return tcPush_(tcDevices_(factionId,0,type,excludePlayer),factionId,type,title,body,data);}
-function tcPushToPlayer_(factionId,playerId,type,title,body,data){const scoped=Object.assign({},data||{},{target_player_id:String(playerId)});return tcPush_(tcDevices_(factionId,playerId,type,0),factionId,type,title,body,scoped);}
+function tcPushToFaction_(apiKey,factionId,excludePlayer,type,title,body,data){
+  let currentMembers;
+  try{currentMembers=tcCurrentFactionMemberIds_(apiKey,factionId);}catch(err){return{configured:tcFirebaseConfigured_(),sent:0,failed:0,blocked:true,reason:'membership_verification_failed',error:String(err&&err.message||err)};}
+  return tcPush_(tcDevices_(factionId,0,type,excludePlayer,currentMembers),factionId,type,title,body,data);
+}
+function tcPushToPlayer_(factionId,playerId,type,title,body,data){const scoped=Object.assign({},data||{},{target_player_id:String(playerId)});return tcPush_(tcDevices_(factionId,playerId,type,0,null),factionId,type,title,body,scoped);}
 
 function tcPush_(devices,factionId,type,title,body,data){
   if(!tcFirebaseConfigured_())return{configured:false,sent:0,failed:0};

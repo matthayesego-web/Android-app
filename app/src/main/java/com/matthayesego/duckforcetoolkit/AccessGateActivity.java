@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -36,6 +37,35 @@ public class AccessGateActivity extends Activity {
             startActivity(i);finish();return;
         }
 
+        // A review session is entirely synthetic and must never warm live Torn/backend/Firebase services.
+        if(PlayReviewStore.isActive(this)){
+            Intent review=new Intent(this,PlayReviewActivity.class);
+            review.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(review);finish();return;
+        }
+
+        String saved=new SecureApiKeyStore(this).load();
+        if(saved==null||saved.trim().isEmpty()){
+            buildUnauthenticatedChoice();
+            return;
+        }
+        startNormalWarmup();
+    }
+
+    private void buildUnauthenticatedChoice(){
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setGravity(Gravity.CENTER_HORIZONTAL);root.setPadding(dp(28),dp(56),dp(28),dp(38));root.setBackgroundColor(TornFcaUi.BG);
+        ImageView mark=new ImageView(this);mark.setImageResource(TornFcaCommandRuntime.isBetaBuild()?R.drawable.tornfca_beta_crest:R.drawable.tornfca_mark);mark.setContentDescription("TornFCA");mark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);root.addView(mark,new LinearLayout.LayoutParams(dp(100),dp(100)));
+        TextView brand=text(TornFcaCommandRuntime.topBrand(),12,TornFcaUi.GOLD,true);brand.setLetterSpacing(.16f);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(20);root.addView(brand,bp);
+        TextView title=text("Faction companion",28,TornFcaUi.TEXT,true);title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(7);root.addView(title,tp);
+        TextView intro=text("Connect a Torn account for live faction tools, or use the isolated store-review sandbox when evaluating TornFCA for Google Play.",13,TornFcaUi.MUTED,false);intro.setGravity(Gravity.CENTER);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);ip.topMargin=dp(8);ip.bottomMargin=dp(22);root.addView(intro,ip);
+
+        Button live=TornFcaUi.button(this,"Continue to TornFCA",TornFcaUi.GOLD);live.setOnClickListener(v->{live.setEnabled(false);startNormalWarmup();});root.addView(live,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50)));
+        Button review=TornFcaUi.button(this,"Google Play Review Access",TornFcaUi.PURPLE);review.setOnClickListener(v->{Intent i=new Intent(this,PlayReviewActivity.class);i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);startActivity(i);finish();});LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));rp.topMargin=dp(10);root.addView(review,rp);
+        TextView foot=text("Review Access uses synthetic data only. It never authenticates to Torn or writes to TornFCA production services.",10.5f,TornFcaUi.MUTED,false);foot.setGravity(Gravity.CENTER);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fp.topMargin=dp(16);root.addView(foot,fp);
+        setContentView(root);
+    }
+
+    private void startNormalWarmup(){
         // Backgrounding/reopening an already-running TornFCA process must not repeat the full cache cycle.
         if(StartupWarmup.hasStartedThisProcess()){
             openHome("");
