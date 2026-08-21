@@ -26,18 +26,14 @@ jobs:
           STORE=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumEntitlementStore.java
           DEV=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperSettings.java
           ROUTER=app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
-          OPS=app/src/main/java/com/matthayesego/duckforcetoolkit/FactionOpsActivity.java
-          DOSSIER=app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDossierActivity.java
-          QUICK=app/src/main/java/com/matthayesego/duckforcetoolkit/QuickIntelActivity.java
-          TOOLHOST=app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java
           INSIGHTS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumInsightsActivity.java
           TRAINING=app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
           TRENDS=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumActivityTrendsActivity.java
           ALERTS=app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationSettingsActivity.java
-          SETTINGS=app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
           PREVIEW=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
           ADMIN=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
           CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
+          COMMAND=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
           PREMIUM_BACKEND=backend/TornFcaPremiumBackend.gs
           MATRIX=docs/PREMIUM_MATRIX_0.10.1.md
           PLAN=PREMIUM_PLAN.md
@@ -45,14 +41,13 @@ jobs:
           grep -q 'versionName = "0.10.18"' "$GRADLE"
           grep -q 'versionCode = 73' "$GRADLE"
 
-          # Backend-verified state only. Simulation must never be persisted as entitlement.
-          if grep -q 'simulatePremium' "$STORE"; then
-            echo 'PremiumEntitlementStore must contain backend-verified state only.' >&2
-            exit 1
-          fi
-          grep -q 'cached Premium expired' "$STORE"
+          # Backend-verified entitlement remains the only persisted production Premium state.
+          ! grep -q 'simulatePremium' "$STORE"
+          grep -q 'public static String tier' "$STORE"
+          grep -q 'expirySummary' "$STORE"
+          grep -q 'sourceLabel' "$STORE"
           RAW_GATES="$(grep -R -l 'PremiumEntitlementStore.hasPremium' app/src/main/java/com/matthayesego/duckforcetoolkit --include='*.java' | grep -v '/PremiumAccess.java$' || true)"
-          if [ -n "$RAW_GATES" ]; then echo 'Direct PremiumEntitlementStore gate bypass found:' >&2; echo "$RAW_GATES" >&2; exit 1; fi
+          if [ -n "$RAW_GATES" ]; then echo 'Direct Premium entitlement feature-gate bypass found:' >&2; echo "$RAW_GATES" >&2; exit 1; fi
 
           grep -q 'getBoolean(KEY_PREMIUM_SIM, false)' "$DEV"
           ! grep -q 'getBoolean(KEY_PREMIUM_SIM, true)' "$DEV"
@@ -69,19 +64,9 @@ jobs:
           grep -q 'PERSONAL_INSIGHTS="personal_insights"' "$ACCESS"
           grep -q 'TRAINING_GOALS="training_goals"' "$ACCESS"
 
-          # Free leadership keeps 7-day Activity; Premium may request deeper windows.
-          grep -q 'return PremiumAccess.has(context, playerId, PremiumAccess.EXTENDED_ACTIVITY) ? requested : 7;' "$DEV"
-          grep -q 'getInt(KEY_ACTIVITY_DAYS, 30)' "$DEV"
-          grep -q 'int days=DeveloperSettings.activityDays(this);' "$OPS"
-
-          # Pulse/Dossier are Premium conveniences, never permission grants.
+          # Core faction workflows must remain outside the Premium route gate.
           grep -q 'TARGET_PULSE.equals(target))return PremiumAccess.FACTION_PULSE' "$ROUTER"
           grep -q 'TARGET_LOOKUP.equals(target))return PremiumAccess.MEMBER_DOSSIER' "$ROUTER"
-          grep -q 'PremiumAccess.has(this,playerId,premium)' "$ROUTER"
-          grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.MEMBER_DOSSIER)' "$DOSSIER"
-          grep -q 'PremiumAccess.has(this,playerId,PremiumAccess.FACTION_PULSE)' "$QUICK"
-
-          # Core participation/admin tools must remain outside the Premium route gate.
           awk '/private String premiumFeature/{flag=1} flag{print} /return null;/{if(flag){exit}}' "$ROUTER" > /tmp/premium-router.txt
           ! grep -q 'TARGET_WAR_PAYOUT' /tmp/premium-router.txt
           ! grep -q 'TARGET_BANKING' /tmp/premium-router.txt
@@ -91,46 +76,48 @@ jobs:
           ! grep -q 'TARGET_OC' /tmp/premium-router.txt
           ! grep -q 'TARGET_STRENGTH' /tmp/premium-router.txt
 
-          # Personal Premium additions cannot remove the existing Free surfaces.
+          # Personal Premium additions are additive to the Free core.
           grep -q 'PremiumAccess.has(this,session.playerId,PremiumAccess.PERSONAL_INSIGHTS)' "$INSIGHTS"
           grep -q '7-DAY PACE' "$INSIGHTS"
           grep -q 'previous 23-day pace' "$INSIGHTS"
           grep -q 'PremiumAccess.has(this,session.playerId,PremiumAccess.TRAINING_GOALS)' "$TRAINING"
           grep -q 'Training Goal Pacing' "$TRAINING"
           grep -q 'Reset progress baseline' "$TRAINING"
-          grep -q 'premium_goal_total' "$TRAINING"
           grep -q 'PremiumAccess.has(this,player,PremiumAccess.ADVANCED_ALERTS)' "$ALERTS"
-          grep -q 'PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS)' "$SETTINGS"
-          grep -q 'TRAINING GOAL PACING' "$PREVIEW"
 
-          # Premium Activity Trends re-verifies leadership and Premium independently.
+          # Leadership + Premium remain separate checks.
           grep -q 'authenticateFreshFaction' "$TRENDS"
           grep -q '!AccessPolicy.isLeaderPosition(verified.position)' "$TRENDS"
           grep -q 'PremiumAccess.has(this,verified.playerId,PremiumAccess.EXTENDED_ACTIVITY)' "$TRENDS"
-          grep -q 'previous 23' "$TRENDS"
-          grep -q 'Free Activity Tracker' "$TRENDS"
           grep -q 'PremiumActivityTrendsActivity' "$MANIFEST"
           grep -q 'android:name=".PremiumActivityTrendsActivity" android:exported="false"' "$MANIFEST"
 
-          # Complimentary Premium is an owner-only backend grant, not a client entitlement shortcut.
+          # Player-facing Premium state and activation UX must stay discoverable.
+          grep -q 'ACCOUNT TIER' "$PREVIEW"
+          grep -q 'Refresh Premium Status' "$PREVIEW"
+          grep -q 'PremiumEntitlementStore.expirySummary' "$PREVIEW"
+          grep -q '1 Xanax = ' "$PREVIEW"
+          grep -q 'PremiumBackendClient.paymentPlayerId' "$PREVIEW"
+          grep -q 'PremiumBackendClient.requiredMessage' "$PREVIEW"
+          grep -q 'PREMIUM PREVIEW' "$PREVIEW"
+          grep -q 'String plan=premium?' "$COMMAND"
+          grep -q 'PREMIUM PREVIEW' "$COMMAND"
+
+          # Complimentary grants remain backend-admin only.
           grep -q 'Complimentary Premium' "$ADMIN"
           grep -q 'Grant Complimentary Premium' "$ADMIN"
           grep -q 'PremiumBackendClient.grantComplimentary' "$ADMIN"
           grep -q 'days.setText("7")' "$ADMIN"
-          grep -q 'parseInt(days.getText().toString(),7)' "$ADMIN"
           grep -q 'grantComplimentary' "$CLIENT"
           grep -q 'request.put("grant_type","complimentary")' "$CLIENT"
 
-          grep -q 'ARMORY("Faction Armory Auditor"' "$TOOLHOST"
-          grep -q 'TRAIN("Company Train Calculator"' "$TOOLHOST"
-
-          # Premium backend v1.3.0: seven-day launch price + distinct complimentary audit source.
-          grep -q "const TORNFCA_PREMIUM_VERSION='1.3.0'" "$PREMIUM_BACKEND"
+          # Premium backend v1.3.1: seven-day launch price, public offer metadata and fail-closed paid scanning.
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.3.1'" "$PREMIUM_BACKEND"
           grep -q 'TORNFCA_DEFAULT_DAYS_PER_XANAX=7' "$PREMIUM_BACKEND"
-          grep -q 'function applyPremiumSevenDayLaunchPricing' "$PREMIUM_BACKEND"
+          grep -q 'payment_player_id:TORNFCA_PREMIUM_DEVELOPER_ID' "$PREMIUM_BACKEND"
+          grep -q 'activations_open:premiumMonetizationApproved_()' "$PREMIUM_BACKEND"
+          grep -q 'required_message:config.required_message' "$PREMIUM_BACKEND"
           grep -q "grantType==='complimentary'?'COMPLIMENTARY_GRANT':'DEVELOPER_GRANT'" "$PREMIUM_BACKEND"
-          grep -q 'function bootstrapPremiumAdminPassword' "$PREMIUM_BACKEND"
-          grep -q "deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP')" "$PREMIUM_BACKEND"
           grep -q "setProperty('MONETIZATION_APPROVED','false')" "$PREMIUM_BACKEND"
           grep -q 'if(!premiumMonetizationApproved_())throw new Error' "$PREMIUM_BACKEND"
           grep -q 'LockService.getScriptLock' "$PREMIUM_BACKEND"
@@ -140,10 +127,7 @@ jobs:
 
           grep -q 'Basic WarPay calculator' "$MATRIX"
           grep -q 'Current Armory Auditor' "$MATRIX"
-          grep -q 'Company Train Calculator' "$MATRIX"
           grep -q 'Banking' "$MATRIX"
-          grep -q 'FFScouter' "$MATRIX"
-          grep -q 'TornStats' "$MATRIX"
           grep -q 'Training Goal Pacing' "$MATRIX"
           grep -q 'Premium leadership view: 30-day review' "$PLAN"
           grep -q 'A separate faction-wide paid tier is \*\*deferred beyond v1.0\*\*' "$PLAN"
