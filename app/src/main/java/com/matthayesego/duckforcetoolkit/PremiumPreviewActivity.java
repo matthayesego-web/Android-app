@@ -53,19 +53,20 @@ public class PremiumPreviewActivity extends Activity {
     }
 
     private void addActivationCard(LinearLayout root,boolean premium,boolean verifiedPremium){
-        if(BuildConfig.PLAY_STORE_BUILD){
-            String body="Premium purchases are not enabled in this Google Play testing build. No payment is accepted in the app. Complimentary and approved testing entitlements can still be verified with Refresh Premium Status.";
-            if(verifiedPremium)body+="\nCurrent entitlement: "+PremiumEntitlementStore.expirySummary(this,currentPlayerId())+".";
-            TornFcaUi.add(this,root,TornFcaUi.card(this,"PREMIUM ACTIVATION","Purchases unavailable in Play beta",body,TornFcaUi.BLUE));
-            return;
-        }
         int days=PremiumBackendClient.daysPerXanax(this),recipient=PremiumBackendClient.paymentPlayerId(this);String required=PremiumBackendClient.requiredMessage(this);boolean open=PremiumBackendClient.activationsOpen(this),offerVerified=PremiumBackendClient.offerVerified(this);
         String eyebrow=open?(premium?"EXTEND PREMIUM":"UNLOCK PREMIUM"):"PREMIUM ACTIVATION";
         String title="1 Xanax = "+days+" Premium days";
         StringBuilder body=new StringBuilder();
-        if(open)body.append(premium?"To extend your Premium time":"To activate Premium").append(", send Xanax in Torn to player ID ").append(recipient).append(" and include \"").append(required).append("\" in the item-send message. TornFCA verifies the transfer server-side and updates the entitlement tied to your numeric Torn player ID.");
-        else if(offerVerified)body.append("The Premium server currently reports paid activations as closed. When activations are opened, send Xanax in Torn to player ID ").append(recipient).append(" with \"").append(required).append("\" in the item-send message. The launch rate is ").append(days).append(" days per Xanax.");
-        else body.append("Launch instructions: send Xanax in Torn to player ID ").append(recipient).append(" with \"").append(required).append("\" in the item-send message. Launch rate: ").append(days).append(" Premium days per Xanax. The app will confirm whether activations are open after the Premium backend is updated.");
+        if(BuildConfig.PLAY_STORE_BUILD){
+            body.append("TornFCA Premium is an externally managed entitlement. TornFCA does not process money, cards, Google Pay, billing, or Torn item transfers. There are no purchase links, checkout controls, or item-transfer controls in TornFCA.\n\n");
+        }
+        if(open){
+            body.append(premium?"To extend your Premium time":"To activate Premium").append(", open Torn separately and send Xanax to MattWithADuck [").append(recipient).append("] with \"").append(required).append("\" in the item-send message. TornFCA does not perform the transfer; after Torn records it, the TornFCA backend verifies the completed transfer and updates the Premium entitlement tied to your numeric Torn player ID.");
+        }else if(offerVerified){
+            body.append("Automatic Premium activations are currently paused. When activations are open, open Torn separately and send Xanax to MattWithADuck [").append(recipient).append("] with \"").append(required).append("\" in the item-send message. The configured rate is ").append(days).append(" Premium days per Xanax. TornFCA does not perform the transfer; it only verifies a completed Torn-side transfer after the fact.");
+        }else{
+            body.append("Premium activation is externally managed through Torn. When activation details are available, TornFCA will show the current Xanax rate, recipient and required item-send message here. TornFCA does not perform Torn item transfers.");
+        }
         if(verifiedPremium)body.append("\nCurrent entitlement: ").append(PremiumEntitlementStore.expirySummary(this,currentPlayerId())).append(".");
         TornFcaUi.add(this,root,TornFcaUi.card(this,eyebrow,title,body.toString(),open?TornFcaUi.GOLD:TornFcaUi.BLUE));
     }
