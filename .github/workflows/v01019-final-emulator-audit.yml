@@ -1,0 +1,274 @@
+name: TornFCA v0.10.19 Final Emulator Audit
+
+on:
+  push:
+    branches: [ develop ]
+    paths:
+      - '.github/workflows/v01019-final-emulator-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Record exact audit run
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01019-emulator-audit-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- docs/v01019-emulator-audit-run.txt
+          git commit -m 'Record v0.10.19 emulator audit run' || true
+          git pull --rebase origin develop
+          git push origin HEAD:develop
+
+      - name: Verify v0.10.19 release identity and critical live services
+        run: |
+          set -euo pipefail
+          grep -q 'versionCode = 74' app/build.gradle.kts
+          grep -q 'versionName = "0.10.19"' app/build.gradle.kts
+          grep -q 'targetSdk = 36' app/build.gradle.kts
+          grep -q 'androidx.activity:activity:1.10.1' app/build.gradle.kts
+          ! grep -R 'void onBackPressed' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionActivity.java app/src/main/java/com/matthayesego/duckforcetoolkit/PlayReviewActivity.java app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
+          curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbwphLmR-N82GJUChzwZlxQ8DGKVoaN6VCNiXvbpKfgJV6JUxlcwPOYVKgbI1h9tmjp-ig/exec' -o /tmp/community.json
+          curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' -o /tmp/premium.json
+          python3 - <<'PY'
+          import json
+          c=json.load(open('/tmp/community.json')); p=json.load(open('/tmp/premium.json'))
+          assert c.get('ok') is True and c.get('version') == '1.9.0', c
+          assert p.get('ok') is True and p.get('version') == '1.3.1', p
+          assert p.get('monetization_approved') is False, p
+          print('Community',c.get('version'),'Premium',p.get('version'),'monetization',p.get('monetization_approved'))
+          PY
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Lint, unit test and assemble runtime candidate
+        env:
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: gradle --no-daemon :app:lintBeta :app:testDebugUnitTest :app:assembleDebug :app:assembleBeta
+
+      - name: Add transient screen-audit instrumentation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle.kts'); t=p.read_text()
+          marker='        versionName = "0.10.19"\n'
+          addition='        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"\n'
+          if addition not in t:
+              if marker not in t: raise SystemExit('version marker missing')
+              t=t.replace(marker,marker+addition,1)
+          deps='''    androidTestImplementation("androidx.test:runner:1.6.2")\n    androidTestImplementation("androidx.test:rules:1.6.1")\n    androidTestImplementation("androidx.test.ext:junit:1.2.1")\n'''
+          if 'androidTestImplementation("androidx.test:runner:1.6.2")' not in t:
+              t=t.replace('dependencies {\n','dependencies {\n'+deps,1)
+          p.write_text(t)
+          PY
+          mkdir -p app/src/androidTest/java/com/matthayesego/duckforcetoolkit
+          cat > app/src/androidTest/java/com/matthayesego/duckforcetoolkit/PreBetaScreenAuditTest.java <<'JAVA'
+          package com.matthayesego.duckforcetoolkit;
+
+          import static org.junit.Assert.assertNotNull;
+
+          import android.app.Activity;
+          import android.app.Instrumentation;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.graphics.Bitmap;
+          import android.os.SystemClock;
+          import android.util.Log;
+
+          import androidx.test.ext.junit.runners.AndroidJUnit4;
+          import androidx.test.platform.app.InstrumentationRegistry;
+          import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+          import androidx.test.runner.lifecycle.Stage;
+
+          import org.junit.After;
+          import org.junit.Before;
+          import org.junit.Test;
+          import org.junit.runner.RunWith;
+
+          import java.io.File;
+          import java.io.FileOutputStream;
+          import java.util.ArrayList;
+          import java.util.Collection;
+
+          @RunWith(AndroidJUnit4.class)
+          public class PreBetaScreenAuditTest {
+              private static final String TAG="TORNFCA_AUDIT";
+              private Instrumentation inst;
+              private Context app;
+              private File shots;
+
+              @Before public void setup(){
+                  inst=InstrumentationRegistry.getInstrumentation();
+                  app=inst.getTargetContext();
+                  shots=new File(app.getFilesDir(),"screen-audit");
+                  shots.mkdirs();
+                  PlayReviewStore.clear(app);
+              }
+
+              @After public void cleanup(){finishAll();PlayReviewStore.clear(app);}
+
+              private Intent intent(Class<? extends Activity> cls){
+                  Intent i=new Intent(app,cls);
+                  i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  i.putExtra(FactionOpsActivity.EXTRA_FACTION_ID,990001);
+                  i.putExtra(FactionOpsActivity.EXTRA_FACTION_NAME,"Harbor Ducks");
+                  i.putExtra(FactionOpsActivity.EXTRA_FACTION_API,true);
+                  i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,"Leader");
+                  i.putExtra(WarNoticeActivity.EXTRA_CAN_PUBLISH,true);
+                  return i;
+              }
+
+              private void audit(String name,Intent i)throws Exception{
+                  Log.i(TAG,"OPEN "+name+" -> "+i.getComponent());
+                  Activity started=inst.startActivitySync(i);
+                  inst.waitForIdleSync();
+                  SystemClock.sleep(700);
+                  assertNotNull("Activity did not start: "+name,started);
+                  capture(name);
+                  Log.i(TAG,"PASS "+name+" resumed="+started.getClass().getSimpleName()+" finishing="+started.isFinishing());
+                  finishAll();
+                  inst.waitForIdleSync();
+                  SystemClock.sleep(150);
+              }
+
+              private void capture(String name)throws Exception{
+                  Bitmap b=inst.getUiAutomation().takeScreenshot();
+                  if(b==null)return;
+                  String safe=name.replaceAll("[^A-Za-z0-9._-]+","_");
+                  try(FileOutputStream out=new FileOutputStream(new File(shots,safe+".png"))){b.compress(Bitmap.CompressFormat.PNG,100,out);}
+                  b.recycle();
+              }
+
+              private void finishAll(){
+                  inst.runOnMainSync(()->{
+                      Collection<Activity> active=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED);
+                      for(Activity a:new ArrayList<>(active)) if(a!=null&&!a.isFinishing()) a.finish();
+                  });
+              }
+
+              @Test public void screenByScreenRuntimeAudit()throws Exception{
+                  audit("01_Access_Gate",intent(AccessGateActivity.class));
+                  audit("02_Command_Shell_Login_State",intent(BetaCommandActivity.class));
+                  audit("03_Settings",intent(SettingsActivity.class));
+                  audit("04_Legal_Privacy",intent(LegalActivity.class));
+                  audit("05_Notification_Settings",intent(NotificationSettingsActivity.class));
+                  audit("06_Notification_Inbox",intent(NotificationInboxActivity.class));
+                  audit("07_More",intent(MoreActivity.class));
+                  audit("08_About",intent(AboutActivity.class));
+                  audit("09_Member_Center",intent(MemberCenterActivity.class));
+                  audit("10_Member_Directory",intent(MemberDirectoryActivity.class));
+                  audit("11_Faction_Resources",intent(FactionResourcesActivity.class));
+                  audit("12_Training_Center",intent(TrainingCenterActivity.class));
+                  audit("13_Training_Progress",intent(TrainingProgressActivity.class));
+                  audit("14_War_Prep",intent(WarPrepActivity.class));
+                  audit("15_War_Hub",intent(WarHubActivity.class));
+                  audit("16_Territory_War",intent(TerritoryWarActivity.class));
+                  audit("17_Premium_Insights",intent(PremiumInsightsActivity.class));
+                  audit("18_Premium_Trends",intent(PremiumActivityTrendsActivity.class));
+                  audit("19_Faction_Chat",intent(FactionChatActivity.class));
+                  audit("20_Feedback",intent(FeedbackActivity.class));
+                  audit("21_Banking",intent(BankingCompanionActivity.class));
+                  audit("22_Announcements",intent(WarNoticeActivity.class));
+
+                  Intent activity=intent(FactionOpsActivity.class);activity.putExtra(FactionOpsActivity.EXTRA_MODE,FactionOpsActivity.MODE_ACTIVITY);audit("23_Faction_Activity",activity);
+                  Intent war=intent(FactionOpsActivity.class);war.putExtra(FactionOpsActivity.EXTRA_MODE,FactionOpsActivity.MODE_WAR);audit("24_War_Participation",war);
+                  Intent chain=intent(FactionOpsActivity.class);chain.putExtra(FactionOpsActivity.EXTRA_MODE,FactionOpsActivity.MODE_CHAIN);audit("25_Chain_Command",chain);
+                  Intent oc=intent(FactionOpsActivity.class);oc.putExtra(FactionOpsActivity.EXTRA_MODE,FactionOpsActivity.MODE_OC);audit("26_OC_Readiness",oc);
+
+                  audit("27_OC_Tracker",intent(OcTrackerActivity.class));
+                  audit("28_Quick_Intel",intent(QuickIntelActivity.class));
+                  audit("29_Premium_Status",intent(PremiumPreviewActivity.class));
+                  audit("30_Leadership_Attention",intent(LeadershipAttentionActivity.class));
+                  audit("31_Faction_Strength",intent(FactionStrengthActivity.class));
+                  audit("32_Developer_Console",intent(DeveloperConsoleActivity.class));
+                  audit("33_Developer_Gate",intent(DeveloperGateActivity.class));
+                  Intent tool=intent(ToolHostActivity.class);tool.putExtra(ToolHostActivity.EXTRA_TOOL,"ARMORY");audit("34_Embedded_Armory",tool);
+
+                  PlayReviewStore.enter(app,PlayReviewStore.Persona.LEADER);
+                  audit("35_Play_Review_Leader_Dashboard",intent(PlayReviewActivity.class));
+                  PlayReviewStore.clear(app);
+              }
+          }
+          JAVA
+
+      - name: Install Android 16 emulator image
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
+          echo no | avdmanager create avd -f -n tornfca_api36 -k "system-images;android-36;google_apis;x86_64" --device "pixel_6"
+
+      - name: Boot Android 16 emulator
+        run: |
+          set -euo pipefail
+          nohup "$ANDROID_HOME/emulator/emulator" -avd tornfca_api36 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/emulator.log 2>&1 &
+          adb wait-for-device
+          for i in $(seq 1 120); do
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then break; fi
+            sleep 5
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb shell input keyevent 82 || true
+          adb logcat -c
+          adb shell getprop ro.build.version.sdk
+
+      - name: Run screen-by-screen instrumentation audit
+        env:
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: gradle --no-daemon :app:connectedDebugAndroidTest
+
+      - name: Capture runtime evidence and reject fatal app crashes
+        if: always()
+        run: |
+          mkdir -p audit-output
+          adb logcat -d > audit-output/logcat.txt || true
+          cp /tmp/emulator.log audit-output/emulator.log || true
+          adb exec-out run-as com.matthayesego.duckforcetoolkit.internal tar -cf - -C files screen-audit > audit-output/screen-audit.tar 2>/dev/null || true
+          grep 'TORNFCA_AUDIT' audit-output/logcat.txt > audit-output/screen-results.txt || true
+          if grep -E 'Process: com\.matthayesego\.duckforcetoolkit\.internal|ANR in com\.matthayesego\.duckforcetoolkit\.internal' audit-output/logcat.txt | grep -E 'FATAL|Process:|ANR' >/dev/null; then
+            echo 'Fatal TornFCA process evidence found in logcat.'
+            grep -n -E 'FATAL EXCEPTION|Process: com\.matthayesego\.duckforcetoolkit\.internal|ANR in com\.matthayesego\.duckforcetoolkit\.internal' audit-output/logcat.txt | tail -80
+            exit 1
+          fi
+
+      - name: Upload emulator audit evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v0.10.19-emulator-audit
+          path: |
+            audit-output/
+            app/build/reports/androidTests/connected/
+            app/build/reports/lint-results-beta.html
+          if-no-files-found: warn
+          retention-days: 14
