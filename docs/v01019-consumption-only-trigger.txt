@@ -1,0 +1,1 @@
+Validate v0.10.19 consumption-only Premium instructions before main promotion.
