@@ -1,0 +1,157 @@
+name: TornFCA v0.10.19 Final Play Build
+
+on:
+  push:
+    branches: [ develop ]
+    paths: [ 'docs/v01019-final-play-build-trigger.txt' ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+      TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+      TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+      TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+    steps:
+      - name: Checkout control branch
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Record run ID
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01019-final-play-build-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v01019-final-play-build-run.txt
+          git commit -m 'Record final v0.10.19 Play build run' || true
+          git pull --rebase origin develop
+          git push origin HEAD:develop
+
+      - name: Checkout exact promoted source
+        uses: actions/checkout@v6
+        with:
+          ref: b37a20aac93734f1a549cbf04ae04bd5cdeca6e2
+          fetch-depth: 0
+          clean: true
+
+      - name: Record release source
+        run: echo "PLAY_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Verify final release identity and consumption-only Premium
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.10.19"' app/build.gradle.kts
+          grep -q 'versionCode = 74' app/build.gradle.kts
+          grep -q 'targetSdk = 36' app/build.gradle.kts
+          grep -q 'applicationId = "com.matthayesego.duckforcetoolkit"' app/build.gradle.kts
+          F='app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java'
+          grep -q 'TornFCA Premium is an externally managed entitlement' "$F"
+          grep -q 'There are no purchase links, checkout controls, or item-transfer controls in TornFCA' "$F"
+          grep -q 'open Torn separately and send Xanax to MattWithADuck' "$F"
+          ! grep -q 'https://www.torn.com' "$F"
+          ! grep -q 'ACTION_VIEW' "$F"
+          ! grep -q 'Uri.parse' "$F"
+
+      - name: Verify live Premium backend
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' -o /tmp/premium.json
+          python3 - <<'PY'
+          import json, os
+          p=json.load(open('/tmp/premium.json'))
+          assert p.get('ok') is True, p
+          assert p.get('version') == '1.3.1', p
+          approved=bool(p.get('monetization_approved'))
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('PREMIUM_MONETIZATION_APPROVED=' + ('true' if approved else 'false') + '\n')
+          print(p)
+          PY
+
+      - name: Lint and build final AAB
+        run: gradle --no-daemon :app:lintRelease :app:bundleRelease
+
+      - name: Verify release BuildConfig and bundle
+        run: |
+          set -euo pipefail
+          F='app/build/generated/source/buildConfig/release/com/matthayesego/duckforcetoolkit/BuildConfig.java'
+          test -f "$F"
+          grep -Eq 'PLAY_STORE_BUILD\s*=\s*true' "$F"
+          test -f app/build/outputs/bundle/release/app-release.aab
+          unzip -t app/build/outputs/bundle/release/app-release.aab >/dev/null
+
+      - name: Reconstruct upload keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tornfca-release.jks"
+          chmod 600 "$RUNNER_TEMP/tornfca-release.jks"
+
+      - name: Verify upload certificate and sign AAB
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keytool -list -v -keystore "$RUNNER_TEMP/tornfca-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | tee signing-certificate.txt
+          grep -qi 'C3:EC:C3:5A:64:F8:E7:EC:ED:DA:1C:A4:6D:5F:E0:84:1B:89:0E:ED:9C:78:CC:B6:71:6D:61:A9:23:7F:03:22' signing-certificate.txt
+          cp app/build/outputs/bundle/release/app-release.aab TornFCA-v0.10.19-Play-Beta.aab
+          jarsigner -keystore "$RUNNER_TEMP/tornfca-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 TornFCA-v0.10.19-Play-Beta.aab "$ANDROID_KEY_ALIAS"
+          jarsigner -verify -verbose -certs TornFCA-v0.10.19-Play-Beta.aab | tee aab-signing-verification.txt
+          grep -qi 'jar verified' aab-signing-verification.txt
+          sha256sum TornFCA-v0.10.19-Play-Beta.aab | tee aab-sha256.txt
+
+      - name: Write release metadata
+        run: |
+          {
+            echo 'TornFCA Play Beta Candidate'
+            echo 'versionName=0.10.19'
+            echo 'versionCode=74'
+            echo 'package=com.matthayesego.duckforcetoolkit'
+            echo "source=${PLAY_SOURCE_SHA}"
+            echo 'targetSdk=36'
+            echo 'premiumModel=consumption-only'
+            echo 'premiumPurchaseLinks=false'
+            echo 'premiumTransferControls=false'
+            echo 'premiumExternalInstructions=plain-text-only'
+            echo "premiumMonetizationApproved=${PREMIUM_MONETIZATION_APPROVED}"
+            echo 'signed=true'
+          } | tee play-candidate-metadata.txt
+
+      - name: Upload final Play package
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v0.10.19-FINAL-PLAY-BETA
+          path: |
+            TornFCA-v0.10.19-Play-Beta.aab
+            play-candidate-metadata.txt
+            signing-certificate.txt
+            aab-signing-verification.txt
+            aab-sha256.txt
+            app/build/reports/lint-results-release.html
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/tornfca-release.jks"
