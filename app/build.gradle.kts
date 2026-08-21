@@ -61,6 +61,7 @@ android {
         val firebaseProjectId = localOrEnv("TORNFCA_FIREBASE_PROJECT_ID")
         val firebaseSenderId = localOrEnv("TORNFCA_FIREBASE_SENDER_ID")
         buildConfigField("int", "DEVELOPER_PLAYER_ID", "3987363")
+        buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         buildConfigField("String", "FACTION_BACKEND_URL", quotedBuildValue(factionBackend))
         buildConfigField("String", "PREMIUM_BACKEND_URL", quotedBuildValue(premiumBackend))
         buildConfigField("String", "COMMUNITY_BACKEND_URL", quotedBuildValue(communityBackend))
@@ -93,6 +94,7 @@ android {
         release {
             isMinifyEnabled = false
             signingConfig = null
+            buildConfigField("boolean", "PLAY_STORE_BUILD", "true")
         }
     }
 
