@@ -1,1 +1,0 @@
-Build promoted main v0.10.19 / code 74 for Google Play beta.
