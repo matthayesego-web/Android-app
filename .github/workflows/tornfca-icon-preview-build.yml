@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   icon-preview:
@@ -18,6 +18,20 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: work/v0.10.18-beta-hardening
+          fetch-depth: 0
+
+      - name: Record icon preview run
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01018-icon-preview-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v01018-icon-preview-run.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record v0.10.18 icon preview run'
+            git push origin HEAD:work/v0.10.18-beta-hardening
+          fi
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
