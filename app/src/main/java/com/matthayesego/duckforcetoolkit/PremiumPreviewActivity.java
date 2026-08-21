@@ -53,6 +53,12 @@ public class PremiumPreviewActivity extends Activity {
     }
 
     private void addActivationCard(LinearLayout root,boolean premium,boolean verifiedPremium){
+        if(BuildConfig.PLAY_STORE_BUILD){
+            String body="Premium purchases are not enabled in this Google Play testing build. No payment is accepted in the app. Complimentary and approved testing entitlements can still be verified with Refresh Premium Status.";
+            if(verifiedPremium)body+="\nCurrent entitlement: "+PremiumEntitlementStore.expirySummary(this,currentPlayerId())+".";
+            TornFcaUi.add(this,root,TornFcaUi.card(this,"PREMIUM ACTIVATION","Purchases unavailable in Play beta",body,TornFcaUi.BLUE));
+            return;
+        }
         int days=PremiumBackendClient.daysPerXanax(this),recipient=PremiumBackendClient.paymentPlayerId(this);String required=PremiumBackendClient.requiredMessage(this);boolean open=PremiumBackendClient.activationsOpen(this),offerVerified=PremiumBackendClient.offerVerified(this);
         String eyebrow=open?(premium?"EXTEND PREMIUM":"UNLOCK PREMIUM"):"PREMIUM ACTIVATION";
         String title="1 Xanax = "+days+" Premium days";
