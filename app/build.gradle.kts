@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
 }
 
+import java.util.Base64
 import java.util.Properties
 
 fun localOrEnv(name: String, fallback: String = ""): String {
@@ -14,6 +15,20 @@ fun localOrEnv(name: String, fallback: String = ""): String {
 }
 
 fun quotedBuildValue(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val generatedIconResDir = layout.buildDirectory.dir("generated/tornfcaIconRes")
+val prepareTornFcaLauncherIcon by tasks.registering {
+    val encodedIcon = file("icon-assets/tornfca_launcher_final.webp.b64")
+    val outputIcon = generatedIconResDir.map { it.file("drawable-nodpi/tornfca_launcher_final.webp") }
+    inputs.file(encodedIcon)
+    outputs.file(outputIcon)
+    doLast {
+        val target = outputIcon.get().asFile
+        target.parentFile.mkdirs()
+        val encoded = encodedIcon.readText().replace("\\s".toRegex(), "")
+        target.writeBytes(Base64.getDecoder().decode(encoded))
+    }
+}
 
 android {
     namespace = "com.matthayesego.duckforcetoolkit"
@@ -51,6 +66,7 @@ android {
     }
 
     buildFeatures { buildConfig = true }
+    sourceSets.getByName("main").res.srcDir(generatedIconResDir)
 
     buildTypes {
         debug {
@@ -74,6 +90,8 @@ android {
 
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
+
+tasks.named("preBuild").configure { dependsOn(prepareTornFcaLauncherIcon) }
 
 dependencies {
     implementation("androidx.webkit:webkit:1.14.0")
