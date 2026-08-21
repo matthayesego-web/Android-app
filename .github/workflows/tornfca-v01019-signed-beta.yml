@@ -1,0 +1,13 @@
+name: TornFCA v0.10.19 Signed Beta
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signing-paused:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'v0.10.19 signing remains intentionally paused until final develop validation is green and explicit promotion/signing approval is given.'
