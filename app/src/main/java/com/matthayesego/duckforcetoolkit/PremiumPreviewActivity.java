@@ -10,13 +10,24 @@ import android.widget.ScrollView;
 
 /** Player-facing plan screen. Entitlements are backend-verified when the premium backend is configured. */
 public class PremiumPreviewActivity extends Activity {
-    @Override protected void onCreate(Bundle b){super.onCreate(b);int player=currentPlayerId();if(player>0)PremiumAccess.refresh(this,player);render();}
+    @Override protected void onCreate(Bundle b){super.onCreate(b);render();refresh(false);}
     @Override protected void onResume(){super.onResume();render();}
+
+    private void refresh(boolean force){int player=currentPlayerId();if(player<=0)return;PremiumBackendClient.refreshAsync(this,player,force,()->{if(!isFinishing())render();});}
+
     private void render(){
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
-        TornFcaUi.header(this,r,"More","TornFCA Premium","Keep every essential faction tool. Add deeper history, personal goal pacing, smarter alerts and faster leadership intelligence on top.");
-        int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS),leader=currentLeader();String state=premium?"PREMIUM ACTIVE":"FREE";String detail=premium?PremiumEntitlementStore.summary(this):(PremiumBackendClient.isConfigured()?"Your account currently has the complete free core. Premium is optional depth and convenience.":"You have the complete free core. Premium entitlement services are not enabled in this beta build.");
-        TornFcaUi.add(this,r,TornFcaUi.card(this,"YOUR PLAN",state,detail,premium?TornFcaUi.GOLD:TornFcaUi.GREEN));
+        TornFcaUi.header(this,r,"More","TornFCA Premium","Your plan, expiration and Premium activation details in one place.");
+        int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS),verifiedPremium=PremiumEntitlementStore.hasPremium(this,player),leader=currentLeader();
+        String state=premium?(verifiedPremium?"PREMIUM":"PREMIUM PREVIEW"):"FREE";
+        String detail;
+        if(verifiedPremium)detail=PremiumEntitlementStore.expirySummary(this,player)+"\n"+PremiumEntitlementStore.sourceLabel(this,player);
+        else if(premium)detail="Developer Premium preview is active on this device. This does not create or extend a paid entitlement.";
+        else detail="Complete free core active. Premium is optional and adds deeper history, pacing and convenience.";
+        LinearLayout plan=TornFcaUi.card(this,"ACCOUNT TIER",state,detail,premium?TornFcaUi.GOLD:TornFcaUi.BLUE);
+        Button refresh=TornFcaUi.button(this,"Refresh Premium Status",premium?TornFcaUi.GOLD:TornFcaUi.BLUE);refresh.setOnClickListener(v->refresh(true));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));rp.topMargin=TornFcaUi.dp(this,9);plan.addView(refresh,rp);TornFcaUi.add(this,r,plan);
+
+        addActivationCard(r,premium,verifiedPremium);
 
         TornFcaUi.addSection(this,r,"Free — complete core");
         TornFcaUi.add(this,r,TornFcaUi.card(this,"MEMBER CORE","Faction life stays free","My Day • War Prep • Ranked War and Territories • personal OC • chain • Training Center and baseline progress • faction overview, directory and resources • faction chat • Notification Inbox and standard alerts.",TornFcaUi.GREEN));
@@ -40,6 +51,19 @@ public class PremiumPreviewActivity extends Activity {
         TornFcaUi.add(this,r,TornFcaUi.card(this,"ENTITLEMENT","Follows your Torn account","Premium is verified server-side against your numeric Torn player ID, so it follows you between factions. Complimentary Premium uses the same entitlement system as normal Premium; faction permissions remain completely separate.",TornFcaUi.BLUE));
         setContentView(s);s.requestApplyInsets();
     }
+
+    private void addActivationCard(LinearLayout root,boolean premium,boolean verifiedPremium){
+        int days=PremiumBackendClient.daysPerXanax(this),recipient=PremiumBackendClient.paymentPlayerId(this);String required=PremiumBackendClient.requiredMessage(this);boolean open=PremiumBackendClient.activationsOpen(this),offerVerified=PremiumBackendClient.offerVerified(this);
+        String eyebrow=open?(premium?"EXTEND PREMIUM":"UNLOCK PREMIUM"):"PREMIUM ACTIVATION";
+        String title="1 Xanax = "+days+" Premium days";
+        StringBuilder body=new StringBuilder();
+        if(open)body.append(premium?"To extend your Premium time":"To activate Premium").append(", send Xanax in Torn to player ID ").append(recipient).append(" and include \"").append(required).append("\" in the item-send message. TornFCA verifies the transfer server-side and updates the entitlement tied to your numeric Torn player ID.");
+        else if(offerVerified)body.append("The Premium server currently reports paid activations as closed. When activations are opened, send Xanax in Torn to player ID ").append(recipient).append(" with \"").append(required).append("\" in the item-send message. The launch rate is ").append(days).append(" days per Xanax.");
+        else body.append("Launch instructions: send Xanax in Torn to player ID ").append(recipient).append(" with \"").append(required).append("\" in the item-send message. Launch rate: ").append(days).append(" Premium days per Xanax. The app will confirm whether activations are open after the Premium backend is updated.");
+        if(verifiedPremium)body.append("\nCurrent entitlement: ").append(PremiumEntitlementStore.expirySummary(this,currentPlayerId())).append(".");
+        TornFcaUi.add(this,root,TornFcaUi.card(this,eyebrow,title,body.toString(),open?TornFcaUi.GOLD:TornFcaUi.BLUE));
+    }
+
     private int currentPlayerId(){return PremiumAccess.currentPlayerId(this);}
     private boolean currentLeader(){if(DeveloperPreviewStore.isMemberPreview(this))return false;String key=new SecureApiKeyStore(this).load();if(key==null||key.isBlank())return false;AuthSession hot=TornApiClient.cachedSession(key);if(hot!=null)return AccessPolicy.isLeaderPosition(hot.position);FactionScopeCache.Scope scope=FactionScopeCache.load(this,key);return scope!=null&&AccessPolicy.isLeaderPosition(scope.position);}
 }
