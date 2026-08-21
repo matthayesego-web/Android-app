@@ -1,0 +1,66 @@
+name: TornFCA Icon Preview Build
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+    paths:
+      - '.github/workflows/tornfca-icon-preview-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  icon-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current beta source
+        uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.18-beta-hardening
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Build installable Internal icon preview
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Verify premium launcher artwork and APK identity
+        run: |
+          set -euo pipefail
+          ICON='app/build/generated/tornfcaIconRes/drawable-nodpi/tornfca_launcher_final.webp'
+          APK='app/build/outputs/apk/debug/app-debug.apk'
+          test -f "$ICON"
+          test -f "$APK"
+          echo '8fd5d320e5d85608365013df6bd0a29cbf4cce136eb712b07c2b0a3c8702b3ab  '"$ICON" | sha256sum -c -
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -1)"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK" | tee apk-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit.internal'" apk-badging.txt
+          grep -q "versionCode='73'" apk-badging.txt
+          grep -q "versionName='0.10.18-internal'" apk-badging.txt
+          grep -q "application-label:'TornFCA Internal'" apk-badging.txt
+          grep -q 'ic_launcher_v3' app/src/main/AndroidManifest.xml
+          unzip -l "$APK" | grep -E 'tornfca_launcher_final|ic_launcher_v3' || true
+          cp "$APK" TornFCA-v0.10.18-ICON-PREVIEW-INTERNAL.apk
+          sha256sum TornFCA-v0.10.18-ICON-PREVIEW-INTERNAL.apk | tee apk-sha256.txt
+
+      - name: Upload installable icon preview
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v0.10.18-ICON-PREVIEW-INTERNAL
+          path: |
+            TornFCA-v0.10.18-ICON-PREVIEW-INTERNAL.apk
+            apk-badging.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 7
