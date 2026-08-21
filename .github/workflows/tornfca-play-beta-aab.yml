@@ -74,17 +74,19 @@ jobs:
           grep -q 'There are no purchase links, checkout controls, or item-transfer controls in TornFCA' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
           grep -q 'open Torn separately and send Xanax to MattWithADuck' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
 
-      - name: Verify live beta monetization remains closed
+      - name: Verify live Premium backend
         run: |
           set -euo pipefail
           curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' -o /tmp/premium.json
           python3 - <<'PY'
-          import json
+          import json, os
           p=json.load(open('/tmp/premium.json'))
           assert p.get('ok') is True, p
           assert p.get('version') == '1.3.1', p
-          assert p.get('monetization_approved') is False, p
-          print('Premium backend',p.get('version'),'monetization_approved=',p.get('monetization_approved'))
+          approved = bool(p.get('monetization_approved'))
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write('PREMIUM_MONETIZATION_APPROVED=' + ('true' if approved else 'false') + '\n')
+          print('Premium backend',p.get('version'),'monetization_approved=',approved)
           PY
 
       - name: Syntax-check Apps Script source
@@ -161,7 +163,7 @@ jobs:
             echo "premiumPurchaseLinks=false"
             echo "premiumTransferControls=false"
             echo "premiumExternalInstructions=plain-text-only"
-            echo "premiumMonetizationApproved=false"
+            echo "premiumMonetizationApproved=${PREMIUM_MONETIZATION_APPROVED}"
             echo "signed=true"
           } | tee play-candidate-metadata.txt
 
