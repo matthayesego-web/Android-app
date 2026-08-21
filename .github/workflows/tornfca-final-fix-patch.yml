@@ -1,0 +1,121 @@
+name: TornFCA Final Repair Patch
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+    paths:
+      - '.github/workflows/tornfca-final-fix-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-compile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.18-beta-hardening
+          fetch-depth: 0
+
+      - name: Apply remaining coordinated fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path); text=p.read_text(); count=text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}: {old[:120]!r}')
+              p.write_text(text.replace(old,new,1))
+
+          # Community backend: bind sends to the faction the client composed against, return verified user,
+          # and never turn a successful persisted message into a failed send merely because push delivery failed.
+          community='backend/TornFcaCommunityBackend.gs'
+          replace_once(community, 'TornFCA Community Backend v1.8.1.', 'TornFCA Community Backend v1.9.0.')
+          replace_once(community, "const TC_VERSION='1.8.1';", "const TC_VERSION='1.9.0';")
+          replace_once(community,
+              "    if(action==='chat_send')return tcJson_({ok:true,message:tcSendChat_(key,user,body)});",
+              "    if(action==='chat_send')return tcJson_({ok:true,user:tcPublicUser_(user),message:tcSendChat_(key,user,body)});")
+          replace_once(community,
+          """function tcSendChat_(apiKey,user,body){
+            tcRate_(user.id,'chat_send',2);
+            const channel=tcChannel_(user,body.channel),message=String(body.message||'').trim();
+            if(!message)throw new Error('Message required.');
+            if(message.length>1000)throw new Error('Messages are limited to 1,000 characters.');
+            const row={id:Utilities.getUuid(),faction_id:user.faction_id,channel:channel,author_id:user.id,author_name:user.name,message:message,created_at:Math.floor(Date.now()/1000)};
+            tcDb_().getSheetByName(TC_CHAT).appendRow([row.id,row.faction_id,row.channel,row.author_id,tcSafe_(row.author_name),tcSafe_(row.message),row.created_at]);
+            if(channel!=='leadership')tcPushToFaction_(apiKey,user.faction_id,user.id,'chat',user.name+' • '+channel,message,{channel:channel,author_id:String(user.id)});
+            return row;
+          }""",
+          """function tcSendChat_(apiKey,user,body){
+            tcRate_(user.id,'chat_send',1);
+            const expectedFaction=Number(body.faction_id||0);
+            if(expectedFaction>0&&expectedFaction!==Number(user.faction_id||0))throw new Error('Your faction changed. Chat moved to your current faction; please send again there.');
+            const channel=tcChannel_(user,body.channel),message=String(body.message||'').trim();
+            if(!message)throw new Error('Message required.');
+            if(message.length>1000)throw new Error('Messages are limited to 1,000 characters.');
+            const row={id:Utilities.getUuid(),faction_id:user.faction_id,channel:channel,author_id:user.id,author_name:user.name,message:message,created_at:Math.floor(Date.now()/1000)};
+            tcDb_().getSheetByName(TC_CHAT).appendRow([row.id,row.faction_id,row.channel,row.author_id,tcSafe_(row.author_name),tcSafe_(row.message),row.created_at]);
+            if(channel!=='leadership'){
+              try{tcPushToFaction_(apiKey,user.faction_id,user.id,'chat',user.name+' • '+channel,message,{channel:channel,author_id:String(user.id)});}catch(pushErr){row.push_warning=String(pushErr&&pushErr.message||pushErr);}
+            }
+            return row;
+          }""")
+
+          # Premium backend: status returns the current public activation offer without exposing secrets.
+          premium='backend/TornFcaPremiumBackend.gs'
+          replace_once(premium, 'global premium entitlement backend v1.3.0.', 'global premium entitlement backend v1.3.1.')
+          replace_once(premium, "const TORNFCA_PREMIUM_VERSION='1.3.0';", "const TORNFCA_PREMIUM_VERSION='1.3.1';")
+          replace_once(premium,
+              "      return premiumJson_({ok:true,entitlement:readEntitlement_(user.id)});",
+              "      const config=readPremiumConfig_();\n      return premiumJson_({ok:true,entitlement:readEntitlement_(user.id),offer:{days_per_xanax:config.days_per_xanax,required_message:config.required_message,payment_player_id:TORNFCA_PREMIUM_DEVELOPER_ID,activations_open:premiumMonetizationApproved_()}});")
+
+          # Global secondary-screen repair: keep the compact command return rail, remove the legacy duplicate header back button.
+          ux='app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java'
+          replace_once(ux, 'import android.widget.FrameLayout;\n', 'import android.widget.Button;\nimport android.widget.FrameLayout;\n')
+          old_compact='    private static void compactReturnRail(Activity activity,View root){View found=findTag(root,RAIL_TAG);if(!(found instanceof LinearLayout))return;LinearLayout rail=(LinearLayout)found;if(RAIL_COMPACT.equals(String.valueOf(rail.getContentDescription())))return;String section=sectionFor(activity);rail.removeAllViews();rail.setContentDescription(RAIL_COMPACT);rail.setOrientation(LinearLayout.HORIZONTAL);rail.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);rail.setPadding(0,0,0,0);rail.setBackground(null);rail.setElevation(0f);TextView back=TornFcaCommandUi.text(activity,"←  "+section,10.8f,TornFcaCommandUi.MUTED,true);back.setPadding(TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6),TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6));back.setBackground(TornFcaCommandUi.solid(activity,Color.argb(95,18,26,39),9,TornFcaCommandUi.LINE_SOFT,1));back.setClickable(true);back.setFocusable(true);back.setForeground(TornFcaCommandUi.ripple(activity,TornFcaCommandUi.GOLD,9));back.setOnClickListener(v->{Intent i=TornFcaCommandRuntime.homeIntent(activity,section);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);});rail.addView(back,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));}\n'
+          new_compact='    private static void compactReturnRail(Activity activity,View root){View found=findTag(root,RAIL_TAG);if(!(found instanceof LinearLayout))return;LinearLayout rail=(LinearLayout)found;if(!RAIL_COMPACT.equals(String.valueOf(rail.getContentDescription()))){String section=sectionFor(activity);rail.removeAllViews();rail.setContentDescription(RAIL_COMPACT);rail.setOrientation(LinearLayout.HORIZONTAL);rail.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);rail.setPadding(0,0,0,0);rail.setBackground(null);rail.setElevation(0f);TextView back=TornFcaCommandUi.text(activity,"←  "+section,10.8f,TornFcaCommandUi.MUTED,true);back.setPadding(TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6),TornFcaCommandUi.dp(activity,10),TornFcaCommandUi.dp(activity,6));back.setBackground(TornFcaCommandUi.solid(activity,Color.argb(95,18,26,39),9,TornFcaCommandUi.LINE_SOFT,1));back.setClickable(true);back.setFocusable(true);back.setForeground(TornFcaCommandUi.ripple(activity,TornFcaCommandUi.GOLD,9));back.setOnClickListener(v->{Intent i=TornFcaCommandRuntime.homeIntent(activity,section);i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);activity.startActivity(i);});rail.addView(back,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));}removeLegacyHeaderBackButton(rail);}\n    private static void removeLegacyHeaderBackButton(LinearLayout rail){ViewParent parent=rail.getParent();if(!(parent instanceof LinearLayout))return;LinearLayout page=(LinearLayout)parent;for(int i=page.getChildCount()-1;i>=0;i--){View child=page.getChildAt(i);if(child==rail||!(child instanceof Button))continue;CharSequence raw=((Button)child).getText();if(raw!=null&&raw.toString().trim().startsWith("←"))page.removeViewAt(i);}}\n'
+          replace_once(ux, old_compact, new_compact)
+
+          # Command-shell account badge so FREE/PREMIUM is visible everywhere, not only inside the Premium page.
+          command='app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java'
+          marker='copy.addView(meta,mp);TextView expand=TornFcaCommandUi.text(this,"⌄",22,TornFcaCommandUi.PURPLE_2,false);'
+          replacement='copy.addView(meta,mp);boolean verifiedPremium=identity.playerId>0&&PremiumEntitlementStore.hasPremium(this,identity.playerId);boolean premium=identity.playerId>0&&PremiumAccess.has(this,identity.playerId,PremiumAccess.PERSONAL_INSIGHTS);String plan=premium?(verifiedPremium?"PREMIUM":"PREMIUM PREVIEW"):"FREE";TextView planView=TornFcaCommandUi.text(this,plan,10.5f,premium?TornFcaCommandUi.GOLD_2:TornFcaCommandUi.BLUE,true);planView.setLetterSpacing(.10f);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);pp.topMargin=TornFcaCommandUi.dp(this,7);copy.addView(planView,pp);TextView expand=TornFcaCommandUi.text(this,"⌄",22,TornFcaCommandUi.PURPLE_2,false);'
+          replace_once(command, marker, replacement)
+
+          # Current audit workflows must follow the backend source version, while signing remains intentionally paused.
+          for p in Path('.github/workflows').glob('*.yml'):
+              if p.name == 'tornfca-final-fix-patch.yml': continue
+              text=p.read_text()
+              text=text.replace("TORNFCA_PREMIUM_VERSION='1.3.0'", "TORNFCA_PREMIUM_VERSION='1.3.1'")
+              text=text.replace("TC_VERSION='1.8.1'", "TC_VERSION='1.9.0'")
+              p.write_text(text)
+
+      - name: Syntax-check Apps Script
+        run: |
+          set -euo pipefail
+          for file in backend/*.gs; do cp "$file" "/tmp/$(basename "$file").js"; node --check "/tmp/$(basename "$file").js"; done
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - name: Compile repaired beta source
+        run: gradle --no-daemon :app:compileBetaJavaWithJavac
+
+      - name: Commit verified repairs
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java .github/workflows
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m 'Finish chat premium and navigation repairs'
+          git pull --rebase origin work/v0.10.18-beta-hardening
+          git push origin HEAD:work/v0.10.18-beta-hardening
