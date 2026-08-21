@@ -1,0 +1,59 @@
+name: TornFCA Premium Badge Refresh Fix
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+    paths:
+      - '.github/workflows/tornfca-plan-badge-refresh-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.18-beta-hardening
+          fetch-depth: 0
+      - name: Apply badge refresh patch
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java');t=p.read_text()
+          def swap(old,new):
+            global t
+            if new in t:return
+            if old not in t:raise SystemExit('Expected BetaCommand marker missing')
+            t=t.replace(old,new,1)
+          swap('    private Identity identity;\n    private String currentSection="Home";\n','    private Identity identity;\n    private String currentSection="Home";\n    private String currentPlanLabel="FREE";\n')
+          swap('    @Override protected void onResume(){super.onResume();ViewGroup root=findViewById(android.R.id.content);if(root==null)return;forceCurrentVersion(root);if(isLegacyAuthenticatedHome(root))installCommandShell(root);else if(isCommandShell(root)){Identity now=resolveIdentity();if(!isResolvedIdentity(now)&&isResolvedIdentity(identity)){applyCachedAvatar(root);return;}if(identity==null||!identity.sameAs(now))installCommandShell(root);else applyCachedAvatar(root);}}\n',
+               '    @Override protected void onResume(){super.onResume();ViewGroup root=findViewById(android.R.id.content);if(root==null)return;forceCurrentVersion(root);if(isLegacyAuthenticatedHome(root))installCommandShell(root);else if(isCommandShell(root)){Identity now=resolveIdentity();if(!isResolvedIdentity(now)&&isResolvedIdentity(identity)){applyCachedAvatar(root);}else if(identity==null||!identity.sameAs(now))installCommandShell(root);else if(!planLabel(now.playerId).equals(currentPlanLabel))installCommandShell(root);else applyCachedAvatar(root);}if(identity!=null&&identity.playerId>0)PremiumBackendClient.refreshAsync(this,identity.playerId,()->refreshPlanBadgeIfNeeded());}\n')
+          old='boolean verifiedPremium=identity.playerId>0&&PremiumEntitlementStore.TIER_PREMIUM.equals(PremiumEntitlementStore.tier(this,identity.playerId));boolean premium=identity.playerId>0&&PremiumAccess.has(this,identity.playerId,PremiumAccess.PERSONAL_INSIGHTS);String plan=premium?(verifiedPremium?"PREMIUM":"PREMIUM PREVIEW"):"FREE";TextView planView=TornFcaCommandUi.text(this,plan,10.5f,premium?TornFcaCommandUi.GOLD_2:TornFcaCommandUi.BLUE,true);'
+          new='String plan=planLabel(identity.playerId);currentPlanLabel=plan;boolean premium=!"FREE".equals(plan);TextView planView=TornFcaCommandUi.text(this,plan,10.5f,premium?TornFcaCommandUi.GOLD_2:TornFcaCommandUi.BLUE,true);'
+          swap(old,new)
+          insert='    private String clean(String value,String fallback){return value==null||value.trim().isEmpty()?fallback:value.trim();}\n'
+          replacement='    private String clean(String value,String fallback){return value==null||value.trim().isEmpty()?fallback:value.trim();}\n    private String planLabel(int playerId){if(playerId<=0)return"FREE";boolean verified=PremiumEntitlementStore.TIER_PREMIUM.equals(PremiumEntitlementStore.tier(this,playerId));boolean premium=PremiumAccess.has(this,playerId,PremiumAccess.PERSONAL_INSIGHTS);return premium?(verified?"PREMIUM":"PREMIUM PREVIEW"):"FREE";}\n    private void refreshPlanBadgeIfNeeded(){if(isFinishing()||identity==null)return;ViewGroup root=findViewById(android.R.id.content);if(root==null||!isCommandShell(root))return;String now=planLabel(identity.playerId);if(!now.equals(currentPlanLabel))installCommandShell(root);}\n'
+          swap(insert,replacement)
+          p.write_text(t)
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - run: gradle --no-daemon :app:compileBetaJavaWithJavac
+      - name: Commit compiled patch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m 'Refresh account tier badge after entitlement changes'
+          git pull --rebase origin work/v0.10.18-beta-hardening
+          git push origin HEAD:work/v0.10.18-beta-hardening
