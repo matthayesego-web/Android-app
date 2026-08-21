@@ -1,0 +1,62 @@
+name: TornFCA v0.10.19 Lint Diagnostic
+
+on:
+  push:
+    branches: [ develop ]
+    paths:
+      - '.github/workflows/v01019-lint-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+      - name: Record lint run
+        run: |
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01019-lint-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v01019-lint-run.txt
+          git commit -m 'Record v0.10.19 lint diagnostic run' || true
+          git pull --rebase origin develop
+          git push origin HEAD:develop
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - name: Run lint and print complete error report
+        env:
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: |
+          set +e
+          gradle --no-daemon :app:lintBeta
+          STATUS=$?
+          set -e
+          REPORT=app/build/intermediates/lint_intermediate_text_report/beta/lintReportBeta/lint-results-beta.txt
+          echo '===== COMPLETE LINT REPORT ====='
+          test -f "$REPORT" && cat "$REPORT"
+          exit "$STATUS"
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v0.10.19-lint-diagnostic
+          path: |
+            app/build/intermediates/lint_intermediate_text_report/beta/lintReportBeta/lint-results-beta.txt
+            app/build/reports/lint-results-beta.html
+          if-no-files-found: warn
+          retention-days: 7
