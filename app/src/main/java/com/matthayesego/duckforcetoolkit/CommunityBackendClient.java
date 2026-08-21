@@ -48,7 +48,8 @@ public final class CommunityBackendClient {
     }
     public static JSONArray getChatMessages(String key,String channel)throws IOException{return getChatSnapshot(key,channel).messages;}
 
-    public static JSONObject sendChatMessage(String key,String channel,String message)throws IOException{JSONObject b=request("chat_send",key);put(b,"channel",channel);put(b,"message",message);return postChecked(b,"Unable to send faction chat message.");}
+    public static JSONObject sendChatMessage(String key,String channel,String message)throws IOException{return sendChatMessage(key,channel,message,0);}
+    public static JSONObject sendChatMessage(String key,String channel,String message,int expectedFactionId)throws IOException{JSONObject b=request("chat_send",key);put(b,"channel",channel);put(b,"message",message);if(expectedFactionId>0)put(b,"faction_id",expectedFactionId);return postChecked(b,"Unable to send faction chat message.");}
     public static JSONObject reportChatMessage(String key,String messageId,String reason)throws IOException{JSONObject b=request("chat_report",key);put(b,"messageId",messageId);put(b,"reason",reason);return postChecked(b,"Unable to report this message.");}
     public static JSONArray moderationReports(String key)throws IOException{JSONObject r=postChecked(request("moderation_list",key),"Unable to load moderation reports.");JSONArray a=r.optJSONArray("reports");return a==null?new JSONArray():a;}
     public static JSONObject resolveModerationReport(String key,String reportId,String resolution)throws IOException{JSONObject b=request("moderation_resolve",key);put(b,"reportId",reportId);put(b,"resolution",resolution);return postChecked(b,"Unable to resolve moderation report.");}
