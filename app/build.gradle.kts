@@ -28,10 +28,10 @@ val prepareTornFcaLauncherIcon by tasks.registering {
         require(parts.size == 5) { "Expected 5 TornFCA launcher icon chunks, found ${parts.size}." }
         val encoded = parts.joinToString("") { it.readText().replace("\\s".toRegex(), "") }
         val bytes = Base64.getDecoder().decode(encoded)
-        require(bytes.size == 23948) { "Unexpected TornFCA launcher icon size: ${bytes.size}." }
+        require(bytes.size == 22878) { "Unexpected TornFCA launcher icon size: ${bytes.size}." }
         require(String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" && String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP") { "TornFCA launcher icon is not a valid WebP payload." }
         val sha256 = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        require(sha256 == "2e6186478635ff866e777b758e4bb26599f9672c6dbfcbcb46b1a6799c26bd57") { "TornFCA launcher icon checksum mismatch." }
+        require(sha256 == "78c2a43859fe6fa72818318373b1c3733a404be38e9c0e03aa37b1973a72042e") { "TornFCA launcher icon checksum mismatch." }
         val target = outputIcon.get().asFile
         target.parentFile.mkdirs()
         target.writeBytes(bytes)
