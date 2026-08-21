@@ -71,7 +71,8 @@ jobs:
           grep -q 'PlayReviewActivity' app/src/main/AndroidManifest.xml
           grep -q 'buildConfigField("boolean", "PLAY_STORE_BUILD", "true")' app/build.gradle.kts
           grep -q 'if(BuildConfig.PLAY_STORE_BUILD)' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
-          grep -q 'Purchases unavailable in Play beta' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          grep -q 'There are no purchase links, checkout controls, or item-transfer controls in TornFCA' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          grep -q 'open Torn separately and send Xanax to MattWithADuck' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
 
       - name: Verify live beta monetization remains closed
         run: |
@@ -97,7 +98,7 @@ jobs:
       - name: Lint and build normal-package Play bundle
         run: gradle --no-daemon :app:lintRelease :app:bundleRelease
 
-      - name: Verify compiled release is Play-safe
+      - name: Verify compiled release is Play consumption-only
         run: |
           set -euo pipefail
           BUILD_CONFIG='app/build/generated/source/buildConfig/release/com/matthayesego/duckforcetoolkit/BuildConfig.java'
@@ -156,7 +157,10 @@ jobs:
             echo "source=${GITHUB_SHA}"
             echo "targetSdk=36"
             echo "playStoreBuild=true"
-            echo "externalPremiumPaymentInstructions=false"
+            echo "premiumModel=consumption-only"
+            echo "premiumPurchaseLinks=false"
+            echo "premiumTransferControls=false"
+            echo "premiumExternalInstructions=plain-text-only"
             echo "premiumMonetizationApproved=false"
             echo "signed=true"
           } | tee play-candidate-metadata.txt
