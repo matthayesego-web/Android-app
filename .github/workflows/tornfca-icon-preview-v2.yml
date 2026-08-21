@@ -1,0 +1,70 @@
+name: TornFCA Icon Preview v2
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+    paths:
+      - '.github/workflows/tornfca-icon-preview-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.18-beta-hardening
+      - name: Record run
+        run: |
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01018-icon-preview-v2-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v01018-icon-preview-v2-run.txt
+          git commit -m 'Record icon preview v2 run' || true
+          git pull --rebase origin work/v0.10.18-beta-hardening
+          git push origin HEAD:work/v0.10.18-beta-hardening
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - name: Use unique preview package to bypass launcher cache
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle.kts')
+          t=p.read_text()
+          t=t.replace('applicationIdSuffix = ".internal"','applicationIdSuffix = ".iconpreview2"',1)
+          t=t.replace('manifestPlaceholders["appLabel"] = "TornFCA Internal"','manifestPlaceholders["appLabel"] = "TornFCA Icon Preview 2"',1)
+          p.write_text(t)
+          PY
+      - name: Build fresh icon preview
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verify baked icon and package
+        run: |
+          set -euo pipefail
+          ICON='app/build/generated/tornfcaIconRes/drawable-nodpi/tornfca_launcher_final.webp'
+          APK='app/build/outputs/apk/debug/app-debug.apk'
+          test -f "$ICON"
+          echo '2e6186478635ff866e777b758e4bb26599f9672c6dbfcbcb46b1a6799c26bd57  '"$ICON" | sha256sum -c -
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -1)"
+          "$AAPT" dump badging "$APK" | tee apk-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit.iconpreview2'" apk-badging.txt
+          grep -q "application-label:'TornFCA Icon Preview 2'" apk-badging.txt
+          cp "$APK" TornFCA-v0.10.18-ICON-PREVIEW-V2.apk
+          sha256sum TornFCA-v0.10.18-ICON-PREVIEW-V2.apk | tee apk-sha256.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v0.10.18-ICON-PREVIEW-V2
+          path: |
+            TornFCA-v0.10.18-ICON-PREVIEW-V2.apk
+            apk-badging.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 7
