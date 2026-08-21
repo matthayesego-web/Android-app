@@ -226,21 +226,30 @@ jobs:
           echo no | avdmanager create avd -f -n tornfca_api36 -k "system-images;android-36;google_apis;x86_64" --device "pixel_6"
 
       - name: Boot Android 16 emulator
+        timeout-minutes: 7
         run: |
           set -euo pipefail
-          nohup "$ANDROID_HOME/emulator/emulator" -avd tornfca_api36 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/emulator.log 2>&1 &
-          adb wait-for-device
-          for i in $(seq 1 120); do
+          ACCEL='-accel off'
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm || true
+            if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          fi
+          echo "Emulator acceleration mode: $ACCEL"
+          nohup "$ANDROID_HOME/emulator/emulator" -avd tornfca_api36 -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect $ACCEL > /tmp/emulator.log 2>&1 &
+          EMU_PID=$!
+          timeout 180 adb wait-for-device || { echo 'ADB never saw emulator'; cat /tmp/emulator.log; kill $EMU_PID || true; exit 1; }
+          for i in $(seq 1 72); do
             if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then break; fi
+            if ! kill -0 "$EMU_PID" 2>/dev/null; then echo 'Emulator exited during boot'; cat /tmp/emulator.log; exit 1; fi
             sleep 5
           done
-          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; then echo 'Android boot did not complete'; cat /tmp/emulator.log; exit 1; fi
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
           adb shell input keyevent 82 || true
           adb logcat -c
-          adb shell getprop ro.build.version.sdk
+          test "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" = "36"
 
       - name: Run screen-by-screen instrumentation audit
         env:
