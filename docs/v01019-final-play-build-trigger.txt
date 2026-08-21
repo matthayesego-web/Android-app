@@ -1,1 +1,0 @@
-Build final TornFCA v0.10.19 / build 74 Play beta AAB from promoted main commit b37a20aac93734f1a549cbf04ae04bd5cdeca6e2.
