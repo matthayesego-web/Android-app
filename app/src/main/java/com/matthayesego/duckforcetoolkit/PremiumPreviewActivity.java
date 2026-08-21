@@ -18,7 +18,7 @@ public class PremiumPreviewActivity extends Activity {
     private void render(){
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
         TornFcaUi.header(this,r,"More","TornFCA Premium","Your plan, expiration and Premium activation details in one place.");
-        int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS),verifiedPremium=PremiumEntitlementStore.hasPremium(this,player),leader=currentLeader();
+        int player=currentPlayerId();boolean premium=PremiumAccess.has(this,player,PremiumAccess.PERSONAL_INSIGHTS),verifiedPremium=PremiumEntitlementStore.TIER_PREMIUM.equals(PremiumEntitlementStore.tier(this,player)),leader=currentLeader();
         String state=premium?(verifiedPremium?"PREMIUM":"PREMIUM PREVIEW"):"FREE";
         String detail;
         if(verifiedPremium)detail=PremiumEntitlementStore.expirySummary(this,player)+"\n"+PremiumEntitlementStore.sourceLabel(this,player);
