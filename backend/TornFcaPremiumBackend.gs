@@ -1,5 +1,5 @@
 /**
- * TornFCA global premium entitlement backend v1.3.0.
+ * TornFCA global premium entitlement backend v1.3.1.
  * Deploy as a SEPARATE Apps Script web app from faction/community/developer backends.
  *
  * Security:
@@ -15,7 +15,7 @@
  * - scanPremiumPayments() is intended to run once per minute only after monetization approval: one Torn /user log request/minute.
  * - entitlement identity verification is cached briefly by API-key fingerprint.
  */
-const TORNFCA_PREMIUM_VERSION='1.3.0';
+const TORNFCA_PREMIUM_VERSION='1.3.1';
 const TORNFCA_PREMIUM_DEVELOPER_ID=3987363;
 const TORNFCA_XANAX_ITEM_ID=206;
 const TORNFCA_ITEM_RECEIVE_LOG=4103;
@@ -78,7 +78,8 @@ function doPost(e){
     if(action==='status'){
       const requested=Number(body.player_id||user.id);
       if(requested!==user.id)throw new Error('Premium entitlement reads are limited to the verified signed-in player.');
-      return premiumJson_({ok:true,entitlement:readEntitlement_(user.id)});
+      const config=readPremiumConfig_();
+      return premiumJson_({ok:true,entitlement:readEntitlement_(user.id),offer:{days_per_xanax:config.days_per_xanax,required_message:config.required_message,payment_player_id:TORNFCA_PREMIUM_DEVELOPER_ID,activations_open:premiumMonetizationApproved_()}});
     }
     if(action==='admin_config'){
       requirePremiumDeveloper_(user);

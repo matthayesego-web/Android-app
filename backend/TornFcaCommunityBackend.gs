@@ -1,5 +1,5 @@
 /**
- * TornFCA Community Backend v1.8.1.
+ * TornFCA Community Backend v1.9.0.
  * Deploy this file as its OWN Google Apps Script web app, separate from faction, premium and developer backends.
  * Torn API keys are used only to verify the current request and are never written to Sheets/Properties/Cache.
  * Faction membership/position is read fresh from Torn on every request; only stable basic player identity may be
@@ -13,7 +13,7 @@
  * and report lookups use TextFinder so old history does not make each active poll progressively more expensive.
  * War Prep configuration and completion rows are always keyed by freshly verified faction_id + war_id.
  */
-const TC_VERSION='1.8.1';
+const TC_VERSION='1.9.0';
 const TC_CHAT='ChatMessages';
 const TC_REPORTS='ChatReports';
 const TC_DEVICES='PushDevices';
@@ -51,7 +51,7 @@ function doPost(e){
 
     if(action==='config')return tcJson_({ok:true,user:tcPublicUser_(user),capabilities:{chat:true,chat_reporting:true,moderation:tcCanModerate_(key,user),training:true,war_prep:true,push:tcFirebaseConfigured_(),banking_push:true,announcement_push:true}});
     if(action==='chat_list')return tcJson_({ok:true,user:tcPublicUser_(user),messages:tcReadChat_(user,body)});
-    if(action==='chat_send')return tcJson_({ok:true,message:tcSendChat_(key,user,body)});
+    if(action==='chat_send')return tcJson_({ok:true,user:tcPublicUser_(user),message:tcSendChat_(key,user,body)});
     if(action==='chat_report')return tcJson_({ok:true,report:tcReportChat_(user,body)});
     if(action==='moderation_list'){
       tcRequireModerator_(key,user);
@@ -185,13 +185,17 @@ function tcReadChat_(user,body){
 }
 
 function tcSendChat_(apiKey,user,body){
-  tcRate_(user.id,'chat_send',2);
+  tcRate_(user.id,'chat_send',1);
+  const expectedFaction=Number(body.faction_id||0);
+  if(expectedFaction>0&&expectedFaction!==Number(user.faction_id||0))throw new Error('Your faction changed. Chat moved to your current faction; please send again there.');
   const channel=tcChannel_(user,body.channel),message=String(body.message||'').trim();
   if(!message)throw new Error('Message required.');
   if(message.length>1000)throw new Error('Messages are limited to 1,000 characters.');
   const row={id:Utilities.getUuid(),faction_id:user.faction_id,channel:channel,author_id:user.id,author_name:user.name,message:message,created_at:Math.floor(Date.now()/1000)};
   tcDb_().getSheetByName(TC_CHAT).appendRow([row.id,row.faction_id,row.channel,row.author_id,tcSafe_(row.author_name),tcSafe_(row.message),row.created_at]);
-  if(channel!=='leadership')tcPushToFaction_(apiKey,user.faction_id,user.id,'chat',user.name+' • '+channel,message,{channel:channel,author_id:String(user.id)});
+  if(channel!=='leadership'){
+    try{tcPushToFaction_(apiKey,user.faction_id,user.id,'chat',user.name+' • '+channel,message,{channel:channel,author_id:String(user.id)});}catch(pushErr){row.push_warning=String(pushErr&&pushErr.message||pushErr);}
+  }
   return row;
 }
 
