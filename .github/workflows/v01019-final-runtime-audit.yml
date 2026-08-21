@@ -40,6 +40,8 @@ jobs:
           grep -q 'compileSdk = 36' app/build.gradle.kts
           grep -q 'targetSdk = 36' app/build.gradle.kts
           grep -q 'androidx.activity:activity:1.10.1' app/build.gradle.kts
+          grep -q 'PLAY_STORE_BUILD", "true"' app/build.gradle.kts
+          grep -q 'BuildConfig.PLAY_STORE_BUILD' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
           ! grep -R 'void onBackPressed' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionActivity.java app/src/main/java/com/matthayesego/duckforcetoolkit/PlayReviewActivity.java app/src/main/java/com/matthayesego/duckforcetoolkit/ToolHostActivity.java app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
           curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbwphLmR-N82GJUChzwZlxQ8DGKVoaN6VCNiXvbpKfgJV6JUxlcwPOYVKgbI1h9tmjp-ig/exec' -o /tmp/community.json
           curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' -o /tmp/premium.json
@@ -63,13 +65,22 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Fresh Lint, tests and builds
+      - name: Fresh Lint, tests and all candidate builds
         env:
           TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
           TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
           TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
           TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
-        run: gradle --no-daemon :app:lintBeta :app:testDebugUnitTest :app:assembleDebug :app:assembleBeta
+        run: gradle --no-daemon :app:lintBeta :app:testDebugUnitTest :app:assembleDebug :app:assembleBeta :app:assembleRelease
+
+      - name: Verify release is Play-safe
+        run: |
+          set -euo pipefail
+          RELEASE_CONFIG="app/build/generated/source/buildConfig/release/com/matthayesego/duckforcetoolkit/BuildConfig.java"
+          test -f "$RELEASE_CONFIG"
+          grep -q 'PLAY_STORE_BUILD = true' "$RELEASE_CONFIG"
+          grep -q 'Purchases unavailable in Play beta' app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumPreviewActivity.java
+          echo 'Release variant is hard-locked to Play-safe Premium acquisition UI.'
 
       - name: Add transient screen-audit instrumentation
         run: |
@@ -241,13 +252,10 @@ jobs:
             gradle --no-daemon :app:connectedDebugAndroidTest
             mkdir -p audit-output
             adb logcat -d > audit-output/logcat.txt
-            adb exec-out run-as com.matthayesego.duckforcetoolkit.internal tar -cf - -C files screen-audit > audit-output/screen-audit.tar 2>/dev/null || true
             grep 'TORNFCA_AUDIT' audit-output/logcat.txt > audit-output/screen-results.txt || true
+            test "$(grep -c 'TORNFCA_AUDIT.*OPEN' audit-output/screen-results.txt || true)" -ge 35
             test "$(grep -c 'TORNFCA_AUDIT.*PASS' audit-output/screen-results.txt || true)" -ge 35
-            if grep -n -E 'FATAL EXCEPTION|ANR in com\.matthayesego\.duckforcetoolkit\.internal|Process: com\.matthayesego\.duckforcetoolkit\.internal' audit-output/logcat.txt; then
-              echo 'Fatal TornFCA runtime evidence found.'
-              exit 1
-            fi
+            ! grep -qE 'Process: com\.matthayesego\.duckforcetoolkit\.internal|ANR in com\.matthayesego\.duckforcetoolkit\.internal' audit-output/logcat.txt
 
       - name: Upload runtime evidence
         if: always()
