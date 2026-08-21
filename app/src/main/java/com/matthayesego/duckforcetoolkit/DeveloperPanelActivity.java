@@ -1,0 +1,69 @@
+package com.matthayesego.duckforcetoolkit;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+/** Hidden developer tools reached through verified Torn-ID access. */
+public class DeveloperPanelActivity extends Activity {
+    public static final String EXTRA_DEVELOPER_ROLE="developer_role",EXTRA_DEVELOPER_USERNAME="developer_username";
+    private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(15,20,28),BORDER=Color.rgb(45,55,69),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(154,164,178),GOLD=Color.rgb(241,194,106),BLUE=Color.rgb(88,166,255),GREEN=Color.rgb(63,185,80),PURPLE=Color.rgb(163,113,247),RED=Color.rgb(248,81,73);
+    private int factionId;private String factionName;private boolean factionApi;private String position,developerRole,developerUsername;private DeveloperSessionStore sessions;
+
+    @Override protected void onCreate(Bundle savedInstanceState){
+        super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);sessions=new DeveloperSessionStore(this);
+        DeveloperSessionStore.Session current=sessions.load();if(current==null){finish();return;}
+        developerRole=current.role;developerUsername=current.username;
+        factionId=getIntent().getIntExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME);factionApi=getIntent().getBooleanExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,false);position=getIntent().getStringExtra(DeveloperConsoleActivity.EXTRA_POSITION);
+        if(factionName==null||factionName.trim().isEmpty())factionName="No faction context";if(position==null||position.trim().isEmpty())position="Unknown role";render();
+    }
+
+    private boolean root(){return"root".equals(developerRole);}
+    private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
+    private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
+    private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
+    private Button button(String label,int stroke){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(TEXT);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackground(rounded(PANEL,stroke,12));return b;}
+    private LinearLayout card(String title,String body,int stroke){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(17),dp(16),dp(17),dp(16));c.setBackground(rounded(PANEL,stroke,17));c.addView(text(title,19,TEXT,true));TextView b=text(body,13,MUTED,false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(6);c.addView(b,p);return c;}
+    private void addCard(LinearLayout r,LinearLayout c){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.bottomMargin=dp(10);r.addView(c,p);}
+    private void addButton(LinearLayout card,String label,int color,Runnable action){Button b=button(label,color);b.setOnClickListener(v->action.run());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48));p.topMargin=dp(12);card.addView(b,p);}
+    @SuppressWarnings("deprecation") private ScrollView shell(){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.setBackgroundColor(BG);int l=dp(16),t=dp(20),r=dp(16),b=dp(28);s.setPadding(l,t,r,b);s.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(l+i.getSystemWindowInsetLeft(),t+i.getSystemWindowInsetTop(),r+i.getSystemWindowInsetRight(),b+i.getSystemWindowInsetBottom());return i;});return s;}
+
+    private void render(){
+        ScrollView s=shell();LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);s.addView(r,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        Button back=button("← Companion",BORDER);back.setOnClickListener(v->{Intent i=TornFcaCommandRuntime.homeIntent(this,"More");i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);startActivity(i);finish();});r.addView(back,new LinearLayout.LayoutParams(dp(132),dp(44)));
+        TextView brand=text("TORNFCA • HIDDEN DEVELOPER CHANNEL",10,GOLD,true);brand.setLetterSpacing(.10f);brand.setGravity(Gravity.CENTER);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(18);r.addView(brand,bp);
+        TextView title=text("Developer Panel",30,TEXT,true);title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(5);tp.bottomMargin=dp(4);r.addView(title,tp);
+        String authLine="@"+developerUsername+" • "+developerRole.toUpperCase()+" • Torn ID verified";
+        TextView sub=text(authLine,13,MUTED,false);sub.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.bottomMargin=dp(18);r.addView(sub,sp);
+
+        if(root()){
+            LinearLayout access=card("Developer Access","Authorize or remove Torn player IDs. Your Root ID is permanent; every added ID receives Developer access only and cannot manage this list.",PURPLE);addButton(access,"Manage Authorized Torn IDs",PURPLE,()->startActivity(new Intent(this,DeveloperAccessActivity.class)));addCard(r,access);
+        }
+
+        boolean preview=DeveloperPreviewStore.isMemberPreview(this);LinearLayout previewCard=card("Standard Member Preview",preview?"ACTIVE — TornFCA is presenting the non-leadership member view. Your actual Torn identity and backend permissions are unchanged.":"Switch the presentation layer to what a normal non-leadership faction member sees without impersonating another player or changing server authorization.",preview?GREEN:GOLD);addButton(previewCard,preview?"Exit Member Preview":"Enter Member Preview",preview?GREEN:GOLD,()->{DeveloperPreviewStore.setMemberPreview(this,!DeveloperPreviewStore.isMemberPreview(this));Intent i=TornFcaCommandRuntime.homeIntent(this,"Home");i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);startActivity(i);finish();});addCard(r,previewCard);
+
+        LinearLayout advanced=card("Advanced Developer Console","Diagnostics, permission simulation, local feature switches, faction-scope cache controls and test launchers.",BLUE);addButton(advanced,"Open Advanced Console",BLUE,()->{Intent i=new Intent(this,DeveloperConsoleActivity.class);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_ID,factionId);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_NAME,factionName);i.putExtra(DeveloperConsoleActivity.EXTRA_FACTION_API,factionApi);i.putExtra(DeveloperConsoleActivity.EXTRA_POSITION,position);startActivity(i);});addCard(r,advanced);
+
+        if(root()){
+            LinearLayout backend=card("Developer Backend",DeveloperBackendClient.isConfigured()?"Maintenance mode, minimum supported version, aggregate usage and remote emergency feature switches. Existing sensitive write controls keep their separate authorization until we deliberately simplify them.":"Developer control-plane architecture is present, but this build does not contain its backend URL.",BLUE);addButton(backend,"Open Backend Control",BLUE,()->startActivity(new Intent(this,DeveloperBackendActivity.class)));addCard(r,backend);
+            LinearLayout moderation=card("Community Moderation",CommunityBackendClient.isConfigured()?"Separate moderation authorization still applies; Developer Console access does not automatically grant faction moderation rights.":"Community moderation backend is not configured in this build.",PURPLE);addButton(moderation,"Open Moderation Queue",PURPLE,()->startActivity(new Intent(this,CommunityModerationActivity.class)));addCard(r,moderation);
+            LinearLayout premium=card("Premium & Entitlements",PremiumBackendClient.isConfigured()?"Premium administration keeps its own authorization boundary.":"Premium backend is not configured in this build.",GOLD);addButton(premium,"Open Premium Controls",GOLD,()->startActivity(new Intent(this,PremiumAdminActivity.class)));addCard(r,premium);
+        }
+
+        addCard(r,card("Access boundary",root()?"Your verified Torn player ID is the permanent Root. Only Root can add or remove Developer Console IDs. Delegated IDs can use developer/testing tools but cannot grant access to anyone else.":"Your Torn player ID has delegated Developer Console access. You cannot add or remove other developer IDs and you do not gain Root-only backend, moderation or Premium controls.",BORDER));
+        LinearLayout logout=card("Developer Session","Torn-ID sessions expire automatically and are invalidated immediately if Root removes an authorized ID.",RED);addButton(logout,"Sign Out of Developer Channel",RED,this::logout);addCard(r,logout);
+        TextView footer=text("TornFCA v"+TornFcaBrand.VERSION+" • hidden developer channel",11,MUTED,false);footer.setGravity(Gravity.CENTER);LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fp.topMargin=dp(8);r.addView(footer,fp);setContentView(s);s.requestApplyInsets();
+    }
+
+    private void logout(){DeveloperSessionStore.Session current=sessions.load();sessions.clear();if(current!=null&&DeveloperBackendClient.isConfigured())new Thread(()->{try{DeveloperBackendClient.developerLogout(current.token);}catch(Exception ignored){}},"TornFCA-DeveloperLogout").start();Toast.makeText(this,"Developer session ended.",Toast.LENGTH_SHORT).show();finish();}
+}

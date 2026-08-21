@@ -1,5 +1,105 @@
 # Changelog
 
+## v0.9.28 — 2026-08-17
+
+- Split the member-facing **War Center** into two clear modes: **Ranked War** and **Territories**, while keeping a single simple War destination in bottom navigation.
+- Kept the existing ranked-war workflow intact but relabeled it clearly as Ranked War, including live status, opponent intelligence, participation, completed history and leadership payout tools.
+- Added a member-safe **Territories** screen using Torn API v2's dedicated current warfare, faction territory and territory-war history endpoints.
+- Added faction territory summaries for owned blocks, total daily respect, rackets, sector, size, density, wall slots and acquired date.
+- Added live territory-war cards with assault/defense context, opponent, current scores, target, wall counts and whether the signed-in member is currently on the wall.
+- Added completed territory-war history plus an official report drill-down showing faction totals and the signed-in member's score, joins and clears when Torn returns a contribution row.
+- Added a plain-language Territory explanation so members unfamiliar with the system can understand what the data means without leaving TornFCA.
+- Updated My War Prep so members are prompted to check whether their faction is using Ranked War, Territories or both, and routed its war shortcut through the split War Center.
+- Registered all new War/Territory activities as internal-only Android screens and expanded Member Core CI to protect the split, Torn endpoint choices and personal contribution fields.
+- Verified the implementation against Torn's current OpenAPI 6.10.2 dedicated warfare endpoints rather than the deprecated generic `/faction/warfare` route.
+- Changed `TornFcaBrand.VERSION` to derive from Android `BuildConfig.VERSION_NAME`, preventing stale hard-coded visible-version labels in future releases.
+- Bumped Android versionCode to 45 and versionName to 0.9.28.
+
+## v0.9.27 — 2026-08-17
+
+- Completed the release-preparation legal/privacy pass for the expanded member experience while keeping `main` untouched.
+- Advanced the in-app legal acknowledgement to `2026-08-17-v3`, with a concise pre-sign-in data-use disclosure and separate acknowledgement of Privacy/data use from agreement to Terms & Conditions and the EULA.
+- Prevented Firebase Cloud Messaging auto-initialization before the current legal version is acknowledged, with an independent guard inside `PushNotifications` so future callers cannot bypass the gate accidentally.
+- Reorganized More, Settings and About so everyday faction tools remain centered in Member Center and legal/privacy information stays easy to find without duplicating primary navigation.
+- Kept Member Center organized around **Start Here**, **Daily & Readiness**, **Growth & Training**, **My Faction**, **Community & Alerts**, and **Optional Upgrade**, with core member tools before Premium.
+- Added a synchronized Google Play release/Data Safety checklist and a clearly marked public privacy-policy publication draft; final public contact/HTTPS hosting remains a production-release task.
+- Added faction-chat **Report** and **Block User** controls, device-local faction-scoped blocking, and suppression of chat push notifications from blocked authors.
+- Added verified faction-scoped `ChatReports` intake with message snapshots, reporter/author identity, reason, timestamp and status.
+- Added a hidden central Community Moderation queue restricted server-side to the verified TornFCA owner player ID; moderation actions bypass cached identity and re-check Torn before access.
+- Added moderator actions to dismiss reports or remove reported messages; removals redact the message, close other open reports for that message, and record moderator identity, timestamp and resolution.
+- Updated TornFCA Community Backend to v1.3.0 and expanded CI to protect the new legal v3 and community-safety boundaries.
+- Removed a stale hard-coded developer-panel version label in favor of `TornFcaBrand.VERSION`.
+- Bumped Android versionCode to 44 and versionName to 0.9.27.
+
+## v0.9.26 — 2026-08-17
+
+- Completed a readability-only polish pass after the v0.9.25 navigation/legal foundation, without changing feature access or permission boundaries.
+- Simplified Member Center descriptions so ordinary members see player-facing language instead of terms such as member-safe, permission-gated, backend configured, or entitlement state.
+- Simplified About, Settings, and More descriptions while keeping the same legal, privacy, provider-consent, Premium, and leadership behavior.
+- Reduced the API sign-in notice to the essentials: use a Limited Access key, choose session-only or encrypted storage, and note that leadership tools may require in-game Faction API Access.
+- Made the compact sign-in notice open Legal & Privacy directly when tapped.
+- Strengthened the Community Security Audit so optional-provider opt-out is verified by the actual FFScouter and TornStats consent-disable calls rather than by a specific button label.
+- Preserved the compact Home/Faction/War/(Leadership)/More navigation and the task-grouped Member Center rather than adding more bottom-navigation items.
+- Bumped Android versionCode to 43 and versionName to 0.9.26.
+
+## v0.9.25 — 2026-08-17
+
+- Reorganized the free Member Center around plain-language workflows: **Start Here**, **Daily & Readiness**, **Growth & Training**, **My Faction**, **Community & Alerts**, and **Optional Upgrade**.
+- Kept everyday navigation intentionally compact rather than adding more bottom-navigation tabs; Home/Faction/War remain the primary routes and deeper member tools are organized under Member Center.
+- Added versioned first-run legal acknowledgement before Torn API sign-in.
+- Added in-app **Privacy Policy**, **Terms & Conditions**, and **End User License Agreement** screens.
+- Added persistent access to Legal & Privacy from More, Settings, and About TornFCA.
+- Added a device-local legal-version/timestamp record so materially revised legal documents can require renewed acknowledgement later.
+- Added a Google Play release/Data safety checklist grounded in TornFCA's current Torn API, device storage, faction community, FCM, FFScouter, and TornStats architecture.
+- Added a clearly marked web privacy-policy publication draft; it remains non-production until a public privacy contact is chosen and HTTPS hosting is enabled/tested.
+- Expanded the Member Core CI audit to protect member navigation, free-core discoverability, legal routing, local privacy boundaries, and faction isolation.
+- Bumped Android versionCode to 42 and versionName to 0.9.25.
+
+## v0.9.24 — 2026-08-17
+
+- Added free **My War Prep** for ordinary faction members.
+- Added current/upcoming ranked-war timing plus the signed-in member's own bars, cooldowns, travel, refills, and organized-crime context.
+- Added a five-step personal readiness checklist scoped to `player_id + faction_id + war cycle`, preventing checklist state from carrying into another faction or future war.
+- Added shortcuts from War Prep to My War, My Day, Faction Resources, and faction community tools.
+- Kept faction-specific requirements in faction-authored rules/guides rather than inventing universal energy, Xanax, travel, or war-readiness requirements inside TornFCA.
+- Preserved the v0.9.23 faction-resource restore point before introducing War Prep.
+- Bumped Android versionCode to 41 and versionName to 0.9.24.
+
+## v0.9.23 — 2026-08-17
+
+- Added **Faction Resources** to the free Member Center for ordinary faction members.
+- Added a five-step local onboarding checklist covering faction identity, training expectations, organized crime readiness, war/chain expectations, and faction guides.
+- Scoped onboarding progress to both `player_id` and `faction_id`, so joining a different faction starts a separate checklist rather than carrying another faction's onboarding state forward.
+- Added quick links from Faction Resources to My Day, Training Center, Faction Directory, and My War.
+- Reused the existing freshly verified faction-scoped guide library for onboarding, training, trading, war prep, community rules, and other faction-local member resources; no new backend tenant datastore was introduced.
+- Generalized Leader/Co-leader publishing from training-only guides to broader faction member guides while retaining the same server-side faction/leadership authorization and archive controls.
+- Kept Faction Resources useful when the shared backend is unavailable: local onboarding and native member shortcuts continue to work while shared faction guides report their unavailable state clearly.
+- Bumped Android versionCode to 40 and versionName to 0.9.23.
+
+## v0.9.22 — 2026-08-17
+
+- Added **My Training Progress** to the free Member Center.
+- Added private personal battle-stat progress using the signed-in player's own Torn battle stats only.
+- Added device-local baselines scoped to both `player_id` and `faction_id`, so progress comparisons do not carry across factions.
+- Added total battle-stat gain, per-stat deltas, Xanax-use delta, time tracked, and average Xanax use per day since baseline.
+- Added side-by-side display of the current faction's published training expectations when the faction Community backend is available.
+- Kept personal battle-stat baselines on the device; they are not written to the faction training library or exposed to ordinary faction members.
+- Kept faction-wide training compliance, violation summaries, long-term trend reporting, and automated follow-up outside the free member screen for future permission-aware Faction Pro tooling.
+- Added a member-controlled **Reset progress baseline** action.
+- Bumped Android versionCode to 39 and versionName to 0.9.22.
+
+## v0.9.21 — 2026-08-17
+
+- Expanded the free member core with a searchable faction directory and member-safe roster cards.
+- Added a free Training Center with universal TornFCA starter guides.
+- Added faction-scoped training rules so Leader/Co-leader can publish stat-gain expectations, regular Xanax expectations, and notes/exceptions.
+- Added a faction-scoped custom training guide library with publishing and archive controls.
+- Enforced guide/rule tenant isolation by verified `faction_id`; every training action now performs a fresh Torn faction check so old-faction content is revoked immediately after a faction change.
+- Kept advanced member history, trend/compliance analytics, and automated follow-up in the Premium/Faction Pro roadmap rather than paywalling basic member guidance.
+- Updated the Google Play/public-release roadmap to make EULA, Terms & Conditions, About/login acknowledgement, Privacy Policy, and Data safety explicit production gates.
+- Updated Community backend schema to add `TrainingRules` and `TrainingGuides` while preserving existing chat/push data when setup is rerun.
+- Bumped Android versionCode to 38 and versionName to 0.9.21.
+
 ## v0.4.3 — 2026-08-14
 
 - Restored the Duck Force noir artwork after the v0.4.2 image-rendering regression.

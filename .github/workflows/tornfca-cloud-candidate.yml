@@ -1,0 +1,117 @@
+name: TornFCA Cloud Candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Read version
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - name: Verify cloud configuration is present
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: |
+          set -euo pipefail
+          for var in TORNFCA_FACTION_BACKEND_URL TORNFCA_PREMIUM_BACKEND_URL TORNFCA_COMMUNITY_BACKEND_URL TORNFCA_DEVELOPER_BACKEND_URL TORNFCA_WARPAY_BACKEND_URL; do
+            value="${!var:-}"
+            test -n "$value" || { echo "Missing $var"; exit 1; }
+            case "$value" in https://*) ;; *) echo "$var must use HTTPS"; exit 1;; esac
+          done
+          test -n "${TORNFCA_FIREBASE_APP_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_APP_ID'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_API_KEY:-}" || { echo 'Missing TORNFCA_FIREBASE_API_KEY'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_PROJECT_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_PROJECT_ID'; exit 1; }
+          test -n "${TORNFCA_FIREBASE_SENDER_ID:-}" || { echo 'Missing TORNFCA_FIREBASE_SENDER_ID'; exit 1; }
+
+      - name: Require all five deployed backends to be live and current
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+        run: |
+          set -euo pipefail
+          check_backend() {
+            url="$1"; expected="$2"; version="$3"
+            body="$(curl --fail --silent --show-error --location --max-time 25 "$url")"
+            printf '%s\n' "$body" | grep -F '"ok":true' >/dev/null
+            printf '%s\n' "$body" | grep -F "$expected" >/dev/null
+            printf '%s\n' "$body" | grep -F '"version":"'"$version"'"' >/dev/null
+          }
+          check_backend "$TORNFCA_FACTION_BACKEND_URL" 'TornFCA Faction Backend' '1.1.0'
+          check_backend "$TORNFCA_COMMUNITY_BACKEND_URL" 'TornFCA Community Backend' '1.7.0'
+          check_backend "$TORNFCA_PREMIUM_BACKEND_URL" 'TornFCA Premium Entitlements' '1.2.0'
+          check_backend "$TORNFCA_DEVELOPER_BACKEND_URL" 'TornFCA Developer Control Plane' '1.4.0'
+          check_backend "$TORNFCA_WARPAY_BACKEND_URL" 'TornFCA WarPay Backend' '1.1.0'
+
+      - name: Build cloud-enabled unsigned release
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Align and inspect release
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          ZIPALIGN="$(find "$SDK_ROOT/build-tools" -type f -name zipalign | sort -V | tail -1)"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -1)"
+          test -x "$ZIPALIGN"
+          test -x "$AAPT"
+          "$ZIPALIGN" -P 16 -f -v 4 app/build/outputs/apk/release/app-release-unsigned.apk "TornFCA-v${VERSION_NAME}-cloud-aligned-unsigned-release.apk"
+          "$ZIPALIGN" -c -P 16 -v 4 "TornFCA-v${VERSION_NAME}-cloud-aligned-unsigned-release.apk"
+          "$AAPT" dump badging "TornFCA-v${VERSION_NAME}-cloud-aligned-unsigned-release.apk" | tee cloud-release-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit'" cloud-release-badging.txt
+          grep -q "application-label:'TornFCA'" cloud-release-badging.txt
+
+      - name: Upload cloud candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v${{ env.VERSION_NAME }}-cloud-candidate
+          path: |
+            TornFCA-v${VERSION_NAME}-cloud-aligned-unsigned-release.apk
+            cloud-release-badging.txt
+          if-no-files-found: error
+          retention-days: 14

@@ -31,10 +31,12 @@ public class DeveloperConsoleActivity extends Activity {
     private String factionName;
     private boolean factionApi;
     private String position;
+    private JSONObject userStats=new JSONObject();
+    private boolean userStatsLoading=false;
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
-        keyStore=new SecureApiKeyStore(this);factionId=getIntent().getIntExtra(EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(EXTRA_FACTION_NAME);factionApi=getIntent().getBooleanExtra(EXTRA_FACTION_API,false);position=getIntent().getStringExtra(EXTRA_POSITION);if(factionName==null)factionName="Faction";if(position==null)position="Unknown";render();
+        keyStore=new SecureApiKeyStore(this);factionId=getIntent().getIntExtra(EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(EXTRA_FACTION_NAME);factionApi=getIntent().getBooleanExtra(EXTRA_FACTION_API,false);position=getIntent().getStringExtra(EXTRA_POSITION);if(factionName==null)factionName="Faction";if(position==null)position="Unknown";render();refreshUserStats();
     }
 
     private boolean effectiveFactionApi(){return factionApi&&!DeveloperSettings.simulatePublicOnly(this);}
@@ -49,10 +51,12 @@ public class DeveloperConsoleActivity extends Activity {
 
     private void render(){
         ScrollView s=shell();LinearLayout r=root(s);Button back=button("← Companion");back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(124),dp(44)));
-        TextView title=text("Developer Console",27,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);tp.bottomMargin=dp(4);r.addView(title,tp);TextView sub=text("v0.7 prep control surface • read-only testing unless explicitly stated",13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.bottomMargin=dp(14);r.addView(sub,sp);
+        TextView title=text("Developer Console",27,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);tp.bottomMargin=dp(4);r.addView(title,tp);TextView sub=text("TornFCA v"+TornFcaBrand.VERSION+" developer controls • read-only testing unless explicitly stated",13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.bottomMargin=dp(14);r.addView(sub,sp);
 
         boolean multi=DeveloperSettings.multiFactionPreview(this);
-        addCard(r,card("Current tenant",factionName+" ["+factionId+"] • "+position+"\nFaction API access: "+(factionApi?"YES":"NO")+"\nEffective test access: "+(effectiveFactionApi()?"FACTION API":"PUBLIC-ONLY")+"\nTenant architecture: "+(multi?"PREVIEW":"SINGLE-FACTION")+"\nBackend configured: "+(CompanionBackendClient.isConfigured()?"YES":"NO"),BLUE));
+        addCard(r,card("Current tenant",factionName+" ["+factionId+"] • "+position+"\nFaction API access: "+(factionApi?"YES":"NO")+"\nEffective test access: "+(effectiveFactionApi()?"FACTION API":"PUBLIC-ONLY")+"\nTenant architecture: MULTI-FACTION"+(multi?" + PREVIEW DIAGNOSTICS":"")+"\nBackend configured: "+(CompanionBackendClient.isConfigured()?"YES":"NO"),BLUE));
+
+        String trackerBody;if(!DeveloperBackendClient.isConfigured())trackerBody="Developer backend is not configured in this build.";else if(userStatsLoading)trackerBody="Refreshing verified user counts…";else trackerBody="Current total: "+userStats.optInt("current_total",0)+" (active in last 24h)\nTotal unique: "+userStats.optInt("total_unique",0)+" (all-time verified TornFCA users)";LinearLayout tracker=card("User tracker",trackerBody,BLUE);Button refreshUsers=button("Refresh User Counts");refreshUsers.setEnabled(DeveloperBackendClient.isConfigured()&&!userStatsLoading);refreshUsers.setOnClickListener(v->refreshUserStats());LinearLayout.LayoutParams rup=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));rup.topMargin=dp(8);tracker.addView(refreshUsers,rup);addCard(r,tracker);
 
         long cacheAge=FactionScopeCache.ageSeconds(this);String cacheText=FactionScopeCache.hasFreshScope(this)?"Fresh faction scope cache • age "+cacheAge+" sec • expires after 5 minutes.":"No fresh faction scope cache. The next feature launch will re-verify Torn identity and faction.";LinearLayout cache=card("Faction scope verification",cacheText,BORDER);Button fresh=button("Force Fresh Faction Verification");fresh.setOnClickListener(v->{FactionScopeCache.clear(this);Toast.makeText(this,"Faction scope cache cleared.",Toast.LENGTH_SHORT).show();render();});LinearLayout.LayoutParams freshp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));freshp.topMargin=dp(7);cache.addView(fresh,freshp);addCard(r,cache);
 
@@ -66,7 +70,7 @@ public class DeveloperConsoleActivity extends Activity {
         Button premiumLaunch=button("Open Premium Preview");premiumLaunch.setOnClickListener(v->startActivity(new Intent(this,PremiumPreviewActivity.class)));LinearLayout.LayoutParams plp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));plp.topMargin=dp(7);quick.addView(premiumLaunch,plp);
         addCard(r,quick);
 
-        LinearLayout multiCard=card("Multi-faction architecture preview",multi?"ON — faction-scoped tools are marked for tenant-preview testing. The production sign-in gate remains Duck Force-only until the multi-faction release gate is deliberately opened.":"OFF — production and developer behavior remain single-faction. New data remains scoped by authenticated faction ID.",multi?GOOD:GOLD);Button multiButton=button(multi?"Turn Tenant Preview Off":"Turn Tenant Preview On");multiButton.setOnClickListener(v->{DeveloperSettings.setMultiFactionPreview(this,!DeveloperSettings.multiFactionPreview(this));render();});multiCard.addView(multiButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,multiCard);
+        LinearLayout multiCard=card("Multi-faction preview diagnostics",multi?"ON — extra tenant-preview markers are enabled for multi-faction testing. Production sign-in already follows the authenticated Torn faction tenant.":"OFF — production remains multi-faction; only the extra tenant-preview diagnostics are disabled.",multi?GOOD:BORDER);Button multiButton=button(multi?"Turn Tenant Preview Off":"Turn Tenant Preview On");multiButton.setOnClickListener(v->{DeveloperSettings.setMultiFactionPreview(this,!DeveloperSettings.multiFactionPreview(this));render();});multiCard.addView(multiButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,multiCard);
 
         boolean publicOnly=DeveloperSettings.simulatePublicOnly(this);LinearLayout publicCard=card("Permission simulation",publicOnly?"PUBLIC-ONLY simulation is ON. Faction API-only features behave as though this member lacks Faction API Access.":"Using the real authenticated Torn permission state.",publicOnly?GOLD:BORDER);Button publicButton=button(publicOnly?"Use Real Permissions":"Simulate Public-Only Member");publicButton.setOnClickListener(v->{DeveloperSettings.setSimulatePublicOnly(this,!DeveloperSettings.simulatePublicOnly(this));render();});publicCard.addView(publicButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,publicCard);
 
@@ -89,9 +93,16 @@ public class DeveloperConsoleActivity extends Activity {
 
         LinearLayout diag=card("API diagnostics","Run a read-only endpoint sweep using the encrypted API key currently stored on this device.",GOLD);Button run=button("Run Endpoint Diagnostics");run.setOnClickListener(v->runDiagnostics());diag.addView(run,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,diag);
 
-        LinearLayout reset=card("Reset prep controls","Restores all feature modules, single-faction mode, real permission checks, real entitlement state, 30-day/20-page activity scanning and concise diagnostics. Banking data is not touched.",BORDER);Button resetButton=button("Reset Developer Settings");resetButton.setOnClickListener(v->{DeveloperSettings.reset(this);FactionScopeCache.clear(this);render();});reset.addView(resetButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,reset);
+        LinearLayout reset=card("Reset prep controls","Restores all feature modules, tenant-preview diagnostics off, real permission checks, real entitlement state, 30-day/20-page activity scanning and concise diagnostics. Banking data is not touched.",BORDER);Button resetButton=button("Reset Developer Settings");resetButton.setOnClickListener(v->{DeveloperSettings.reset(this);FactionScopeCache.clear(this);render();});reset.addView(resetButton,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)));addCard(r,reset);
 
         setContentView(s);s.requestApplyInsets();
+    }
+
+    private void refreshUserStats(){
+        if(!DeveloperBackendClient.isConfigured()||userStatsLoading)return;
+        String key=keyStore.load();if(key==null||key.trim().isEmpty())return;
+        userStatsLoading=true;render();
+        new Thread(()->{try{JSONObject response=DeveloperBackendClient.readConfig(key);JSONObject stats=response.optJSONObject("user_stats");if(stats!=null)userStats=stats;}catch(Exception ignored){}finally{userStatsLoading=false;runOnUiThread(this::render);}},"TornFCA-DeveloperUserStats").start();
     }
 
     private void addLaunchButton(LinearLayout parent,String label,String target){Button b=button(label);b.setOnClickListener(v->{Intent i=new Intent(this,FeatureRouterActivity.class);i.putExtra(FeatureRouterActivity.EXTRA_TARGET,target);startActivity(i);});LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));p.topMargin=dp(7);parent.addView(b,p);}

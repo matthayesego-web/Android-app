@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Official TornFCA Network Helix brand mark. -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#29E6FF" android:strokeWidth="2.3" android:strokeLineJoin="round" android:pathData="M54,13 L82,28 L82,72 L54,95 L26,72 L26,28 Z"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#9A5CFF" android:strokeWidth="2.3" android:strokeLineJoin="round" android:pathData="M54,13 L82,28 L82,72 L54,95"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#F1C86E" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M43,18 L54,11 L65,18 M45,90 L54,97 L63,90"/>
+    <path android:fillColor="#F1C86E" android:pathData="M54,8.5 A3.4,3.4 0,1 0,54.1,8.5 M54,99.5 A3.4,3.4 0,1 0,54.1,99.5"/>
+
+    <!-- Network circuitry. -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#34DFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M34,35 L34,47 M39,38 L39,51 M44,34 L44,43 M31,63 L31,72 M37,59 L37,76 M43,66 L43,79"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#A26AFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M64,34 L64,43 M69,38 L69,51 M74,35 L74,47 M65,66 L65,79 M71,59 L71,76 M77,63 L77,72"/>
+    <path android:fillColor="#34DFFF" android:pathData="M34,31.8 A3.1,3.1 0,1 0,34.1,31.8 M39,34.8 A3.1,3.1 0,1 0,39.1,34.8 M44,30.8 A3.1,3.1 0,1 0,44.1,30.8 M31,76.2 A3.1,3.1 0,1 0,31.1,76.2 M37,79.2 A3.1,3.1 0,1 0,37.1,79.2 M43,82.2 A3.1,3.1 0,1 0,43.1,82.2"/>
+    <path android:fillColor="#A26AFF" android:pathData="M64,30.8 A3.1,3.1 0,1 0,64.1,30.8 M69,34.8 A3.1,3.1 0,1 0,69.1,34.8 M74,31.8 A3.1,3.1 0,1 0,74.1,31.8 M65,82.2 A3.1,3.1 0,1 0,65.1,82.2 M71,79.2 A3.1,3.1 0,1 0,71.1,79.2 M77,76.2 A3.1,3.1 0,1 0,77.1,76.2"/>
+
+    <!-- Double helix. -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#39E8FF" android:strokeWidth="6.3" android:strokeLineCap="round" android:pathData="M39,18 C28,29 28,40 42,51 C57,63 68,72 67,88"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#A04DFF" android:strokeWidth="6.3" android:strokeLineCap="round" android:pathData="M69,18 C80,29 80,40 66,51 C51,63 40,72 41,88"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#86F7FF" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M38,20 C30,29 31,38 43,48"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#D393FF" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M70,20 C78,29 77,38 65,48"/>
+
+    <!-- Central F. -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#B9F8FF" android:strokeWidth="5.2" android:strokeLineJoin="miter" android:strokeLineCap="square" android:pathData="M47,72 L47,48 L65,48 M47,59 L61,59"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#A65DFF" android:strokeWidth="2" android:pathData="M49.6,72 L49.6,63"/>
+</vector>

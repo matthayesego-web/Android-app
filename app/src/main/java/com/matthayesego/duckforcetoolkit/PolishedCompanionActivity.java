@@ -15,7 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-/** Presentation layer for the compact quick-access dashboard and companion visual polish. */
+/** v0.8 presentation shell: Home / Faction / Leadership over the working v0.7 feature layer. */
 public class PolishedCompanionActivity extends CompanionActivity {
     private static final int BG = Color.rgb(6, 9, 13);
     private static final int SURFACE = Color.rgb(15, 20, 28);
@@ -26,6 +26,10 @@ public class PolishedCompanionActivity extends CompanionActivity {
     private static final int GOLD_LIGHT = Color.rgb(241, 194, 106);
     private static final int BLUE = Color.rgb(88, 166, 255);
     private static final int GREEN = Color.rgb(63, 185, 80);
+
+    private static final int TAB_HOME = 0;
+    private static final int TAB_FACTION = 1;
+    private static final int TAB_LEADERSHIP = 2;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,14 +54,12 @@ public class PolishedCompanionActivity extends CompanionActivity {
     }
 
     @Override public void setContentView(View view) {
-        if (containsText(view, "Connect your Torn account")) prepareLogin(view);
-        if (containsText(view, "Welcome back,")) {
-            attachFactionIntelligence(view);
-            retargetDeveloperConsole(view);
-        }
+        boolean login = containsText(view, "Connect your Torn account") || containsText(view, "Sign in to Duck Force");
+        boolean home = containsText(view, "Welcome back,");
+        if (login) prepareLogin(view);
         polishTree(view);
         stampText(view);
-        if (containsText(view, "Welcome back,")) compactKnownHomeCards(view);
+        if (home) installV080Shell(view);
         super.setContentView(view);
     }
 
@@ -113,48 +115,140 @@ public class PolishedCompanionActivity extends CompanionActivity {
         }
     }
 
-    private void attachFactionIntelligence(View root) {
+    private void installV080Shell(View root) {
         if (!(root instanceof ScrollView)) return;
         ScrollView scroll = (ScrollView) root;
         if (scroll.getChildCount() == 0 || !(scroll.getChildAt(0) instanceof LinearLayout)) return;
         LinearLayout column = (LinearLayout) scroll.getChildAt(0);
-        if (containsText(column, "QUICK ACCESS")) return;
+        if ("v080-shell".equals(column.getTag())) return;
 
-        int insertAt = Math.min(4, column.getChildCount());
-        TextView section = sectionLabel("QUICK ACCESS");
-        LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        sectionParams.bottomMargin = dp(8); column.addView(section, insertAt++, sectionParams);
+        ShellRefs refs = new ShellRefs();
+        refs.column = column;
+        refs.hero = findDirect(column, "Welcome back,");
+        refs.war = findDirect(column, "WAR STATUS");
+        refs.banking = findDirect(column, "BANKING");
+        refs.armory = findDirect(column, "ARMORY AUDITOR");
+        refs.leadership = findDirect(column, "LEADERSHIP CONTROLS");
+        refs.train = findDirect(column, "COMPANY TRAINING CALCULATOR");
+        refs.developer = findDirect(column, "DEVELOPER CONSOLE");
+        refs.owner = refs.developer != null;
+        refs.leadershipVisible = refs.owner || refs.leadership != null || refs.armory != null;
+        if (refs.hero == null) return;
 
-        LinearLayout grid = new LinearLayout(this); grid.setOrientation(LinearLayout.VERTICAL);
-        boolean activity = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_ACTIVITY);
-        boolean war = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_WAR);
-        boolean chain = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_CHAIN);
-        boolean oc = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_OC);
-        boolean pulse = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_PULSE);
-        boolean lookup = DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_LOOKUP);
+        column.setTag("v080-shell");
+        renderShell(refs, TAB_HOME);
+    }
 
-        addPair(grid,
-                activity ? featureTile("📊 Activity", "30-day participation", FeatureRouterActivity.TARGET_ACTIVITY, BLUE) : null,
-                war ? featureTile("⚔ War", "Live participation", FeatureRouterActivity.TARGET_WAR, GOLD_LIGHT) : null);
-        addPair(grid,
-                chain ? featureTile("⛓ Chain", "Status & readiness", FeatureRouterActivity.TARGET_CHAIN, GREEN) : null,
-                oc ? featureTile("🧩 OC Tracker", "Open • plan • complete", FeatureRouterActivity.TARGET_OC, BLUE) : null);
-        addPair(grid,
-                pulse ? featureTile("◉ Faction Pulse", "Health at a glance", FeatureRouterActivity.TARGET_PULSE, GREEN) : null,
-                lookup ? featureTile("⌕ Member Lookup", "Find anyone fast", FeatureRouterActivity.TARGET_LOOKUP, BLUE) : null);
-
-        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        gp.bottomMargin = dp(10); column.addView(grid, insertAt++, gp);
-
-        if (DeveloperSettings.featureEnabled(this, DeveloperSettings.FEATURE_PREMIUM_PREVIEW)) {
-            TextView premium = sectionLabel("PREMIUM PREVIEW"); premium.setTextColor(GOLD_LIGHT);
-            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            pp.topMargin = dp(2); pp.bottomMargin = dp(8); column.addView(premium, insertAt++, pp);
-            LinearLayout premiumGrid = new LinearLayout(this); premiumGrid.setOrientation(LinearLayout.VERTICAL);
-            addPair(premiumGrid, premiumTile("🔔 Smart Alerts", "Locked • planned"), premiumTile("◆ Advanced Intel", "Locked • planned"));
-            LinearLayout.LayoutParams pgp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            pgp.bottomMargin = dp(8); column.addView(premiumGrid, insertAt++, pgp);
+    private View findDirect(LinearLayout parent, String needle) {
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            View child = parent.getChildAt(i);
+            if (containsText(child, needle)) return child;
         }
+        return null;
+    }
+
+    private void renderShell(ShellRefs refs, int selected) {
+        LinearLayout column = refs.column;
+        column.removeAllViews();
+        addDetached(column, refs.hero, false);
+
+        LinearLayout nav = new LinearLayout(this); nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setPadding(0, dp(12), 0, dp(12));
+        nav.addView(navButton("Home", selected == TAB_HOME, () -> renderShell(refs, TAB_HOME)), navParams(false));
+        nav.addView(navButton("Faction", selected == TAB_FACTION, () -> renderShell(refs, TAB_FACTION)), navParams(true));
+        if (refs.leadershipVisible) nav.addView(navButton("Leadership", selected == TAB_LEADERSHIP, () -> renderShell(refs, TAB_LEADERSHIP)), navParams(true));
+        column.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(60)));
+
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
+        if (selected == TAB_FACTION) renderFaction(refs, content);
+        else if (selected == TAB_LEADERSHIP && refs.leadershipVisible) renderLeadership(refs, content);
+        else renderHome(refs, content);
+        column.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView footer = new TextView(this);
+        footer.setText("TornFCA v"+TornFcaBrand.VERSION+" • faction operating layer");
+        footer.setTextColor(MUTED); footer.setTextSize(11); footer.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        fp.topMargin = dp(6); fp.bottomMargin = dp(4); column.addView(footer, fp);
+    }
+
+    private void renderHome(ShellRefs refs, LinearLayout content) {
+        addSection(content, "WHAT NEEDS MY ATTENTION?");
+        if (refs.war != null) addDetached(content, refs.war, true);
+        addPair(content,
+                featureTile("My OC", "My assignment, slot, CPR and item readiness", () -> openMember(MemberFactionActivity.MODE_OC), BLUE),
+                featureTile("My War", "My ranked-war hits and current war status", () -> openMember(MemberFactionActivity.MODE_PARTICIPATION), GOLD_LIGHT));
+        addPair(content,
+                featureTile("Chain", "Current faction chain status", () -> openFeature(FeatureRouterActivity.TARGET_CHAIN), GREEN),
+                featureTile("My Obligations", "What needs my action right now", () -> openMember(MemberFactionActivity.MODE_OVERVIEW), GOLD_LIGHT));
+        LinearLayout digest = tileBase("While You Were Away", "Live/session digest now; durable cross-device history comes with the shared backend.", BLUE);
+        digest.setOnClickListener(v -> openMember(MemberFactionActivity.MODE_OVERVIEW));
+        addFull(content, digest);
+    }
+
+    private void renderFaction(ShellRefs refs, LinearLayout content) {
+        addSection(content, "FACTION OVERVIEW");
+        if (refs.war != null) addDetached(content, refs.war, true);
+        addPair(content,
+                featureTile("My Participation", "My own ranked-war activity only", () -> openMember(MemberFactionActivity.MODE_PARTICIPATION), BLUE),
+                featureTile("My OC", "My own organized-crime details only", () -> openMember(MemberFactionActivity.MODE_OC), GREEN));
+        addPair(content,
+                featureTile("Intel", "Search the current Duck Force directory", () -> openFeature(FeatureRouterActivity.TARGET_LOOKUP), BLUE),
+                featureTile("Chain Status", "Faction chain status and readiness", () -> openFeature(FeatureRouterActivity.TARGET_CHAIN), GREEN));
+
+        addSection(content, "SHARED TOOLS");
+        if (refs.banking != null) addDetached(content, refs.banking, true);
+    }
+
+    private void renderLeadership(ShellRefs refs, LinearLayout content) {
+        addSection(content, "MEMBERS");
+        addPair(content,
+                featureTile("Activity Tracker", "Faction-wide participation scan", () -> openFeature(FeatureRouterActivity.TARGET_ACTIVITY), BLUE),
+                featureTile("Faction Pulse", "Member health and availability", () -> openFeature(FeatureRouterActivity.TARGET_PULSE), GREEN));
+        addFull(content, featureTile("Member Lookup", "Full leadership lookup from the current faction roster", () -> openFeature(FeatureRouterActivity.TARGET_LOOKUP), BLUE));
+
+        addSection(content, "WAR");
+        addPair(content,
+                featureTile("War Participation", "Live or latest ranked-war participation", () -> openFeature(FeatureRouterActivity.TARGET_WAR), GOLD_LIGHT),
+                featureTile("Chain Command", "Chain status and readiness", () -> openFeature(FeatureRouterActivity.TARGET_CHAIN), GREEN));
+
+        addSection(content, "OC");
+        addFull(content, featureTile("OC Management", "Open, planning and completed organized crimes", () -> openFeature(FeatureRouterActivity.TARGET_OC), BLUE));
+
+        addSection(content, "OPERATIONS");
+        if (refs.banking != null) addDetached(content, refs.banking, true);
+        if (refs.armory != null) addDetached(content, refs.armory, true);
+        if (refs.leadership != null) addDetached(content, refs.leadership, true);
+
+        if (refs.owner) {
+            addSection(content, "OWNER / DEVELOPER");
+            if (refs.train != null) addDetached(content, refs.train, true);
+            if (refs.developer != null) {
+                refs.developer.setClickable(true);
+                refs.developer.setOnClickListener(v -> openFeature(FeatureRouterActivity.TARGET_DEVELOPER));
+                addDetached(content, refs.developer, true);
+            }
+        }
+    }
+
+    private void addSection(LinearLayout parent, String value) {
+        TextView section = sectionLabel(value);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        p.topMargin = dp(4); p.bottomMargin = dp(8); parent.addView(section, p);
+    }
+
+    private Button navButton(String label, boolean selected, Runnable action) {
+        Button b = new Button(this); b.setText(label); b.setAllCaps(false); b.setTextSize(13);
+        b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL)); b.setStateListAnimator(null);
+        b.setTextColor(selected ? Color.rgb(24,17,8) : TEXT);
+        b.setBackground(selected ? goldButton() : rounded(SURFACE, BORDER, 13));
+        b.setOnClickListener(v -> action.run());
+        return b;
+    }
+
+    private LinearLayout.LayoutParams navParams(boolean withMargin) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        if (withMargin) p.leftMargin = dp(7); return p;
     }
 
     private TextView sectionLabel(String value) {
@@ -173,21 +267,20 @@ public class PolishedCompanionActivity extends CompanionActivity {
         rp.bottomMargin = dp(8); grid.addView(row, rp);
     }
 
+    private void addFull(LinearLayout parent, View child) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(92));
+        p.bottomMargin = dp(9); parent.addView(child, p);
+    }
+
     private LinearLayout.LayoutParams tileParams(boolean withLeftMargin) {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(92), 1f);
         if (withLeftMargin) p.leftMargin = dp(8);
         return p;
     }
 
-    private LinearLayout featureTile(String title, String body, String target, int stroke) {
+    private LinearLayout featureTile(String title, String body, Runnable action, int stroke) {
         LinearLayout tile = tileBase(title, body, stroke);
-        tile.setOnClickListener(v -> openFeature(target));
-        return tile;
-    }
-
-    private LinearLayout premiumTile(String title, String body) {
-        LinearLayout tile = tileBase(title, body, GOLD_LIGHT);
-        tile.setOnClickListener(v -> startActivity(new Intent(this, PremiumPreviewActivity.class)));
+        tile.setOnClickListener(v -> action.run());
         return tile;
     }
 
@@ -201,36 +294,20 @@ public class PolishedCompanionActivity extends CompanionActivity {
         return tile;
     }
 
+    private void addDetached(LinearLayout parent, View child, boolean marginBottom) {
+        if (child == null) return;
+        ViewGroup old = child.getParent() instanceof ViewGroup ? (ViewGroup) child.getParent() : null;
+        if (old != null) old.removeView(child);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        if (marginBottom) p.bottomMargin = dp(10); parent.addView(child, p);
+    }
+
     private void openFeature(String target) {
         Intent i = new Intent(this, FeatureRouterActivity.class); i.putExtra(FeatureRouterActivity.EXTRA_TARGET, target); startActivity(i);
     }
 
-    private boolean retargetDeveloperConsole(View view) {
-        if (view instanceof ViewGroup) {
-            ViewGroup g = (ViewGroup) view;
-            for (int i = 0; i < g.getChildCount(); i++) if (retargetDeveloperConsole(g.getChildAt(i))) return true;
-            if (view instanceof LinearLayout && containsText(view, "🛠 Developer Console")) {
-                view.setClickable(true); view.setOnClickListener(v -> openFeature(FeatureRouterActivity.TARGET_DEVELOPER)); return true;
-            }
-        }
-        return false;
-    }
-
-    private void compactKnownHomeCards(View view) {
-        if (view instanceof LinearLayout) {
-            LinearLayout l = (LinearLayout) view;
-            String title = directTitle(l);
-            String[] known={"BANKING","ARMORY AUDITOR","LEADERSHIP CONTROLS","COMPANY TRAINING CALCULATOR","DEVELOPER CONSOLE"};
-            for(String k:known) if(k.equals(title)){l.setPadding(dp(14),dp(11),dp(14),dp(11));break;}
-        }
-        if (view instanceof ViewGroup) {
-            ViewGroup g=(ViewGroup)view;for(int i=0;i<g.getChildCount();i++)compactKnownHomeCards(g.getChildAt(i));
-        }
-    }
-
-    private String directTitle(LinearLayout layout) {
-        for(int i=0;i<layout.getChildCount();i++){View child=layout.getChildAt(i);if(child instanceof TextView){CharSequence raw=((TextView)child).getText();if(raw!=null)return raw.toString();}}
-        return "";
+    private void openMember(String mode) {
+        Intent i = new Intent(this, MemberFactionActivity.class); i.putExtra(MemberFactionActivity.EXTRA_MODE, mode); startActivity(i);
     }
 
     private void polishTree(View view) {
@@ -258,7 +335,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
         if (view instanceof TextView) {
             TextView t = (TextView) view; CharSequence raw = t.getText();
             if (raw != null) {
-                String v = raw.toString().replace("v0.6.0","v0.7.0").replace("v0.5.0","v0.7.0").replace("v0.4.0","v0.7.0").replace("v0.4.1","v0.7.0").replace("v0.4.2","v0.7.0").replace("v0.4.3","v0.7.0").replace("v0.4.4","v0.7.0")
+                String v = raw.toString().replace("v0.7.0","v0.8.0").replace("v0.6.0","v0.8.0").replace("v0.5.0","v0.8.0").replace("v0.4.0","v0.8.0").replace("v0.4.1","v0.8.0").replace("v0.4.2","v0.8.0").replace("v0.4.3","v0.8.0").replace("v0.4.4","v0.8.0")
                         .replace("Connect your Torn account","Sign in to Duck Force")
                         .replace("Your key verifies your identity and Duck Force membership, then stays encrypted on this device.","Use your Torn API key to verify your membership. Your key is encrypted and stored only on this device.")
                         .replace("Your Duck Force tools, requests and leadership access in one place.","Faction tools, intelligence and leadership access — wherever you play.")
@@ -278,5 +355,18 @@ public class PolishedCompanionActivity extends CompanionActivity {
             ViewGroup g = (ViewGroup) view;
             for (int i = 0; i < g.getChildCount(); i++) stampText(g.getChildAt(i));
         }
+    }
+
+    private static final class ShellRefs {
+        LinearLayout column;
+        View hero;
+        View war;
+        View banking;
+        View armory;
+        View leadership;
+        View train;
+        View developer;
+        boolean owner;
+        boolean leadershipVisible;
     }
 }

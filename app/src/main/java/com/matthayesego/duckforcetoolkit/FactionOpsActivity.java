@@ -105,7 +105,10 @@ public class FactionOpsActivity extends Activity {
     private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");addCard(r,card("Unable to load",message,BAD));setContentView(s);s.requestApplyInsets();});}
 
     private void loadActivity(String key) throws Exception {
-        if(!hasFactionApi()){renderAccessRequired("Faction API Access is required for the faction-news activity scan. War history and chain data remain available without it.");return;}
+        // The cached key-info faction flag can be stale. For Leadership activity scans, Torn's
+        // faction-news endpoint is authoritative; only the explicit developer public-only mode
+        // should pre-block the request.
+        if(DeveloperSettings.simulatePublicOnly(this)){renderAccessRequired("Faction API Access is required for the faction-news activity scan. War history and chain data remain available without it.");return;}
         int days=DeveloperSettings.activityDays(this);
         int pageCap=DeveloperSettings.activityMaxPages(this);
         long now=System.currentTimeMillis()/1000L, from=now-(days*86400L);

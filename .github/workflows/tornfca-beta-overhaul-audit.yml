@@ -1,0 +1,69 @@
+name: Torn FCA Command Overhaul Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify command surface, brand identity and developer access
+        run: |
+          set -euo pipefail
+          GRADLE=app/build.gradle.kts
+          BETA=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          UI=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandUi.java
+          GAUGES=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaGaugeLiveData.java
+          UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
+          ABOUT=app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
+          GATE=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperAccessActivity.java
+          DEV_BACKEND=backend/TornFcaDeveloperBackend.gs
+
+          grep -q 'versionName = "0.10.4"' "$GRADLE"
+          grep -q 'versionCode = 59' "$GRADLE"
+          grep -q 'applicationIdSuffix = ".beta"' "$GRADLE"
+          ! grep -q 'DEVELOPER_ACCESS_SHA256' "$GRADLE"
+
+          grep -q 'Member Network' "$BETA"
+          grep -q 'Training Lab' "$BETA"
+          grep -q 'Operations Command' "$BETA"
+          grep -q 'App Control' "$BETA"
+          grep -q 'metricTile(Activity a,String eyebrow,String center,String title,String detail,int accent,Runnable action)' "$UI"
+          grep -q '/user?selections=bars' "$GAUGES"
+          grep -q 'tornfca_war_prep_v2' "$GAUGES"
+          grep -q 'Faction Announcements' "$UX"
+          grep -q 'War Prep Management' "$UX"
+          ! grep -q 'DeveloperGateActivity.class' "$UX"
+
+          grep -q 'versionTaps>=5' "$ABOUT"
+          grep -q 'DeveloperGateActivity.class' "$ABOUT"
+          grep -q '6-digit authenticator code' "$GATE"
+          grep -q 'Enroll with Invitation Code' "$GATE"
+          grep -q 'Open Authenticator' "$GATE"
+          grep -q 'Create Invitation' "$ACCESS"
+          grep -q 'Reset / Re-enroll' "$ACCESS"
+
+          grep -q "const TD_VERSION='1.4.0'" "$DEV_BACKEND"
+          grep -q 'tdVerifyTotp_' "$DEV_BACKEND"
+          grep -q 'developer_invite_create' "$DEV_BACKEND"
+          grep -q 'developer_access_revoke' "$DEV_BACKEND"
+          cp "$DEV_BACKEND" /tmp/dev.js
+          node --check /tmp/dev.js
+
+          BRAND=app/src/main/res/drawable/tornfca_mark.xml
+          LAUNCH=app/src/main/res/drawable/tornfca_launcher_mark.xml
+          grep -q 'Network Helix' "$BRAND"
+          grep -q 'Network Helix launcher mark' "$LAUNCH"
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+
+          test -f app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepLeadershipActivity.java
+          grep -q 'persistChecklistMetadata' app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+          echo 'Torn FCA v0.10.4 command/brand/developer audit passed.'

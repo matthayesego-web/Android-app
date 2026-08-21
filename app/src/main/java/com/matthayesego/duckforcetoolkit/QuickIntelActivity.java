@@ -1,11 +1,13 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
@@ -22,91 +24,27 @@ import java.util.List;
 import java.util.Locale;
 
 public class QuickIntelActivity extends Activity {
-    public static final String EXTRA_MODE = "mode";
-    public static final String MODE_PULSE = "PULSE";
-    public static final String MODE_LOOKUP = "LOOKUP";
+    public static final String EXTRA_MODE="mode";public static final String MODE_PULSE="PULSE";public static final String MODE_LOOKUP="LOOKUP";
+    private static final int BG=Color.rgb(6,9,13),PANEL=Color.rgb(14,20,29),PANEL2=Color.rgb(9,14,21),BORDER=Color.rgb(45,55,69),TEXT=Color.rgb(244,246,249),MUTED=Color.rgb(154,164,178),GOLD=Color.rgb(241,194,106),BLUE=Color.rgb(88,166,255),GOOD=Color.rgb(63,185,80),BAD=Color.rgb(248,81,73);
+    private SecureApiKeyStore keyStore;private String mode;private int factionId;private String factionName;private JSONArray members=new JSONArray();
 
-    private static final int BG=Color.rgb(8,12,18), PANEL=Color.rgb(20,27,38), PANEL2=Color.rgb(27,36,49), BORDER=Color.rgb(49,63,81);
-    private static final int TEXT=Color.rgb(245,248,252), MUTED=Color.rgb(151,163,179), GOLD=Color.rgb(243,184,52), BLUE=Color.rgb(88,166,255), GOOD=Color.rgb(63,185,80), BAD=Color.rgb(248,81,73);
-
-    private SecureApiKeyStore keyStore;
-    private String mode;
-    private int factionId;
-    private String factionName;
-    private JSONArray members = new JSONArray();
-
-    @Override protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(BG);
-        keyStore = new SecureApiKeyStore(this);
-        mode = getIntent().getStringExtra(EXTRA_MODE);
-        factionId = getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID, 0);
-        factionName = getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);
-        if (mode == null) mode = MODE_PULSE;
-        if (factionName == null || factionName.trim().isEmpty()) factionName = "Faction";
-        JSONArray cached = FactionMemberCache.load(factionId);
-        if (cached != null) {
-            members = cached;
-            if (MODE_LOOKUP.equals(mode)) renderLookup(null); else renderPulse();
-        } else {
-            showLoading();
-            load();
-        }
-    }
-
+    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);mode=getIntent().getStringExtra(EXTRA_MODE);if(mode==null)mode=MODE_PULSE;if(MODE_PULSE.equals(mode)){int playerId=PremiumAccess.currentPlayerId(this);PremiumAccess.refresh(this,playerId);if(!PremiumAccess.has(this,playerId,PremiumAccess.FACTION_PULSE)){startActivity(new Intent(this,PremiumPreviewActivity.class));finish();return;}}factionId=getIntent().getIntExtra(FactionOpsActivity.EXTRA_FACTION_ID,0);factionName=getIntent().getStringExtra(FactionOpsActivity.EXTRA_FACTION_NAME);if(factionName==null||factionName.trim().isEmpty())factionName="Faction";JSONArray cached=FactionMemberCache.load(factionId);if(cached!=null){members=cached;if(MODE_LOOKUP.equals(mode))renderLookup(null);else renderPulse();}else{showLoading();load();}}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
+    private GradientDrawable gradient(int a,int b,int stroke,int radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{a,b});d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setLineSpacing(0f,1.08f);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
-    private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(TEXT);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackground(rounded(PANEL2,BORDER,11));return b;}
-    private LinearLayout card(String title,String body,int stroke){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(15),dp(13),dp(15),dp(13));c.setBackground(rounded(PANEL,stroke,16));c.addView(text(title,17,TEXT,true));if(body!=null&&!body.isEmpty()){TextView b=text(body,13,MUTED,false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(5);c.addView(b,p);}return c;}
-    private void addCard(LinearLayout root,LinearLayout c){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.bottomMargin=dp(9);root.addView(c,p);}
-    private ScrollView shell(){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.setBackgroundColor(BG);s.setPadding(dp(16),dp(16),dp(16),dp(28));return s;}
+    private Button button(String label,int stroke){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(TEXT);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackground(rounded(PANEL2,stroke,12));return b;}
+    private LinearLayout card(String title,String body,int stroke){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(17),dp(15),dp(17),dp(15));c.setBackground(rounded(PANEL,stroke,18));c.addView(text(title,18,TEXT,true));if(body!=null&&!body.isEmpty()){TextView b=text(body,13,MUTED,false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(6);c.addView(b,p);}return c;}
+    private void addCard(LinearLayout root,LinearLayout c){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.bottomMargin=dp(10);root.addView(c,p);}
+    @SuppressWarnings("deprecation") private ScrollView shell(){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.setBackgroundColor(BG);int l=dp(16),t=dp(18),r=dp(16),b=dp(30);s.setPadding(l,t,r,b);s.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(l+i.getSystemWindowInsetLeft(),t+i.getSystemWindowInsetTop(),r+i.getSystemWindowInsetRight(),b+i.getSystemWindowInsetBottom());return i;});return s;}
     private LinearLayout root(ScrollView s){LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);s.addView(r,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));return r;}
-
     private String title(){return MODE_LOOKUP.equals(mode)?"Member Quick Lookup":"Faction Pulse";}
-    private void addHeader(LinearLayout r,String subtitle){Button back=button("← Companion");back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(124),dp(44)));TextView t=text(title(),27,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);r.addView(t,tp);TextView s=text(factionName+" • "+subtitle,13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(4);sp.bottomMargin=dp(14);r.addView(s,sp);}
-    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading member snapshot…");addCard(r,card("Quick intel","Reading the current faction member list once, then sharing it briefly between quick-access tools.",BLUE));setContentView(s);}
-
+    private void addHeader(LinearLayout r,String subtitle){Button back=button("← Companion",BORDER);back.setOnClickListener(v->finish());r.addView(back,new LinearLayout.LayoutParams(dp(132),dp(44)));LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setGravity(Gravity.CENTER_HORIZONTAL);hero.setPadding(dp(18),dp(18),dp(18),dp(18));hero.setBackground(gradient(Color.rgb(20,37,55),Color.rgb(14,18,24),BLUE,22));TextView brand=text("TORNFCA • INTEL",10,BLUE,true);brand.setLetterSpacing(.13f);hero.addView(brand);TextView t=text(title(),29,TEXT,true);t.setGravity(Gravity.CENTER);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(5);hero.addView(t,tp);TextView sub=text(factionName+" • "+subtitle,13,MUTED,false);sub.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(5);hero.addView(sub,sp);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);hp.topMargin=dp(14);hp.bottomMargin=dp(14);r.addView(hero,hp);}
+    private void finishView(ScrollView s){setContentView(s);s.requestApplyInsets();}
+    private void showLoading(){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Loading member snapshot…");addCard(r,card("Quick intel","Reading the current faction member list once, then sharing it briefly between quick-access tools.",BLUE));finishView(s);}
     private void load(){String key=keyStore.load();if(key==null||key.trim().isEmpty()){renderError("Reconnect your Torn API key to use quick intel.");return;}new Thread(()->{try{JSONArray data=TornApiClient.getJson("/faction/members",key).optJSONArray("members");members=data==null?new JSONArray():data;FactionMemberCache.save(factionId,members);runOnUiThread(()->{if(MODE_LOOKUP.equals(mode))renderLookup(null);else renderPulse();});}catch(Exception e){renderError(e.getMessage()==null?"Unable to load faction members.":e.getMessage());}}).start();}
-    private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");addCard(r,card("Unable to load",message,BAD));setContentView(s);});}
-
-    private void renderPulse(){
-        int total=members.length(),online=0,hospital=0,jail=0,travel=0,notOc=0,onWall=0,available=0;
-        List<String> ready=new ArrayList<>();
-        for(int i=0;i<members.length();i++){
-            JSONObject m=members.optJSONObject(i);if(m==null)continue;
-            JSONObject last=m.optJSONObject("last_action"), status=m.optJSONObject("status");
-            String lastState=last==null?"":last.optString("status","");String state=status==null?"":status.optString("state","");String lower=state.toLowerCase(Locale.US);
-            boolean isOnline="Online".equalsIgnoreCase(lastState);if(isOnline)online++;
-            if(lower.contains("hospital"))hospital++;if(lower.contains("jail"))jail++;if(lower.contains("travel")||lower.contains("abroad"))travel++;
-            if(!m.optBoolean("is_in_oc",false))notOc++;if(m.optBoolean("is_on_wall",false))onWall++;
-            boolean blocked=lower.contains("hospital")||lower.contains("jail")||lower.contains("travel")||lower.contains("abroad");if(!blocked){available++;if(isOnline)ready.add(m.optString("name","Unknown"));}
-        }
-        Collections.sort(ready,String.CASE_INSENSITIVE_ORDER);
-        ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Live member health snapshot");
-        addCard(r,card("Faction snapshot",total+" members • "+online+" online • "+available+" available",GOOD));
-        addCard(r,card("Availability",hospital+" hospital • "+jail+" jailed • "+travel+" traveling/abroad",BORDER));
-        addCard(r,card("OC & territory",notOc+" not currently in an OC • "+onWall+" on territory wall",BLUE));
-        if(ready.isEmpty())addCard(r,card("Online & available","No members matched the online-and-available filter.",BORDER));
-        else {StringBuilder b=new StringBuilder();for(int i=0;i<Math.min(20,ready.size());i++){if(i>0)b.append(" • ");b.append(ready.get(i));}if(ready.size()>20)b.append(" • +").append(ready.size()-20).append(" more");addCard(r,card("Ready right now",b.toString(),GOLD));}
-        setContentView(s);
-    }
-
-    private void renderLookup(String query){
-        ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Search current faction members");
-        EditText search=new EditText(this);search.setHint("Member name");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setSingleLine(true);search.setInputType(InputType.TYPE_CLASS_TEXT);search.setPadding(dp(14),0,dp(14),0);search.setBackground(rounded(PANEL2,BORDER,11));if(query!=null)search.setText(query);r.addView(search,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50)));
-        Button go=button("Search Member");LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));gp.topMargin=dp(8);gp.bottomMargin=dp(12);r.addView(go,gp);go.setOnClickListener(v->renderLookup(search.getText().toString().trim()));
-        if(query==null||query.trim().isEmpty()){addCard(r,card("Instant lookup","Search by full or partial name. Results come from the member snapshot already loaded for this screen.",BLUE));setContentView(s);return;}
-        String q=query.toLowerCase(Locale.US);List<JSONObject> matches=new ArrayList<>();
-        for(int i=0;i<members.length();i++){JSONObject m=members.optJSONObject(i);if(m!=null&&m.optString("name","").toLowerCase(Locale.US).contains(q))matches.add(m);}
-        if(matches.isEmpty())addCard(r,card("No match","No current faction member matched “"+query+"”.",BAD));
-        else for(JSONObject m:matches)addCard(r,memberCard(m));
-        setContentView(s);
-    }
-
-    private LinearLayout memberCard(JSONObject m){
-        String name=m.optString("name","Unknown");String position=m.optString("position","Member");JSONObject status=m.optJSONObject("status"),last=m.optJSONObject("last_action");String state=status==null?"Unknown":status.optString("state","Unknown");String lastState=last==null?"Unknown":last.optString("status","Unknown");String relative=last==null?"":last.optString("relative","");
-        String body=position+"\nStatus: "+state+"\nLast action: "+lastState+(relative.isEmpty()?"":" • "+relative)+"\nOC: "+(m.optBoolean("is_in_oc",false)?"Assigned":"Not assigned")+" • Wall: "+(m.optBoolean("is_on_wall",false)?"Yes":"No");
-        return card(name,body,"Online".equalsIgnoreCase(lastState)?GOOD:BORDER);
-    }
+    private void renderError(String message){runOnUiThread(()->{ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Data unavailable");addCard(r,card("Unable to load",message,BAD));finishView(s);});}
+    private void renderPulse(){int total=members.length(),online=0,hospital=0,jail=0,travel=0,notOc=0,onWall=0,available=0;List<String> ready=new ArrayList<>();for(int i=0;i<members.length();i++){JSONObject m=members.optJSONObject(i);if(m==null)continue;JSONObject last=m.optJSONObject("last_action"),status=m.optJSONObject("status");String lastState=last==null?"":last.optString("status","");String state=status==null?"":status.optString("state","");String lower=state.toLowerCase(Locale.US);boolean isOnline="Online".equalsIgnoreCase(lastState);if(isOnline)online++;if(lower.contains("hospital"))hospital++;if(lower.contains("jail"))jail++;if(lower.contains("travel")||lower.contains("abroad"))travel++;if(!m.optBoolean("is_in_oc",false))notOc++;if(m.optBoolean("is_on_wall",false))onWall++;boolean blocked=lower.contains("hospital")||lower.contains("jail")||lower.contains("travel")||lower.contains("abroad");if(!blocked){available++;if(isOnline)ready.add(m.optString("name","Unknown"));}}Collections.sort(ready,String.CASE_INSENSITIVE_ORDER);ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Live member health snapshot");addCard(r,card("Faction snapshot",total+" members\n"+online+" online • "+available+" currently available",GOOD));addCard(r,card("Availability",hospital+" hospital • "+jail+" jailed • "+travel+" traveling/abroad",BORDER));addCard(r,card("OC & territory",notOc+" not currently in an OC • "+onWall+" on territory wall",BLUE));if(ready.isEmpty())addCard(r,card("Online & available","No members matched the online-and-available filter.",BORDER));else{StringBuilder b=new StringBuilder();for(int i=0;i<Math.min(20,ready.size());i++){if(i>0)b.append(" • ");b.append(ready.get(i));}if(ready.size()>20)b.append(" • +").append(ready.size()-20).append(" more");addCard(r,card("Ready right now",b.toString(),GOLD));}TextView footer=text("TornFCA v"+TornFcaBrand.VERSION+" • live faction snapshot",10.5f,MUTED,false);footer.setGravity(Gravity.CENTER);r.addView(footer);finishView(s);}
+    private void renderLookup(String query){ScrollView s=shell();LinearLayout r=root(s);addHeader(r,"Search current faction members");EditText search=new EditText(this);search.setHint("Member name");search.setHintTextColor(MUTED);search.setTextColor(TEXT);search.setSingleLine(true);search.setInputType(InputType.TYPE_CLASS_TEXT);search.setPadding(dp(14),0,dp(14),0);search.setBackground(rounded(PANEL2,BLUE,13));if(query!=null)search.setText(query);r.addView(search,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(54)));Button go=button("Search Member",BLUE);LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48));gp.topMargin=dp(9);gp.bottomMargin=dp(12);r.addView(go,gp);go.setOnClickListener(v->renderLookup(search.getText().toString().trim()));if(query==null||query.trim().isEmpty()){addCard(r,card("Instant lookup","Search by full or partial name. Results use the faction snapshot already loaded on this device. Use Faction Strength Intel for FFScouter battle-stat estimates.",BLUE));finishView(s);return;}String q=query.toLowerCase(Locale.US);List<JSONObject> matches=new ArrayList<>();for(int i=0;i<members.length();i++){JSONObject m=members.optJSONObject(i);if(m!=null&&m.optString("name","").toLowerCase(Locale.US).contains(q))matches.add(m);}if(matches.isEmpty())addCard(r,card("No match","No current faction member matched “"+query+"”.",BAD));else for(JSONObject m:matches)addCard(r,memberCard(m));finishView(s);}
+    private LinearLayout memberCard(JSONObject m){String name=m.optString("name","Unknown");String position=m.optString("position","Member");JSONObject status=m.optJSONObject("status"),last=m.optJSONObject("last_action");String state=status==null?"Unknown":status.optString("state","Unknown");String lastState=last==null?"Unknown":last.optString("status","Unknown");String relative=last==null?"":last.optString("relative","");String body=position+"\nStatus: "+state+"\nLast action: "+lastState+(relative.isEmpty()?"":" • "+relative)+"\nOC: "+(m.optBoolean("is_in_oc",false)?"Assigned":"Not assigned")+" • Wall: "+(m.optBoolean("is_on_wall",false)?"Yes":"No");return card(name,body,"Online".equalsIgnoreCase(lastState)?GOOD:BORDER);}
 }

@@ -1,43 +1,63 @@
-# Duck Force Companion — Play Store Roadmap
+# TornFCA — Google Play / Public Release Roadmap
 
-Target: v0.7.0
+Current development line: v0.9.x community beta preparation
+Production target: v1.0.0 after closed-beta validation
 
-## v0.4.0 — Companion foundation
-- Companion-first navigation and branding.
-- Owner / Developer role and private My Tools section.
-- Banking workflow prototype.
-- Full launcher badge plus Android adaptive-icon resource.
-- Permanent direct-release signing identity established outside source control.
-- targetSdk 36 / compileSdk 36.
+## Member-first beta objective
+Before public release, TornFCA must be clearly useful to an ordinary faction member without payment or leadership permissions. The free core should include:
+- My Day / readiness summary.
+- Current war, chain and personal OC context.
+- Personal ranked-war participation.
+- Member-safe faction overview and roster/directory.
+- Universal training resources.
+- Faction-scoped training rules and custom guide library.
+- Faction community/chat and important notification history where the community backend is enabled.
 
-## v0.5.0 — Shared faction services
-- Deploy and connect the shared Duck Force backend.
-- Shared banking request queue and history.
-- Live balance reconciliation and payout status.
-- Individual private-tool grants and delegated developer/tester roles.
-- One-tap chat-listener export/install flow.
-- In-app update/version status.
+Leadership tools remain additive and permission-aware. Premium should add convenience, history, automation and analytics rather than removing the basic information members need to participate.
 
-## v0.6.0 — Release quality and policy pass
-- War / activity companion features selected from testing feedback.
-- Notifications and background behavior reviewed for Android policy compliance.
-- Privacy policy and in-app privacy/about page.
-- Data inventory and Google Play Data safety answers prepared.
-- Accessibility, icon, phone-size and tablet-size review.
-- Release build hardening and crash/error handling.
-- Produce signed Android App Bundle test build.
+## v0.9.x — Community beta hardening
+- Continue the member-facing navigation and UI overhaul.
+- Expand member-safe faction information and self-service tools.
+- Add faction-local training expectations and guide publishing.
+- Verify tenant isolation for chat, training content, notifications and any future shared faction data.
+- Continue multi-faction testing; no Duck Force-only production assumptions.
+- Maintain restore branches before high-risk changes.
+- Keep `main` untouched until a tested release is explicitly approved for promotion.
 
-## v0.7.0 — Play Store ready
-- Final package/application identity review.
-- Google Play App Signing enrollment plan.
-- Separate Play upload key.
-- Signed Android App Bundle (.aab).
-- Store title, short description, full description, screenshots, feature graphic and app icon.
-- Privacy policy / Data safety complete.
-- Internal/closed Play testing before production release.
-- Direct APK distribution remains available for Duck Force testers where appropriate.
+## Legal / policy work required before production
+- Final privacy policy and in-app privacy disclosure.
+- End User License Agreement (EULA).
+- Terms & Conditions / Terms of Service.
+- Add EULA and Terms links to the About page.
+- Add appropriate EULA / Terms acknowledgement to the login/onboarding flow before public production release.
+- Decide whether acceptance must be explicit (checkbox/button + versioned acceptance record) based on the final legal text and account/data model.
+- Complete Google Play Data safety answers from the final data inventory.
+- Clearly describe Torn API-key handling, optional third-party provider connections, community backend data, push notifications and any paid entitlements.
+- Accessibility, phone/tablet layout, icon and crash/error-state review.
 
-## Current platform target
-As of August 31, 2026 Google Play requires new Android mobile apps and app updates to target Android 16 / API 36 or higher. Duck Force Companion already targets API 36.
+## Billing / entitlement work before monetization
+- Production entitlement backend keyed by Torn `player_id` and `faction_id`.
+- Google Play Billing integration for Android digital entitlements.
+- Server-side purchase-token verification.
+- Restore purchase / refresh entitlement flow.
+- Subscription/product descriptions, cancellation and support information.
+- Developer/test entitlement simulation must remain unavailable in public builds outside the hidden protected developer tooling.
 
-Google Play App Signing should use separate upload and app-signing keys. The permanent Duck Force direct-distribution key must remain securely backed up and out of source control.
+## Signing and release
+- `applicationId`: `com.matthayesego.duckforcetoolkit` unless an explicitly approved migration occurs before production.
+- targetSdk / compileSdk remain API 36 or later as required by Google Play at release time.
+- Produce signed Android App Bundle (.aab) for Play testing.
+- Use Google Play App Signing with a separate upload key.
+- Preserve the permanent direct-distribution signing identity and backup outside source control.
+- Run internal and closed Play testing before production rollout.
+- Direct APK distribution may remain available for approved testers where appropriate.
+
+## v1.0.0 production gate
+Do not promote to production until all of the following are true:
+1. Member-first free core is stable across multiple factions.
+2. Leadership permissions and faction isolation have been re-audited.
+3. Community backend security checks pass.
+4. EULA, Terms, Privacy Policy and Data safety are complete.
+5. Billing/entitlements are production-safe if monetization is enabled at launch.
+6. Signed release/AAB update path is tested.
+7. Closed-beta feedback has no unresolved release-blocking issues.

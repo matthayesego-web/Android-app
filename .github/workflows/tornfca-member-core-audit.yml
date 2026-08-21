@@ -1,0 +1,130 @@
+name: TornFCA Member Core Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Verify free member core, navigation and tenant boundaries
+        run: |
+          set -euo pipefail
+
+          MEMBER=app/src/main/java/com/matthayesego/duckforcetoolkit/MemberCenterActivity.java
+          MANIFEST=app/src/main/AndroidManifest.xml
+          WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+          TERRITORY=app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarActivity.java
+          TERRITORY_DETAIL=app/src/main/java/com/matthayesego/duckforcetoolkit/TerritoryWarDetailActivity.java
+          COMMUNITY=backend/TornFcaCommunityBackend.gs
+          WARPREP=app/src/main/java/com/matthayesego/duckforcetoolkit/WarPrepActivity.java
+
+          grep -q '"My Day"' "$MEMBER"
+          grep -q '"Faction Directory"' "$MEMBER"
+          grep -q '"Faction Resources"' "$MEMBER"
+          grep -q '"Training Center"' "$MEMBER"
+          grep -q '"My Training Progress"' "$MEMBER"
+          grep -q '"My War Prep"' "$MEMBER"
+          grep -q '"War Center"' "$MEMBER"
+          grep -q 'FeatureRouterActivity.TARGET_WAR' "$MEMBER"
+          grep -q '"Start here"' "$MEMBER"
+          grep -q '"Daily & readiness"' "$MEMBER"
+          grep -q '"Growth & training"' "$MEMBER"
+          grep -q '"My faction"' "$MEMBER"
+          grep -q '"Community & alerts"' "$MEMBER"
+          grep -q '"Optional upgrade"' "$MEMBER"
+          grep -q 'Core faction-member tools stay free' "$MEMBER"
+          grep -q 'The core member tools above remain free' "$MEMBER"
+
+          grep -q 'MemberDirectoryActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'FactionResourcesActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'TrainingCenterActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'TrainingProgressActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'WarPrepActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'WarPrepLeadershipActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'WarHubActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'TerritoryWarActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'TerritoryWarDetailActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'LegalActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'LegalDocumentActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'CommunityModerationActivity" android:exported="false"' "$MANIFEST"
+
+          grep -q 'TARGET_WAR.equals(target)){i=new Intent(this,WarHubActivity.class)' app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          grep -q '"Ranked War"' "$WARHUB"
+          grep -q '"Territories"' "$WARHUB"
+          grep -q 'WarCenterActivity.class' "$WARHUB"
+          grep -q 'TerritoryWarActivity.class' "$WARHUB"
+          grep -q 'WarHubActivity.class' "$WARPREP"
+          grep -q 'TORNFCA • RANKED WAR' app/src/main/java/com/matthayesego/duckforcetoolkit/WarCenterActivity.java
+
+          grep -q '/faction/warfareterritory?limit=100&sort=DESC' "$TERRITORY"
+          grep -q '/territorywars?limit=8&sort=DESC' "$TERRITORY"
+          grep -q '/territory",key' "$TERRITORY"
+          grep -q 'players_on_wall' "$TERRITORY"
+          grep -q 'isAggressor' "$TERRITORY"
+          grep -q '/territorywarreport' "$TERRITORY_DETAIL"
+          grep -q 'optInt("joins",0)' "$TERRITORY_DETAIL"
+          grep -q 'optInt("clears",0)' "$TERRITORY_DETAIL"
+          grep -q 'optInt("score",0)' "$TERRITORY_DETAIL"
+
+          grep -q 'LegalAcceptanceStore.hasAcceptedCurrent(this)' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q 'EXTRA_REQUIRE_ACCEPTANCE,true' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q 'LEGAL_VERSION="2026-08-17-v4"' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalAcceptanceStore.java
+          grep -q 'I have reviewed the Privacy Policy and understand the data-use notice above.' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          grep -q 'I agree to the Terms & Conditions and the End User License Agreement.' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          grep -q '!LegalAcceptanceStore.hasAcceptedCurrent(context)' app/src/main/java/com/matthayesego/duckforcetoolkit/PushNotifications.java
+          grep -q 'Notifications & Firebase' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalDocumentActivity.java
+          grep -q 'Torn API service disclosure' app/src/main/java/com/matthayesego/duckforcetoolkit/LegalDocumentActivity.java
+          grep -q 'Privacy, Terms & EULA' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
+          grep -q 'Review Legal Documents' app/src/main/java/com/matthayesego/duckforcetoolkit/SettingsActivity.java
+          grep -q 'Legal & Privacy' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
+
+          grep -q 'reportChatMessage' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          grep -q 'moderationReports' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          grep -q 'resolveModerationReport' app/src/main/java/com/matthayesego/duckforcetoolkit/CommunityBackendClient.java
+          grep -q '"Report"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
+          grep -q '"Block User"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionChatActivity.java
+          grep -q 'BlockedUserStore.isBlocked' app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaMessagingService.java
+          grep -q "const TC_VERSION='1.7.0'" "$COMMUNITY"
+          grep -q "action==='chat_report'" "$COMMUNITY"
+          grep -q "action==='moderation_list'" "$COMMUNITY"
+          grep -q "action==='moderation_resolve'" "$COMMUNITY"
+          grep -q 'TC_MODERATOR_PLAYER_ID=3987363' "$COMMUNITY"
+          grep -q "setProperty('MODERATION_ALLOW_LEADERS','false')" "$COMMUNITY"
+          grep -q "setProperty('MODERATION_ABILITIES','')" "$COMMUNITY"
+          grep -q 'tcCanModerate_' "$COMMUNITY"
+          grep -q "tcTornGet_('/user/faction',apiKey)" "$COMMUNITY"
+          grep -q 'LockService.getScriptLock' "$COMMUNITY"
+          grep -q 'TC_CHAT_SCAN_LIMIT=5000' "$COMMUNITY"
+          grep -q '\[Removed by TornFCA moderation\]' "$COMMUNITY"
+          grep -q 'CommunityModerationActivity.class' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
+
+          grep -q '/user/battlestats' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          grep -q '/user/personalstats?cat=drugs' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+          grep -q 'Your baseline stays on this device' app/src/main/java/com/matthayesego/duckforcetoolkit/TrainingProgressActivity.java
+
+          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
+          grep -q 'CommunityBackendClient.trainingLibrary' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
+          grep -q 'Resources belong to the faction' app/src/main/java/com/matthayesego/duckforcetoolkit/FactionResourcesActivity.java
+
+          grep -q 'selections=bars,cooldowns,travel,refills,organizedcrime' "$WARPREP"
+          grep -q '"p"+session.playerId+"_f"+session.factionId+"_"+cycle()+"_"' "$WARPREP"
+          grep -q 'war.warId' "$WARPREP"
+          grep -q 'Faction War Prep Management' "$WARPREP"
+          grep -q 'Only TornFCA users' "$WARPREP"
+          grep -q 'Per-war and per-faction' "$WARPREP"
+
+          grep -q 'tcVerifyUser_(key)' "$COMMUNITY"
+          grep -q 'Guide does not belong to your current faction.' "$COMMUNITY"
+          grep -q 'Faction Leader or Co-leader access is required to change training rules.' "$COMMUNITY"
+
+          echo 'TornFCA free member-core/navigation/legal/community-safety/war-mode audit passed.'

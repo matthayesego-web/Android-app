@@ -1,0 +1,67 @@
+name: TornFCA Mobile Command Navigation Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify persistent five-section command navigation
+        run: |
+          set -euo pipefail
+          COMMAND=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
+          SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
+          UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
+          WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+
+          # Exactly the approved five top-level command sections.
+          grep -q 'navItem("Home"' "$COMMAND"
+          grep -q 'navItem("Members"' "$COMMAND"
+          grep -q 'navItem("Training"' "$COMMAND"
+          grep -q 'navItem("Operations"' "$COMMAND"
+          grep -q 'navItem("More"' "$COMMAND"
+          test "$(grep -o 'nav.addView(navItem(' "$COMMAND" | wc -l)" -eq 5
+
+          # Home is summary/readiness, not a giant tool list.
+          grep -q '"Command Center"' "$COMMAND"
+          grep -q '"My Day"' "$COMMAND"
+          grep -q '"War Prep"' "$COMMAND"
+          grep -q 'NotificationInboxActivity.class' "$COMMAND"
+
+          # Member, Training and Operations pages retain dedicated compositions.
+          grep -q '"Member Network"' "$COMMAND"
+          grep -q 'MemberDirectoryActivity.class' "$COMMAND"
+          grep -q 'FactionResourcesActivity.class' "$COMMAND"
+          grep -q 'FactionChatActivity.class' "$COMMAND"
+          grep -q '"Training Lab"' "$COMMAND"
+          grep -q 'TrainingCenterActivity.class' "$COMMAND"
+          grep -q 'TrainingProgressActivity.class' "$COMMAND"
+          grep -q '"Operations Command"' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_WAR' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_ACTIVITY' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_WAR_PAYOUT' "$COMMAND"
+          grep -q 'FeatureRouterActivity.TARGET_BANKING' "$COMMAND"
+
+          # Leadership appears contextually within command pages rather than adding a sixth top-level tab.
+          grep -q 'if(identity.leader)' "$COMMAND"
+          ! grep -q 'navItem("Leadership"' "$COMMAND"
+
+          # Secondary screens return to the canonical command section.
+          grep -q 'TornFcaCommandRuntime.homeIntent(activity,sectionFor(activity))' "$SURFACE"
+          grep -q 'TornFcaCommandRuntime.homeIntent(activity,section)' "$UX"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Operations")' "$WARHUB"
+
+          # Beta and production share navigation while branding remains variant-correct.
+          grep -q 'new Intent(context, BetaCommandActivity.class)' "$RUNTIME"
+          grep -q 'isBetaBuild() ? "TORN FCA BETA" : "TORN FCA"' "$RUNTIME"
+          grep -q 'replaceBetaCrest' "$RUNTIME"
+
+          echo 'TornFCA mobile command-navigation audit passed.'

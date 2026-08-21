@@ -1,6 +1,7 @@
 package com.matthayesego.duckforcetoolkit;
 
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -20,19 +21,25 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-public class CompanionActivity extends Activity {
-    private static final String APP_VERSION = "0.5.0";
-    private static final String DUCK_FORCE_NAME = "Duck Force";
+public class CompanionActivity extends ComponentActivity {
+    private static final String APP_VERSION = TornFcaBrand.VERSION;
     private static final int BG=Color.rgb(8,12,18),BG2=Color.rgb(12,18,27),PANEL=Color.rgb(20,27,38),PANEL2=Color.rgb(27,36,49),BORDER=Color.rgb(49,63,81),ACCENT=Color.rgb(243,184,52),ACCENT2=Color.rgb(255,216,118),TEXT=Color.rgb(245,248,252),MUTED=Color.rgb(151,163,179),GOOD=Color.rgb(63,185,80),BAD=Color.rgb(248,81,73),BLUE=Color.rgb(88,166,255);
     private enum Screen{LOGIN,HOME,BANKING,LEADERSHIP,DEVELOPER}
-    private Screen screen=Screen.LOGIN;private AuthSession session;private SecureApiKeyStore keyStore;
+    private Screen screen=Screen.LOGIN;private volatile AuthSession session;private SecureApiKeyStore keyStore;
 
-    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);String saved=keyStore.load();if(saved==null||saved.trim().isEmpty())showLogin(null);else authenticate(saved,true);}
+    @Override protected void onCreate(Bundle savedInstanceState){
+        super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);
+        getOnBackPressedDispatcher().addCallback(this,new OnBackPressedCallback(true){@Override public void handleOnBackPressed(){if(screen!=Screen.HOME&&screen!=Screen.LOGIN)showHome();else finish();}});
+        String saved=keyStore.load();
+        if(saved==null||saved.trim().isEmpty()){showLogin(null);return;}
+        FactionScopeCache.Scope cached=FactionScopeCache.load(this,saved);
+        if(cached!=null){session=sessionFromScope(cached);showHome();refreshSavedSession(saved);}
+        else authenticate(saved,true);
+    }
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private GradientDrawable rounded(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
     private GradientDrawable gradient(int start,int end,int stroke,int radius){GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{start,end});d.setCornerRadius(dp(radius));if(stroke!=Color.TRANSPARENT)d.setStroke(dp(1),stroke);return d;}
@@ -49,27 +56,65 @@ public class CompanionActivity extends Activity {
     private void showLogin(String error){
         screen=Screen.LOGIN;session=null;ScrollView scroll=shell();LinearLayout c=column(scroll);
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setGravity(Gravity.CENTER_HORIZONTAL);hero.setPadding(dp(22),dp(28),dp(22),dp(26));hero.setBackground(gradient(Color.rgb(35,49,69),Color.rgb(17,24,35),ACCENT,24));
-        TextView icon=text("🦆",52,TEXT,false);icon.setGravity(Gravity.CENTER);hero.addView(icon);TextView brand=text("DUCK FORCE",13,ACCENT2,true);brand.setLetterSpacing(.22f);brand.setGravity(Gravity.CENTER);hero.addView(brand);TextView title=text("Faction Companion",30,TEXT,true);title.setGravity(Gravity.CENTER);hero.addView(title);TextView sub=text("Your Duck Force tools, requests and leadership access in one place.",14,MUTED,false);sub.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(7);hero.addView(sub,sp);c.addView(hero);spacer(c,14);
-        LinearLayout login=card("Connect your Torn account","Your key verifies your identity and Duck Force membership, then stays encrypted on this device.",BORDER);EditText key=new EditText(this);key.setHint("16-character Torn API key");key.setHintTextColor(MUTED);key.setTextColor(TEXT);key.setSingleLine(true);key.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);key.setPadding(dp(14),0,dp(14),0);key.setBackground(rounded(BG2,BORDER,12));LinearLayout.LayoutParams kp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(54));kp.topMargin=dp(14);login.addView(key,kp);Button connect=primary("Connect to Duck Force");LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));bp.topMargin=dp(12);login.addView(connect,bp);TextView status=text(error==null?"🔐 Encrypted locally  •  Duck Force only  •  v"+APP_VERSION:error,12,error==null?MUTED:BAD,false);status.setGravity(Gravity.CENTER_HORIZONTAL);LinearLayout.LayoutParams stp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);stp.topMargin=dp(10);login.addView(status,stp);connect.setOnClickListener(v->{String value=key.getText().toString().trim();if(value.isEmpty()){status.setText("Enter an API key first.");status.setTextColor(BAD);return;}connect.setEnabled(false);connect.setText("Checking access…");authenticate(value,false);});c.addView(login);setContentView(scroll);scroll.requestApplyInsets();
+        TextView icon=text("🦆",52,TEXT,false);icon.setGravity(Gravity.CENTER);hero.addView(icon);TextView brand=text("TORNFCA",13,ACCENT2,true);brand.setLetterSpacing(.22f);brand.setGravity(Gravity.CENTER);hero.addView(brand);TextView title=text("Faction Companion",30,TEXT,true);title.setGravity(Gravity.CENTER);hero.addView(title);TextView sub=text("Your faction tools, requests and permitted leadership access in one place.",14,MUTED,false);sub.setGravity(Gravity.CENTER);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(7);hero.addView(sub,sp);c.addView(hero);spacer(c,14);
+        LinearLayout login=card("Connect your Torn account","Your key verifies your identity and current Torn faction, then follows the storage option you choose at sign-in.",BORDER);EditText key=new EditText(this);key.setHint("16-character Torn API key");key.setHintTextColor(MUTED);key.setTextColor(TEXT);key.setSingleLine(true);key.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);key.setPadding(dp(14),0,dp(14),0);key.setBackground(rounded(BG2,BORDER,12));LinearLayout.LayoutParams kp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(54));kp.topMargin=dp(14);login.addView(key,kp);Button connect=primary("Connect to TornFCA");LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(50));bp.topMargin=dp(12);login.addView(connect,bp);TextView status=text(error==null?"🔐 Torn identity + faction verification  •  v"+APP_VERSION:error,12,error==null?MUTED:BAD,false);status.setGravity(Gravity.CENTER_HORIZONTAL);LinearLayout.LayoutParams stp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);stp.topMargin=dp(10);login.addView(status,stp);connect.setOnClickListener(v->{String value=key.getText().toString().trim();if(value.isEmpty()){status.setText("Enter an API key first.");status.setTextColor(BAD);return;}connect.setEnabled(false);connect.setText("Checking access…");authenticate(value,false);});c.addView(login);setContentView(scroll);scroll.requestApplyInsets();
     }
 
-    private void showLoading(){ScrollView s=shell();LinearLayout c=column(s);c.addView(card("🦆 Duck Force Companion","Verifying your saved Torn account and exact faction permissions…",ACCENT));setContentView(s);s.requestApplyInsets();}
-    private void authenticate(String key,boolean saved){if(saved)showLoading();new Thread(()->{try{AuthSession result=TornApiClient.authenticate(key);if(result.factionName==null||!DUCK_FORCE_NAME.equalsIgnoreCase(result.factionName.trim()))throw new IOException("This build is restricted to Duck Force members.");result=CompanionBackendClient.resolvePermissions(result,key);keyStore.save(key);session=result;runOnUiThread(this::showHome);}catch(Exception e){if(saved)keyStore.clear();String message=e.getMessage()==null?"Unable to verify Torn account.":e.getMessage();runOnUiThread(()->showLogin(message));}}).start();}
+    private void showLoading(){ScrollView s=shell();LinearLayout c=column(s);c.addView(card("TornFCA","Verifying your saved Torn account and current faction permissions…",ACCENT));setContentView(s);s.requestApplyInsets();}
+
+    private AuthSession sessionFromScope(FactionScopeCache.Scope cached){
+        boolean resolved=AccessPolicy.isLeaderPosition(cached.position);
+        return new AuthSession(cached.playerId,cached.playerName,cached.factionId,cached.factionName,cached.position,cached.factionApiAccess,AccessTier.GREEN,new JSONArray(),new JSONArray(),resolved);
+    }
+
+    private void refreshSavedSession(String key){
+        new Thread(()->{
+            try{
+                AuthSession fresh=TornApiClient.authenticate(key);
+                keyStore.save(key);FactionScopeCache.save(this,key,fresh);session=fresh;
+                runOnUiThread(()->{if(screen==Screen.HOME)showHome();});
+                resolveBackendPermissionsAsync(key,fresh);
+            }catch(Exception ignored){}
+        },"TornFCA-SessionRefresh").start();
+    }
+
+    private void authenticate(String key,boolean saved){
+        if(saved)showLoading();
+        new Thread(()->{
+            try{
+                AuthSession result=TornApiClient.authenticate(key);
+                keyStore.save(key);FactionScopeCache.save(this,key,result);session=result;
+                runOnUiThread(this::showHome);
+                resolveBackendPermissionsAsync(key,result);
+            }catch(Exception e){
+                if(saved)keyStore.clear();String message=e.getMessage()==null?"Unable to verify Torn account.":e.getMessage();runOnUiThread(()->showLogin(message));
+            }
+        },"TornFCA-Authenticate").start();
+    }
+
+    private void resolveBackendPermissionsAsync(String key,AuthSession base){
+        if(base==null||!CompanionBackendClient.isConfigured())return;
+        new Thread(()->{
+            AuthSession resolved=CompanionBackendClient.resolvePermissions(base,key);
+            if(resolved==null)return;session=resolved;
+            runOnUiThread(()->{if(screen==Screen.HOME)showHome();});
+        },"TornFCA-BackendPermissions").start();
+    }
 
     private void showHome(){
         if(session==null){showLogin("Connect your Torn account to continue.");return;}screen=Screen.HOME;ScrollView scroll=shell();LinearLayout c=column(scroll);
         LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(18),dp(18),dp(18),dp(18));hero.setBackground(gradient(Color.rgb(34,49,69),Color.rgb(18,27,40),BORDER,20));hero.addView(text("Welcome back, "+session.playerName,22,TEXT,true));TextView meta=text(session.factionName+" • "+session.position+" • "+session.accessLabel(),13,MUTED,false);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);mp.topMargin=dp(5);hero.addView(meta,mp);
         if(AppRoles.isOwner(session)){TextView owner=text("OWNER / DEVELOPER",11,ACCENT2,true);owner.setPadding(dp(9),dp(5),dp(9),dp(5));owner.setBackground(rounded(BG2,ACCENT,11));LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);op.topMargin=dp(10);hero.addView(owner,op);}
-        LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);Button refresh=secondary("↻ Refresh");refresh.setOnClickListener(v->{String key=keyStore.load();if(key!=null)authenticate(key,true);});actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(44),1f));Button logout=secondary("Forget key");logout.setOnClickListener(v->{keyStore.clear();session=null;showLogin(null);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1f);lp.leftMargin=dp(8);actions.addView(logout,lp);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));ap.topMargin=dp(14);hero.addView(actions,ap);c.addView(hero);
+        LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);Button refresh=secondary("↻ Refresh");refresh.setOnClickListener(v->{String key=keyStore.load();if(key!=null)authenticate(key,true);});actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(44),1f));Button logout=secondary("Forget key");logout.setOnClickListener(v->{keyStore.clear();FactionScopeCache.clear(this);TornApiClient.clearMemoryCache();FactionMemberCache.clear();session=null;showLogin(null);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1f);lp.leftMargin=dp(8);actions.addView(logout,lp);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(44));ap.topMargin=dp(14);hero.addView(actions,ap);c.addView(hero);
         spacer(c,12);addWarBanner(c);spacer(c,6);c.addView(section("Faction companion"));spacer(c,8);
         LinearLayout banking=card("💰 Banking","Request faction payouts, review history and manage the shared queue when permitted.",BLUE);banking.setClickable(true);banking.setOnClickListener(v->showBanking());addCard(c,banking);
         if(session.hasPermission("Faction API Access"))addExactToolCard(c,"📦 Armory Auditor","Audit any faction armory item, member totals, deposits/restocks and detailed activity.","ARMORY","Faction API Access",BLUE);
         if(session.canManageAccess()){LinearLayout leadership=card("⚙️ Leadership Controls","Exact Torn permissions, listener guidance and faction administration.",ACCENT);leadership.setClickable(true);leadership.setOnClickListener(v->showLeadership());addCard(c,leadership);}
         if(AppRoles.isOwner(session)){spacer(c,4);c.addView(section("My tools"));spacer(c,8);addExactToolCard(c,"🏋️ Company Train Calculator","Private company-training payment calculator.","TRAIN","Owner / Developer",ACCENT);LinearLayout dev=card("🛠 Developer Console","Private tools, owner status and future per-player grants.",ACCENT);dev.setClickable(true);dev.setOnClickListener(v->showDeveloper());addCard(c,dev);}
-        TextView footer=text("Duck Force Companion v"+APP_VERSION+" • Exact Torn permission model",11,MUTED,false);footer.setGravity(Gravity.CENTER_HORIZONTAL);c.addView(footer);setContentView(scroll);scroll.requestApplyInsets();
+        TextView footer=text("TornFCA v"+APP_VERSION+" • Torn permission model",11,MUTED,false);footer.setGravity(Gravity.CENTER_HORIZONTAL);c.addView(footer);setContentView(scroll);scroll.requestApplyInsets();
     }
 
-    private void addWarBanner(LinearLayout parent){LinearLayout war=card("WAR STATUS","Checking Torn for ranked war status…",ACCENT);TextView headline=(TextView)war.getChildAt(0);TextView detail=war.getChildCount()>1&&war.getChildAt(1)instanceof TextView?(TextView)war.getChildAt(1):null;war.setClickable(true);war.setOnClickListener(v->openWarNotices());addCard(parent,war);String key=keyStore.load();if(key==null)return;new Thread(()->{try{WarStatus status=WarStatus.from(TornApiClient.getJson("/faction/wars",key),session.factionId);runOnUiThread(()->{long now=System.currentTimeMillis()/1000L;headline.setText(status.headline(now));headline.setTextColor(status.isLive(now)?GOOD:TEXT);if(detail!=null)detail.setText(status.detail(now)+" • Tap for notices");});}catch(Exception e){runOnUiThread(()->{headline.setText("War status unavailable");if(detail!=null)detail.setText("Tap to retry and open leadership notices.");});}}).start();}
+    private void addWarBanner(LinearLayout parent){LinearLayout war=card("WAR STATUS","Checking Torn for ranked war status…",ACCENT);TextView headline=(TextView)war.getChildAt(0);TextView detail=war.getChildCount()>1&&war.getChildAt(1)instanceof TextView?(TextView)war.getChildAt(1):null;war.setClickable(true);war.setOnClickListener(v->openWarNotices());addCard(parent,war);String key=keyStore.load();if(key==null)return;new Thread(()->{try{WarStatus status=WarStatus.from(TornApiClient.getJson("/faction/wars",key),session.factionId);runOnUiThread(()->{long now=System.currentTimeMillis()/1000L;headline.setText(status.headline(now));headline.setTextColor(status.isLive(now)?GOOD:TEXT);if(detail!=null)detail.setText(status.detail(now)+" • Tap for notices");});}catch(Exception e){runOnUiThread(()->{headline.setText("War status unavailable");if(detail!=null)detail.setText("Tap to retry and open faction notices.");});}}).start();}
     private void openWarNotices(){if(session==null)return;Intent i=new Intent(this,WarNoticeActivity.class);i.putExtra(WarNoticeActivity.EXTRA_FACTION_ID,session.factionId);i.putExtra(WarNoticeActivity.EXTRA_FACTION_NAME,session.factionName);i.putExtra(WarNoticeActivity.EXTRA_CAN_PUBLISH,session.canPublishNotices());startActivity(i);}
     private void addExactToolCard(LinearLayout parent,String title,String body,String tool,String permission,int stroke){LinearLayout c=card(title,body,stroke);TextView access=text("Access: "+permission+" • Tap to open",11,stroke,true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(10);c.addView(access,p);c.setClickable(true);c.setOnClickListener(v->openTool(tool));addCard(parent,c);}
     private void openTool(String tool){Intent i=new Intent(this,ToolHostActivity.class);i.putExtra(ToolHostActivity.EXTRA_TOOL,tool);startActivity(i);}
@@ -122,12 +167,11 @@ public class CompanionActivity extends Activity {
     private String formatMoney(long amount){return String.format(Locale.US,"$%,d",amount);}
 
     private void showLeadership(){
-        if(session==null||!session.canManageAccess()){showHome();return;}screen=Screen.LEADERSHIP;ScrollView scroll=shell();LinearLayout c=column(scroll);addBack(c,"Leadership Controls");LinearLayout war=card("War & leadership notices","Live Torn ranked-war countdown plus the faction message board. Notice publishing uses Announcement Changes permission.",ACCENT);war.setClickable(true);war.setOnClickListener(v->openWarNotices());addCard(c,war);addCard(c,card("💬 Faction Chat Listener","The v0.5 listener recognizes banker/balance/withdrawal requests plus amount-specific requests such as “bank 25m”, retries failed sends and deduplicates successfully queued messages.",BLUE));addCard(c,card("Retroactive banking","Shared banking reconciliation checks retroactive chat requests against faction balances and flags sub-$1M balances as likely already handled.",GOOD));
+        if(session==null||!session.canManageAccess()){showHome();return;}screen=Screen.LEADERSHIP;ScrollView scroll=shell();LinearLayout c=column(scroll);addBack(c,"Leadership Controls");LinearLayout war=card("War & leadership notices","Live Torn ranked-war countdown plus the faction message board. Notice publishing uses Announcement Changes permission.",ACCENT);war.setClickable(true);war.setOnClickListener(v->openWarNotices());addCard(c,war);addCard(c,card("💬 Faction Chat Listener","The listener recognizes banker/balance/withdrawal requests plus amount-specific requests such as “bank 25m”, retries failed sends and deduplicates successfully queued messages.",BLUE));addCard(c,card("Retroactive banking","Shared banking reconciliation checks retroactive chat requests against faction balances and flags sub-$1M balances as likely already handled.",GOOD));
         if(session.positions!=null&&session.positions.length()>0){c.addView(section("Exact Torn rank permissions"));spacer(c,8);for(int i=0;i<session.positions.length();i++){JSONObject pos=session.positions.optJSONObject(i);if(pos==null)continue;JSONArray abilities=pos.optJSONArray("abilities");StringBuilder body=new StringBuilder();if(abilities!=null)for(int j=0;j<abilities.length();j++){if(j>0)body.append(" • ");body.append(abilities.optString(j));}addCard(c,card(pos.optString("name","Position"),body.length()==0?"No explicit abilities":body.toString(),BORDER));}}
         addCard(c,card("Permission synchronization",CompanionBackendClient.isConfigured()?"Leadership rank permissions, notices and banking are connected to the shared backend.":"Rank permissions, faction notices, banking queue and listener ingestion are coded and ready; shared operation begins when the Companion backend deployment URL is connected.",BORDER));setContentView(scroll);scroll.requestApplyInsets();
     }
 
-    private void showDeveloper(){if(!AppRoles.isOwner(session)){showHome();return;}screen=Screen.DEVELOPER;ScrollView scroll=shell();LinearLayout c=column(scroll);addBack(c,"Developer Console");addCard(c,card("Owner identity active",session.playerName+" ["+session.playerId+"] is recognized as Owner/Developer. The API key is not the developer credential.",ACCENT));addCard(c,card("Permission architecture","Feature access checks Torn ability names directly instead of treating Green/Orange/Red/Black as application roles.",GOOD));addCard(c,card("Shared banking foundation","v0.5 adds backend queue/history, listener ingestion, manager status controls and retroactive balance reconciliation with local outage fallback.",BLUE));addCard(c,card("Multi-faction path","Faction ID is carried through permission, notice and banking schemas so the backend can be generalized beyond Duck Force without rebuilding the access model.",BLUE));addCard(c,card("Release foundation","v0.5.0 continues the permanent-signing track. Play Store target remains v0.7.0.",BORDER));setContentView(scroll);scroll.requestApplyInsets();}
+    private void showDeveloper(){if(!AppRoles.isOwner(session)){showHome();return;}screen=Screen.DEVELOPER;ScrollView scroll=shell();LinearLayout c=column(scroll);addBack(c,"Developer Console");addCard(c,card("Owner identity active",session.playerName+" ["+session.playerId+"] is recognized as Owner/Developer. The API key is not the developer credential.",ACCENT));addCard(c,card("Permission architecture","Feature access checks Torn ability names directly instead of treating Green/Orange/Red/Black as application roles.",GOOD));addCard(c,card("Shared banking foundation","Backend queue/history, listener ingestion, manager status controls and retroactive balance reconciliation retain local outage fallback.",BLUE));addCard(c,card("Multi-faction boundary","Faction ID is the tenant boundary across permission, notice and banking schemas; player ID remains the user identity.",BLUE));addCard(c,card("Release foundation","TornFCA v"+APP_VERSION+" remains on the permanent-signing track while the Play candidate is still under device validation.",BORDER));setContentView(scroll);scroll.requestApplyInsets();}
     private void addBack(LinearLayout c,String title){Button back=secondary("← Home");back.setOnClickListener(v->showHome());c.addView(back,new LinearLayout.LayoutParams(dp(104),dp(42)));TextView t=text(title,26,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);tp.bottomMargin=dp(14);c.addView(t,tp);}
-    @Override public void onBackPressed(){if(screen!=Screen.HOME&&screen!=Screen.LOGIN)showHome();else super.onBackPressed();}
 }

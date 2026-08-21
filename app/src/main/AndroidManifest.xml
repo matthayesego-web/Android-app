@@ -1,8 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
-        <activity android:name=".PolishedCompanionActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application android:name=".TornFcaApplication" android:allowBackup="false" android:icon="@mipmap/ic_launcher_v3" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher_v3" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+        <activity android:name=".AccessGateActivity" android:exported="true" android:launchMode="singleTask" android:clearTaskOnLaunch="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+        <activity android:name=".PlayReviewActivity" android:exported="false" />
+        <activity android:name=".BetaCommandActivity" android:exported="false"/>
+        <activity android:name=".TornFcaCurrentActivity" android:exported="false"/>
+        <activity android:name=".TornFcaActivity" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$More" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$About" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$FeatureRouter" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$WarCenter" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$WarPayout" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$BankingCompanion" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$MemberDossier" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$DeveloperGate" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$DeveloperPanel" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$PremiumAdmin" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$LeadershipAttention" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$FactionStrength" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$MemberFaction" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$WarNotice" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$FactionOps" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$OcTracker" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$QuickIntel" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$PremiumPreview" android:exported="false"/>
+        <activity android:name=".TornFcaScreens$DeveloperConsole" android:exported="false"/>
+        <activity android:name=".SettingsActivity" android:exported="false"/>
+        <activity android:name=".LegalActivity" android:exported="false"/>
+        <activity android:name=".LegalDocumentActivity" android:exported="false"/>
+        <activity android:name=".NotificationSettingsActivity" android:exported="false"/>
+        <activity android:name=".NotificationInboxActivity" android:exported="false"/>
+        <activity android:name=".MemberCenterActivity" android:exported="false"/>
+        <activity android:name=".MemberDirectoryActivity" android:exported="false"/>
+        <activity android:name=".FactionResourcesActivity" android:exported="false"/>
+        <activity android:name=".TrainingCenterActivity" android:exported="false"/>
+        <activity android:name=".TrainingAdminActivity" android:exported="false"/>
+        <activity android:name=".TrainingProgressActivity" android:exported="false"/>
+        <activity android:name=".WarPrepActivity" android:exported="false"/>
+        <activity android:name=".WarPrepLeadershipActivity" android:exported="false"/>
+        <activity android:name=".WarHubActivity" android:exported="false"/>
+        <activity android:name=".TerritoryWarActivity" android:exported="false"/>
+        <activity android:name=".TerritoryWarDetailActivity" android:exported="false"/>
+        <activity android:name=".PremiumInsightsActivity" android:exported="false"/>
+        <activity android:name=".PremiumActivityTrendsActivity" android:exported="false"/>
+        <activity android:name=".FactionChatActivity" android:exported="false"/>
+        <activity android:name=".CommunityModerationActivity" android:exported="false"/>
+        <activity android:name=".FeedbackActivity" android:exported="false"/>
+        <service android:name=".TornFcaMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>
+
+        <activity android:name=".WarCenterActivity" android:exported="false"/>
+        <activity android:name=".WarPayoutActivity" android:exported="false"/>
+        <activity android:name=".WarPayoutReceiptActivity" android:exported="false"/>
+        <activity android:name=".WarHistoryDetailActivity" android:exported="false"/>
+        <activity android:name=".MemberDailyActivity" android:exported="false"/>
+        <activity android:name=".MemberWarActivity" android:exported="false"/>
+        <activity android:name=".BankingCompanionActivity" android:exported="false"/>
+        <activity android:name=".MemberDossierActivity" android:exported="false"/>
+        <activity android:name=".MoreActivity" android:exported="false"/>
+        <activity android:name=".AboutActivity" android:exported="false"/>
+        <activity android:name=".DeveloperGateActivity" android:exported="false"/>
+        <activity android:name=".DeveloperPanelActivity" android:exported="false"/>
+        <activity android:name=".DeveloperAccessActivity" android:exported="false"/>
+        <activity android:name=".DeveloperBackendActivity" android:exported="false"/>
+        <activity android:name=".PremiumAdminActivity" android:exported="false"/>
+        <activity android:name=".LeadershipAttentionActivity" android:exported="false"/>
+        <activity android:name=".FactionStrengthActivity" android:exported="false"/>
+        <activity android:name=".MemberFactionActivity" android:exported="false"/>
         <activity android:name=".FeatureRouterActivity" android:exported="false"/>
         <activity android:name=".WarNoticeActivity" android:exported="false"/>
         <activity android:name=".FactionOpsActivity" android:exported="false"/>
@@ -10,9 +77,6 @@
         <activity android:name=".QuickIntelActivity" android:exported="false"/>
         <activity android:name=".PremiumPreviewActivity" android:exported="false"/>
         <activity android:name=".DeveloperConsoleActivity" android:exported="false"/>
-        <activity android:name=".CompanionActivity" android:exported="false"/>
         <activity android:name=".ToolHostActivity" android:exported="false"/>
-        <activity android:name=".ToolkitActivity" android:exported="false"/>
-        <activity android:name=".MainActivity" android:exported="false"/>
     </application>
 </manifest>

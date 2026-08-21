@@ -1,0 +1,276 @@
+name: TornFCA Beta Dev Build
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  pull_request:
+    branches: [ restore/v0.10.1-source-hardened-2026-08-17 ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  beta-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Read version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          VERSION_CODE="$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -1)"
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - name: Beta preflight
+        id: preflight
+        run: |
+          set -euo pipefail
+          grep -q 'applicationIdSuffix = ".beta"' app/build.gradle.kts
+          grep -q 'versionName = "0.10.12"' app/build.gradle.kts
+          grep -q 'versionCode = 67' app/build.gradle.kts
+          ! grep -q 'DEVELOPER_ACCESS_SHA256' app/build.gradle.kts
+          grep -q 'FEEDBACK_BACKEND_URL' app/build.gradle.kts
+          grep -q 'FeedbackActivity' app/src/main/AndroidManifest.xml
+          grep -q 'Feedback & Requests' app/src/main/java/com/matthayesego/duckforcetoolkit/MoreActivity.java
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          grep -q '@drawable/tornfca_launcher_mark' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          grep -q 'Official TornFCA Network Helix brand mark' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q 'android:scaleX="1.14"' app/src/main/res/drawable/tornfca_launcher_mark.xml
+          grep -q '#29E6FF' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q '#9A5CFF' app/src/main/res/drawable/tornfca_mark.xml
+          grep -q 'versionTaps>=5' app/src/main/java/com/matthayesego/duckforcetoolkit/AboutActivity.java
+          grep -q 'Hidden entry • verified Torn ID access' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperGateActivity.java
+          grep -q 'developerIdLogin' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperBackendClient.java
+          grep -q 'Manage Authorized Torn IDs' app/src/main/java/com/matthayesego/duckforcetoolkit/DeveloperPanelActivity.java
+          grep -q 'DeveloperIdAccess' backend/TornFcaDeveloperBackend.gs
+          grep -q "const TD_VERSION='1.5.0'" backend/TornFcaDeveloperBackend.gs
+          grep -q 'confirmClear(rows.length())' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
+          grep -q 'StartupWarmup.start' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q 'StartupWarmup.hasStartedThisProcess' app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          grep -q 'FactionMemberCache.save' app/src/main/java/com/matthayesego/duckforcetoolkit/StartupWarmup.java
+          grep -q 'WAR_CACHE_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q 'DataFreshness.label' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDirectoryActivity.java
+          grep -q '45L\*60L\*1000L' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
+          grep -q 'renderSafe' app/src/main/java/com/matthayesego/duckforcetoolkit/BankingCompanionActivity.java
+          grep -q 'BackendRequestGovernor.acquire' app/src/main/java/com/matthayesego/duckforcetoolkit/CompanionBackendClient.java
+          for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs backend/TornFcaFeedbackBackend.gs; do
+            cp "$file" "/tmp/$(basename "$file").js"
+            node --check "/tmp/$(basename "$file").js"
+          done
+
+      - name: Verify deployed backend health
+        id: backend_health
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          check_backend() {
+            url="$1"; expected="$2"; version="$3"
+            body="$(curl --fail --silent --show-error --location --max-time 25 "$url")"
+            printf '%s\n' "$body" | grep -F '"ok":true' >/dev/null
+            printf '%s\n' "$body" | grep -F "$expected" >/dev/null
+            printf '%s\n' "$body" | grep -F '"version":"'"$version"'"' >/dev/null
+          }
+          check_backend 'https://script.google.com/macros/s/AKfycbzR8zjFVYaDoIZaxFdJV4yBaM4mLSv-iqZL8146HCzq6vRzJgeYr1Y0TKkPGrdASjQj/exec' 'TornFCA Faction Backend' '1.1.0'
+          check_backend 'https://script.google.com/macros/s/AKfycbwphLmR-N82GJUChzwZlxQ8DGKVoaN6VCNiXvbpKfgJV6JUxlcwPOYVKgbI1h9tmjp-ig/exec' 'TornFCA Community Backend' '1.7.0'
+          check_backend 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' 'TornFCA Premium Entitlements' '1.2.0'
+          check_backend 'https://script.google.com/macros/s/AKfycbwQeLGPlVpbHgqq2ZG9b73r1PUNvroWQ1CQoy-DXNYCw4W-bCX9VhDkUM7yy_ydw_rjrQ/exec' 'TornFCA Developer Control Plane' '1.5.0'
+          check_backend 'https://script.google.com/macros/s/AKfycbzb2RKPNS_Q4LsAK7nIC2oId8UqHXEd-1t93lyyY8bNz3S-7eMJCP1BqP1bnrNq4JiTGQ/exec' 'TornFCA WarPay Backend' '1.1.0'
+          check_backend 'https://script.google.com/macros/s/AKfycbyAFt3NNQJWOrbWOuYsH-1MZjf0gxGYZ9l4oSTFtN4unBaXpS2u_Go5xOdP-tIAWi2X/exec' 'TornFCA Feedback Backend' '1.0.0'
+
+      - name: Compile Beta
+        id: compile
+        env:
+          TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
+          TORNFCA_PREMIUM_BACKEND_URL: ${{ secrets.TORNFCA_PREMIUM_BACKEND_URL }}
+          TORNFCA_COMMUNITY_BACKEND_URL: ${{ secrets.TORNFCA_COMMUNITY_BACKEND_URL }}
+          TORNFCA_DEVELOPER_BACKEND_URL: ${{ secrets.TORNFCA_DEVELOPER_BACKEND_URL }}
+          TORNFCA_WARPAY_BACKEND_URL: ${{ secrets.TORNFCA_WARPAY_BACKEND_URL }}
+          TORNFCA_FEEDBACK_BACKEND_URL: ${{ secrets.TORNFCA_FEEDBACK_BACKEND_URL }}
+          TORNFCA_FIREBASE_APP_ID: ${{ secrets.TORNFCA_FIREBASE_APP_ID }}
+          TORNFCA_FIREBASE_API_KEY: ${{ secrets.TORNFCA_FIREBASE_API_KEY }}
+          TORNFCA_FIREBASE_PROJECT_ID: ${{ secrets.TORNFCA_FIREBASE_PROJECT_ID }}
+          TORNFCA_FIREBASE_SENDER_ID: ${{ secrets.TORNFCA_FIREBASE_SENDER_ID }}
+        run: gradle --no-daemon :app:assembleBeta
+
+      - name: Upload unsigned Beta for recovery signing
+        id: unsigned_upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v${{ env.VERSION_NAME }}-unsigned-recovery
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Validate signing secrets
+        id: signing_secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+      - name: Align, permanently sign and verify Beta
+        id: sign
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          BUILD_TOOLS="$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APK_SIGNER="$BUILD_TOOLS/apksigner"
+          AAPT="$BUILD_TOOLS/aapt"
+          test -x "$ZIPALIGN"
+          test -x "$APK_SIGNER"
+          test -x "$AAPT"
+          INPUT="app/build/outputs/apk/beta/app-beta-unsigned.apk"
+          test -f "$INPUT"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tornfca-release.jks"
+          chmod 600 "$RUNNER_TEMP/tornfca-release.jks"
+          ALIGNED="$RUNNER_TEMP/TornFCA-Beta-v${VERSION_NAME}-aligned.apk"
+          OUT="TornFCA-Beta-v${VERSION_NAME}.apk"
+          "$ZIPALIGN" -P 16 -f -v 4 "$INPUT" "$ALIGNED"
+          "$ZIPALIGN" -c -P 16 -v 4 "$ALIGNED"
+          "$APK_SIGNER" sign \
+            --ks "$RUNNER_TEMP/tornfca-release.jks" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out "$OUT" \
+            "$ALIGNED"
+          "$APK_SIGNER" verify --verbose --print-certs "$OUT" | tee signer-verification.txt
+          grep -qi 'c3ecc35a64f8e7ecedda1ca46d5fe0841b890eed9c78ccb6716d61a9237f0322' signer-verification.txt
+          "$AAPT" dump badging "$OUT" | tee apk-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit.beta'" apk-badging.txt
+          grep -q "versionCode='${VERSION_CODE}'" apk-badging.txt
+          grep -q "versionName='${VERSION_NAME}-beta'" apk-badging.txt
+          grep -q "application-label:'Torn FCA Beta'" apk-badging.txt
+          sha256sum "$OUT" | tee apk-sha256.txt
+
+      - name: Upload signed Beta APK
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v${{ env.VERSION_NAME }}
+          path: |
+            TornFCA-Beta-v${{ env.VERSION_NAME }}.apk
+            apk-badging.txt
+            signer-verification.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish connector-readable Beta snapshot
+        id: snapshot
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/TornFCA-Beta-v${VERSION_NAME}.apk"
+          PUB="$RUNNER_TEMP/tornfca-beta-publish"
+          rm -rf "$PUB"
+          mkdir -p "$PUB"
+          cd "$PUB"
+          git init
+          git checkout --orphan beta-artifacts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          cp "$GITHUB_WORKSPACE/apk-badging.txt" .
+          cp "$GITHUB_WORKSPACE/signer-verification.txt" .
+          cp "$GITHUB_WORKSPACE/apk-sha256.txt" .
+          base64 -w 0 "$OUT" > TornFCA-Beta-latest.apk.b64
+          split -b 180000 -d -a 3 TornFCA-Beta-latest.apk.b64 TornFCA-Beta-latest.apk.b64.part.
+          rm TornFCA-Beta-latest.apk.b64
+          PARTS="$(find . -maxdepth 1 -name 'TornFCA-Beta-latest.apk.b64.part.*' | wc -l | tr -d ' ')"
+          SHA="$(awk '{print $1}' apk-sha256.txt)"
+          printf 'version_name=%s\nversion_code=%s\npackage=com.matthayesego.duckforcetoolkit.beta\nparts=%s\nchunk_bytes=180000\nsha256=%s\nsource_commit=%s\n' "$VERSION_NAME" "$VERSION_CODE" "$PARTS" "$SHA" "$GITHUB_SHA" > build-info.txt
+          git add .
+          git commit -m "Publish TornFCA Beta v${VERSION_NAME}"
+          git push --force origin HEAD:beta-artifacts
+
+      - name: Publish latest Beta prerelease
+        id: prerelease
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="tornfca-beta-latest"
+          OUT="TornFCA-Beta-v${VERSION_NAME}.apk"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push --force origin "refs/tags/$TAG"
+          NOTES="Signed TornFCA Beta v${VERSION_NAME} (versionCode ${VERSION_CODE}) for device/Google Play testing. This is a prerelease and is not v1.0."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "TornFCA Beta v${VERSION_NAME}" --notes "$NOTES" --prerelease
+          else
+            gh release create "$TAG" --title "TornFCA Beta v${VERSION_NAME}" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
+          fi
+          gh release upload "$TAG" "$OUT" apk-badging.txt signer-verification.txt apk-sha256.txt --clobber
+
+      - name: Publish pipeline status
+        if: always() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          BACKEND_HEALTH_OUTCOME: ${{ steps.backend_health.outcome }}
+          COMPILE_OUTCOME: ${{ steps.compile.outcome }}
+          UNSIGNED_OUTCOME: ${{ steps.unsigned_upload.outcome }}
+          SIGNING_SECRETS_OUTCOME: ${{ steps.signing_secrets.outcome }}
+          SIGN_OUTCOME: ${{ steps.sign.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          SNAPSHOT_OUTCOME: ${{ steps.snapshot.outcome }}
+          PRERELEASE_OUTCOME: ${{ steps.prerelease.outcome }}
+        run: |
+          set -euo pipefail
+          PUB="$RUNNER_TEMP/tornfca-beta-status"
+          rm -rf "$PUB"
+          mkdir -p "$PUB"
+          cd "$PUB"
+          git init
+          git checkout --orphan beta-status
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          printf 'version_name=%s\nversion_code=%s\nsource_commit=%s\npreflight=%s\nbackend_health=%s\ncompile=%s\nunsigned_upload=%s\nsigning_secrets=%s\nsign=%s\nupload=%s\nsnapshot=%s\nprerelease=%s\n' "${VERSION_NAME:-unknown}" "${VERSION_CODE:-unknown}" "$GITHUB_SHA" "${PREFLIGHT_OUTCOME:-unknown}" "${BACKEND_HEALTH_OUTCOME:-unknown}" "${COMPILE_OUTCOME:-unknown}" "${UNSIGNED_OUTCOME:-unknown}" "${SIGNING_SECRETS_OUTCOME:-unknown}" "${SIGN_OUTCOME:-unknown}" "${UPLOAD_OUTCOME:-unknown}" "${SNAPSHOT_OUTCOME:-unknown}" "${PRERELEASE_OUTCOME:-unknown}" > status.txt
+          git add status.txt
+          git commit -m "TornFCA Beta pipeline status"
+          git push --force origin HEAD:beta-status
+
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/tornfca-release.jks" "$RUNNER_TEMP/TornFCA-Beta-v${VERSION_NAME}-aligned.apk"

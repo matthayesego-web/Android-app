@@ -1,0 +1,8 @@
+Morning blocker for TornFCA Beta v0.10.9:
+1. Replace the TornFCA - Developer Backend Apps Script Code.gs with backend/TornFcaDeveloperBackend.gs from this Beta branch (v1.5.0).
+2. Save.
+3. Run setupTornFcaDeveloperBackend() once and authorize if prompted.
+4. Confirm the DeveloperIdAccess sheet/tab exists.
+5. Deploy > Manage deployments > Edit the existing web app > New version > Deploy. Keep Execute as Me and access Anyone.
+6. Open the existing /exec URL and confirm version 1.5.0 plus id_access_mode=true.
+7. Then install/test TornFCA Beta v0.10.9. The hidden Developer Console should automatically admit the owner Torn ID and show Manage Authorized Torn IDs only for Root.

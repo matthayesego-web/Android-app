@@ -1,0 +1,55 @@
+name: TornFCA Permission Freshness Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  permission-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify stale faction roles cannot preserve privileged access
+        run: |
+          set -euo pipefail
+
+          API=app/src/main/java/com/matthayesego/duckforcetoolkit/TornApiClient.java
+          ROUTER=app/src/main/java/com/matthayesego/duckforcetoolkit/FeatureRouterActivity.java
+          MANIFEST=app/src/main/AndroidManifest.xml
+          FACTION=backend/AccessBackend.gs
+          COMMUNITY=backend/TornFcaCommunityBackend.gs
+          WARPAY=backend/TornFcaWarPayBackend.gs
+
+          # Android leadership-only navigation must explicitly invalidate cached faction identity/position.
+          grep -q 'public static AuthSession authenticateFreshFaction' "$API"
+          grep -q 'evictPath("/user?selections=profile,faction", key)' "$API"
+          grep -q 'evictPath("/user/faction", key)' "$API"
+          grep -q 'evictPath("/faction/positions", key)' "$API"
+          grep -q 'SESSION_CACHE.remove(sessionKey(key))' "$API"
+
+          # Leadership routes skip cached FactionScope/AuthSession and use the fresh faction path.
+          grep -q 'final boolean freshFaction=requiresLeadership(target);' "$ROUTER"
+          grep -q '!TARGET_DEVELOPER.equals(target)&&!freshFaction' "$ROUTER"
+          grep -q 'freshFaction?TornApiClient.authenticateFreshFaction(key):TornApiClient.authenticate(key)' "$ROUTER"
+          grep -q 'if(requiresLeadership(target)&&!AccessPolicy.isLeaderPosition(effectivePosition))' "$ROUTER"
+
+          # Premium is evaluated after leadership authorization; Premium can never grant faction authority.
+          LEAD_LINE="$(grep -n 'requiresLeadership(target)&&!AccessPolicy.isLeaderPosition' "$ROUTER" | head -1 | cut -d: -f1)"
+          PREMIUM_LINE="$(grep -n 'String premium=premiumFeature(target)' "$ROUTER" | head -1 | cut -d: -f1)"
+          test -n "$LEAD_LINE" && test -n "$PREMIUM_LINE" && test "$LEAD_LINE" -lt "$PREMIUM_LINE"
+
+          # Premium leadership destination activities are internal-only; normal entry is the guarded router.
+          grep -q 'MemberDossierActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'QuickIntelActivity" android:exported="false"' "$MANIFEST"
+          grep -q 'FeatureRouterActivity" android:exported="false"' "$MANIFEST"
+
+          # Shared server-side privileged state must also use current Torn faction scope.
+          grep -q "tornGet_('/user/faction',apiKey)" "$FACTION"
+          grep -q "tcTornGet_('/user/faction',apiKey)" "$COMMUNITY"
+          grep -q "twTornGet_('/user/faction',apiKey)" "$WARPAY"
+
+          echo 'TornFCA permission freshness audit passed.'

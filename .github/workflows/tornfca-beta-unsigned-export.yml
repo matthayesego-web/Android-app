@@ -1,0 +1,72 @@
+name: TornFCA Beta Unsigned Export
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Validate v0.10.12 optimization source
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.10.12"' app/build.gradle.kts
+          grep -q 'versionCode = 67' app/build.gradle.kts
+          grep -q 'developer_id_login' backend/TornFcaDeveloperBackend.gs
+          grep -q 'FactionMemberCache.save' app/src/main/java/com/matthayesego/duckforcetoolkit/StartupWarmup.java
+          grep -q 'WAR_CACHE_MS' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDailyActivity.java
+          grep -q 'DataFreshness.label' app/src/main/java/com/matthayesego/duckforcetoolkit/MemberDirectoryActivity.java
+          grep -q 'openRelated' app/src/main/java/com/matthayesego/duckforcetoolkit/NotificationInboxActivity.java
+          grep -q 'android:scaleX="1.14"' app/src/main/res/drawable/tornfca_launcher_mark.xml
+          for file in backend/AccessBackend.gs backend/TornFcaCommunityBackend.gs backend/TornFcaPremiumBackend.gs backend/TornFcaDeveloperBackend.gs backend/TornFcaWarPayBackend.gs backend/TornFcaFeedbackBackend.gs; do
+            cp "$file" "/tmp/$(basename "$file").js"
+            node --check "/tmp/$(basename "$file").js"
+          done
+
+      - name: Compile unsigned Beta
+        run: gradle --no-daemon :app:assembleBeta
+
+      - name: Upload unsigned Beta
+        uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-Beta-v0.10.12-unsigned-export
+          path: app/build/outputs/apk/beta/app-beta-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish export status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PUB="$RUNNER_TEMP/tornfca-beta-unsigned-status"
+          rm -rf "$PUB"; mkdir -p "$PUB"; cd "$PUB"
+          git init
+          git checkout --orphan beta-unsigned-status
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          printf 'run_id=%s\nsource_commit=%s\nsource_branch=%s\nartifact=TornFCA-Beta-v0.10.12-unsigned-export\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "$GITHUB_REF_NAME" > status.txt
+          git add status.txt
+          git commit -m "Publish unsigned Beta export status"
+          git push --force origin HEAD:beta-unsigned-status

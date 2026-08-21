@@ -4,11 +4,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 
 /**
- * Tiny process-local cache for faction member snapshots used by quick-access tools.
- * Keeps tool-to-tool navigation fast without persisting faction data to disk.
+ * Small process-local cache for faction member snapshots used by quick-access tools.
+ * Two minutes is long enough to avoid duplicate navigation loads while still keeping presence/
+ * assignment information reasonably current. Manual/background refreshes replace it sooner.
  */
 public final class FactionMemberCache {
-    private static final long TTL_MS = 20_000L;
+    private static final long TTL_MS = 2L * 60L * 1000L;
 
     private static int factionId;
     private static long storedAtMs;
@@ -38,8 +39,13 @@ public final class FactionMemberCache {
     }
 
     public static synchronized long ageSeconds(int requestedFactionId) {
+        long age=ageMs(requestedFactionId);
+        return age<0L?-1L:age/1000L;
+    }
+
+    public static synchronized long ageMs(int requestedFactionId) {
         if (requestedFactionId <= 0 || requestedFactionId != factionId || payload == null) return -1L;
-        return Math.max(0L, (System.currentTimeMillis() - storedAtMs) / 1000L);
+        return Math.max(0L, System.currentTimeMillis() - storedAtMs);
     }
 
     public static synchronized void clear() {

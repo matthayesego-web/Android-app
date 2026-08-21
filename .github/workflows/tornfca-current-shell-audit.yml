@@ -1,0 +1,75 @@
+name: TornFCA Canonical Command Shell Audit
+
+on:
+  push:
+    branches: [ v0.9-faction-automation ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify canonical command shell for Beta and production
+        run: |
+          set -euo pipefail
+          RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
+          ACCESS=app/src/main/java/com/matthayesego/duckforcetoolkit/AccessGateActivity.java
+          LEGAL=app/src/main/java/com/matthayesego/duckforcetoolkit/LegalActivity.java
+          COMMAND=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          BASE=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaActivity.java
+          SURFACE=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaSurfacePolish.java
+          GAUGES=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaGaugeLiveData.java
+          UX=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaUxRepair.java
+          WARHUB=app/src/main/java/com/matthayesego/duckforcetoolkit/WarHubActivity.java
+          MANIFEST=app/src/main/AndroidManifest.xml
+
+          test -f "$RUNTIME"
+          grep -q 'public static boolean enabled() { return true; }' "$RUNTIME"
+          grep -q 'new Intent(context, BetaCommandActivity.class)' "$RUNTIME"
+          grep -q 'return isBetaBuild() ? "TORN FCA BETA" : "TORN FCA"' "$RUNTIME"
+          grep -q 'return isBetaBuild() ? "BETA   •   v"' "$RUNTIME"
+          grep -q 'return isBetaBuild() ? "Torn FCA Beta v" : "Torn FCA v"' "$RUNTIME"
+          grep -q 'replaceBetaCrest' "$RUNTIME"
+
+          # Normal startup and first-run legal acceptance must land on the same command shell.
+          grep -q 'TornFcaCommandRuntime.install(getApplication())' "$ACCESS"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$ACCESS"
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Home")' "$LEGAL"
+          ! grep -q 'new Intent(this,TornFcaCurrentActivity.class)' "$ACCESS"
+          ! grep -q 'new Intent(this,TornFcaCurrentActivity.class)' "$LEGAL"
+
+          # Compatibility War routes must not bounce back into the legacy shell.
+          grep -q 'TornFcaCommandRuntime.homeIntent(this,"Operations")' "$WARHUB"
+          ! grep -q 'TornFcaCurrentActivity.class' "$WARHUB"
+
+          # Canonical command shell is isolated from the legacy global brand/Premium observer.
+          grep -q 'private boolean isCommandActivity(){return this instanceof BetaCommandActivity;}' "$BASE"
+          ! grep -q 'BuildConfig.APPLICATION_ID.endsWith(".beta")&&this instanceof BetaCommandActivity' "$BASE"
+
+          # Live gauges and secondary-screen polish run for both build variants.
+          grep -q '!TornFcaCommandRuntime.enabled()' "$GAUGES"
+          grep -q 'return TornFcaCommandRuntime.enabled()' "$SURFACE"
+          grep -q 'return TornFcaCommandRuntime.enabled()' "$UX"
+          grep -q 'TornFcaCommandRuntime.homeIntent(activity,sectionFor(activity))' "$SURFACE"
+          grep -q 'TornFcaCommandRuntime.homeIntent(activity,section)' "$UX"
+
+          # Approved five-section command layout remains intact.
+          grep -q 'navItem("Home"' "$COMMAND"
+          grep -q 'navItem("Members"' "$COMMAND"
+          grep -q 'navItem("Training"' "$COMMAND"
+          grep -q 'navItem("Operations"' "$COMMAND"
+          grep -q 'navItem("More"' "$COMMAND"
+          grep -q 'Member Network' "$COMMAND"
+          grep -q 'Training Lab' "$COMMAND"
+          grep -q 'Operations Command' "$COMMAND"
+          grep -q 'App Control' "$COMMAND"
+
+          # Command activity is internal-only and AccessGate remains the sole exported Activity.
+          grep -q 'BetaCommandActivity" android:exported="false"' "$MANIFEST"
+          test "$(grep -c 'android:exported="true"' "$MANIFEST")" -eq 1
+
+          echo 'TornFCA canonical command-shell audit passed.'

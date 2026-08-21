@@ -1,0 +1,2 @@
+TornFCA Beta v0.10.9 / versionCode 64
+Hidden Developer Console now uses verified Torn player ID access. Owner ID is permanent Root; Root may add/remove delegated Developer IDs. Hardened password/TOTP infrastructure is retained for later reactivation.

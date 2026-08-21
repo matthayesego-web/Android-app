@@ -1,0 +1,12 @@
+TornFCA Beta v0.10.9 overnight audit — 2026-08-19
+
+- Developer Console entry uses verified Torn player ID only.
+- TornFCA owner player ID remains permanent Root.
+- Root-only UI manages the additional Developer ID allowlist.
+- Delegated IDs cannot add or remove developer access.
+- Removing an ID revokes its active developer sessions and session checks revalidate allowlist state.
+- Hardened username/password/TOTP infrastructure remains in source/backend for future reactivation.
+- Developer backend target is v1.5.0 with id_access_mode=true.
+- CI smoke diagnostics updated to expect Developer v1.5.0 and verify the ID-login POST transport.
+- v0.10.9 compiled successfully in CI before signing recovery.
+- Main/live branch was not modified.

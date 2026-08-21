@@ -1,63 +1,67 @@
-# Duck Force Toolkit access-control architecture
+# TornFCA access-control architecture
 
-## Status
+Status: **v0.10.1 pre-1.0 architecture**.
 
-v0.2.0 introduces the authentication and Torn-permission foundation. Shared rank-by-rank app overrides are scaffolded in `backend/AccessBackend.gs` and require a one-time Google Apps Script deployment before they can be edited globally from the Android app.
+## Identity and tenant authority
 
-## Torn is the identity authority
+Torn is the identity/faction authority. TornFCA does not embed a shared faction master key.
 
-On sign-in, the Android app uses the member's own Torn API key to read:
+The signed-in player's own Torn API key is used to resolve:
 
-- `/key/info` — validates the key owner and whether the key has faction API access.
-- `/user/basic` — player ID/name.
-- `/user/faction` — faction ID/name and faction position.
-- `/faction/positions` — when the user's key has Faction API Access, returns all faction positions and each position's `abilities[]`.
+- numeric player ID/name,
+- current faction ID/name,
+- current faction position,
+- faction position abilities when the key can read them.
 
-The Android app never embeds a shared faction master key.
+Shared TornFCA backends are multi-faction. Shared rows are scoped by the verified numeric `faction_id`; faction names are display metadata, not the tenant key.
 
-## Permission colors
+`backend/AccessBackend.gs` re-reads the current Torn faction membership/position on every authenticated backend request. Only stable basic player identity may be cached briefly using a SHA-256 API-key fingerprint. API keys are never persisted by the backend.
 
-Torn's official faction position UI groups abilities into four bands. The API does not return the color itself, so the app derives the color from the returned ability names:
+## Authorization rules
 
-- **Green / Member**: armory usage/loaning/retrieving, refills, Faction API Access, etc.
-- **Orange / Elevated**: Organised Crimes, Item/Money/Points Giving, Forum Management, Application Management.
-- **Red / Leadership**: Kick Members, Balance Adjustment, War Management, Upgrade Management.
-- **Black / Leadership**: Newsletter Sending, Announcement Changes, Description Changes.
+Two independent questions are always kept separate:
 
-Duck Force Toolkit policy:
+1. **Does Torn authorize this faction action?**
+2. **Does TornFCA Premium unlock an optional convenience feature?**
 
-- Green = member tools.
-- Orange = elevated tools.
-- Red = global tool access.
-- Black = global tool access.
-- Torn position `Leader` or `Co-leader` = global tool access plus permission to manage the app's shared access matrix.
+Premium never creates faction authority.
 
-Only actual Leader/Co-leader positions may change Duck Force Toolkit access rules. A custom position with Red/Black abilities can see all tools, but cannot edit the access matrix.
+Examples:
 
-## v0.2.0 default tool gates
+- Notice publishing: current `Announcement Changes` ability or Leader/Co-leader.
+- Banking queue management/reconciliation: current `Money Giving` or `Balance Adjustment` ability, or Leader/Co-leader.
+- WarPay cloud receipts: current Leader/Co-leader, matching the current Android WarPay boundary.
+- Rank/user access-matrix editing: current Leader/Co-leader.
+- Community moderation: separate configurable capability policy; owner recovery access is always retained. No faction-specific rank names are hardcoded.
 
-- Train Payment Calculator: Green+
-- Xanax Armory Log: Orange+
-- Faction Xanax Auditor: Orange+
+## Shared rank/user overrides
 
-These defaults are deliberately data-driven and are intended to be replaced/overridden by the shared rank access matrix.
+`backend/AccessBackend.gs` keeps optional faction-scoped app access overrides:
 
-## Shared override backend
+- `RankAccess`: `faction_id + rank_name + tool_id`
+- `UserOverrides`: `faction_id + user_id + tool_id`
 
-Rank access cannot be stored only on one phone because changes must apply to every member. `backend/AccessBackend.gs` provides a zero-cost Google Sheets / Apps Script backend.
+These rows cannot leak between factions. Existing legacy single-faction sheets are migrated by `setupTornFcaFactionBackend()` by adding the tenant column.
 
-It stores:
+## Premium boundary
 
-- `RankAccess`: per Torn rank, per app/module allow/deny.
-- `UserOverrides`: optional player-specific allow/deny.
-- `Settings`: Duck Force faction ID/name and schema version.
+The authoritative Free/Premium classification is `docs/PREMIUM_MATRIX_0.10.1.md`.
 
-For every write, the backend re-checks the requesting API key against Torn and accepts the change only when the current faction position is Leader or Co-leader. API keys are not written to the sheet.
+Essential faction participation, safety and ordinary administration remain Free. Premium is the convenience/depth layer and does not override Torn permissions.
 
-## Duck Force numeric faction ID
+## Developer authority
 
-The source currently enforces the exact faction name `Duck Force` and has `DUCK_FORCE_FACTION_ID = 0` as a temporary placeholder. After the first authenticated Duck Force login, the home screen displays the numeric faction ID. Replace `0` with that ID in both Android/backend configuration for a permanent ID lock.
+Developer/operator controls are separate from faction authority:
 
-## Next implementation step
+- verified TornFCA developer player ID: `BuildConfig.DEVELOPER_PLAYER_ID`
+- local developer password gate
+- remote Developer Control Plane owner verification
+- remote mutating actions also require the developer-admin password hash
 
-After deploying `backend/AccessBackend.gs`, add the Apps Script web-app URL to the Android app and turn the Leader/Co-leader Rank Access Control screen from read-only rank inspection into editable per-rank module toggles.
+Developer Premium simulation defaults OFF and is accepted only for the verified developer player ID through `PremiumAccess`. It is never written into the production entitlement cache.
+
+## Deployment requirement
+
+Source code alone is not live authorization. The five Apps Script backends must be deployed/redeployed and the signed candidate must be built with their HTTPS `/exec` URLs before v1.0 can be considered production-ready.
+
+See `docs/V1_BACKEND_GO_LIVE.md` for the deployment/smoke-test sequence.

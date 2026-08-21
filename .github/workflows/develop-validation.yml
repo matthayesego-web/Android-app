@@ -1,0 +1,100 @@
+name: TornFCA Develop Validation
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tornfca-develop-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+
+      - name: Verify release identity
+        run: |
+          set -euo pipefail
+          grep -q 'versionCode = 74' app/build.gradle.kts
+          grep -q 'versionName = "0.10.19"' app/build.gradle.kts
+          grep -q 'compileSdk = 36' app/build.gradle.kts
+          grep -q 'targetSdk = 36' app/build.gradle.kts
+          grep -q 'applicationId = "com.matthayesego.duckforcetoolkit"' app/build.gradle.kts
+
+      - name: Verify winning launcher icon is locked
+        run: |
+          set -euo pipefail
+          grep -q 'bytes.size == 22878' app/build.gradle.kts
+          grep -q '78c2a43859fe6fa72818318373b1c3733a404be38e9c0e03aa37b1973a72042e' app/build.gradle.kts
+          grep -q '@drawable/tornfca_launcher_final' app/src/main/res/mipmap-anydpi-v26/ic_launcher_v3.xml
+
+      - name: Verify backend source versions and critical fixes
+        run: |
+          set -euo pipefail
+          grep -q "TC_VERSION='1.9.0'" backend/TornFcaCommunityBackend.gs
+          grep -q "TORNFCA_PREMIUM_VERSION='1.3.1'" backend/TornFcaPremiumBackend.gs
+          grep -q "TORNFCA_DEFAULT_DAYS_PER_XANAX=7" backend/TornFcaPremiumBackend.gs
+          grep -q "COMPLIMENTARY_GRANT" backend/TornFcaPremiumBackend.gs
+          grep -q "grant_type" backend/TornFcaPremiumBackend.gs
+          grep -q "activations_open" backend/TornFcaPremiumBackend.gs
+          grep -q "Your faction changed. Chat moved to your current faction" backend/TornFcaCommunityBackend.gs
+          grep -q "expectedFaction" backend/TornFcaCommunityBackend.gs
+
+      - name: Syntax check every Apps Script backend
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/tornfca-jscheck
+          for f in backend/*.gs; do
+            out="/tmp/tornfca-jscheck/$(basename "$f" .gs).js"
+            cp "$f" "$out"
+            node --check "$out"
+          done
+
+      - name: Verify deployed Community and Premium endpoints
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbwphLmR-N82GJUChzwZlxQ8DGKVoaN6VCNiXvbpKfgJV6JUxlcwPOYVKgbI1h9tmjp-ig/exec' -o /tmp/community.json
+          curl -fLsS --retry 3 --retry-delay 2 'https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec' -o /tmp/premium.json
+          python3 - <<'PY'
+          import json
+          community=json.load(open('/tmp/community.json'))
+          premium=json.load(open('/tmp/premium.json'))
+          assert community.get('ok') is True, community
+          assert community.get('version') == '1.9.0', community
+          assert premium.get('ok') is True, premium
+          assert premium.get('version') == '1.3.1', premium
+          assert premium.get('monetization_approved') is False, 'MONETIZATION_APPROVED must remain false for first external beta'
+          print('Live Community:', community.get('version'))
+          print('Live Premium:', premium.get('version'), 'monetization_approved=', premium.get('monetization_approved'))
+          PY
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+
+      - name: Compile Debug and unsigned Beta
+        run: gradle --no-daemon :app:assembleDebug :app:assembleBeta
+
+      - name: Run unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
+      - name: Confirm no permanent signing occurs in develop validation
+        run: |
+          set -euo pipefail
+          test ! -e "$RUNNER_TEMP/tornfca-release.keystore"
+          ! grep -q 'ANDROID_KEYSTORE_BASE64' .github/workflows/develop-validation.yml
+          echo 'Develop validation is compile/test only; no release keystore was used.'
