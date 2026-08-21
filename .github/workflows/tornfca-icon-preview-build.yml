@@ -1,0 +1,61 @@
+name: TornFCA Icon Preview Build
+
+on:
+  push:
+    branches: [ work/v0.10.18-beta-hardening ]
+    paths:
+      - '.github/workflows/tornfca-icon-preview-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  icon-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: work/v0.10.18-beta-hardening
+      - name: Record icon preview run
+        run: |
+          printf '%s\n' "$GITHUB_RUN_ID" > docs/v01018-icon-preview-run.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v01018-icon-preview-run.txt
+          git commit -m 'Record cropped icon preview run' || true
+          git pull --rebase origin work/v0.10.18-beta-hardening
+          git push origin HEAD:work/v0.10.18-beta-hardening
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - name: Build Internal icon preview
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verify icon safe-zone resources and APK
+        run: |
+          set -euo pipefail
+          grep -q 'tornfca_launcher_final_safezone' app/src/main/res/mipmap-anydpi-v26/ic_launcher_v3.xml
+          grep -q 'android:insetLeft="16dp"' app/src/main/res/drawable/tornfca_launcher_final_safezone.xml
+          APK='app/build/outputs/apk/debug/app-debug.apk'
+          test -f "$APK"
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -1)"
+          "$AAPT" dump badging "$APK" | tee apk-badging.txt
+          grep -q "package: name='com.matthayesego.duckforcetoolkit.internal'" apk-badging.txt
+          grep -q "versionCode='73'" apk-badging.txt
+          grep -q "versionName='0.10.18-internal'" apk-badging.txt
+          cp "$APK" TornFCA-v0.10.18-ICON-CROPPED-INTERNAL.apk
+          sha256sum TornFCA-v0.10.18-ICON-CROPPED-INTERNAL.apk | tee apk-sha256.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: TornFCA-v0.10.18-ICON-CROPPED-INTERNAL
+          path: |
+            TornFCA-v0.10.18-ICON-CROPPED-INTERNAL.apk
+            apk-badging.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 7
