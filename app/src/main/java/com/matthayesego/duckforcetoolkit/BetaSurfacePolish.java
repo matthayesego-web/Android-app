@@ -82,7 +82,7 @@ public final class BetaSurfacePolish {
         activity.getWindow().setNavigationBarColor(BG);
         if(android.os.Build.VERSION.SDK_INT>=28)activity.getWindow().setNavigationBarDividerColor(LINE);
         int flags=activity.getWindow().getDecorView().getSystemUiVisibility();
-        flags&=~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;flags&=~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        flags&=~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;if(android.os.Build.VERSION.SDK_INT>=26)flags&=~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         activity.getWindow().getDecorView().setSystemUiVisibility(flags);
     }
 

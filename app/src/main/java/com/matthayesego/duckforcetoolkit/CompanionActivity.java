@@ -1,6 +1,7 @@
 package com.matthayesego.duckforcetoolkit;
 
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -24,7 +25,7 @@ import java.text.DateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-public class CompanionActivity extends Activity {
+public class CompanionActivity extends ComponentActivity {
     private static final String APP_VERSION = TornFcaBrand.VERSION;
     private static final int BG=Color.rgb(8,12,18),BG2=Color.rgb(12,18,27),PANEL=Color.rgb(20,27,38),PANEL2=Color.rgb(27,36,49),BORDER=Color.rgb(49,63,81),ACCENT=Color.rgb(243,184,52),ACCENT2=Color.rgb(255,216,118),TEXT=Color.rgb(245,248,252),MUTED=Color.rgb(151,163,179),GOOD=Color.rgb(63,185,80),BAD=Color.rgb(248,81,73),BLUE=Color.rgb(88,166,255);
     private enum Screen{LOGIN,HOME,BANKING,LEADERSHIP,DEVELOPER}
@@ -32,6 +33,7 @@ public class CompanionActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);
+        getOnBackPressedDispatcher().addCallback(this,new OnBackPressedCallback(true){@Override public void handleOnBackPressed(){if(screen!=Screen.HOME&&screen!=Screen.LOGIN)showHome();else finish();}});
         String saved=keyStore.load();
         if(saved==null||saved.trim().isEmpty()){showLogin(null);return;}
         FactionScopeCache.Scope cached=FactionScopeCache.load(this,saved);
@@ -172,5 +174,4 @@ public class CompanionActivity extends Activity {
 
     private void showDeveloper(){if(!AppRoles.isOwner(session)){showHome();return;}screen=Screen.DEVELOPER;ScrollView scroll=shell();LinearLayout c=column(scroll);addBack(c,"Developer Console");addCard(c,card("Owner identity active",session.playerName+" ["+session.playerId+"] is recognized as Owner/Developer. The API key is not the developer credential.",ACCENT));addCard(c,card("Permission architecture","Feature access checks Torn ability names directly instead of treating Green/Orange/Red/Black as application roles.",GOOD));addCard(c,card("Shared banking foundation","Backend queue/history, listener ingestion, manager status controls and retroactive balance reconciliation retain local outage fallback.",BLUE));addCard(c,card("Multi-faction boundary","Faction ID is the tenant boundary across permission, notice and banking schemas; player ID remains the user identity.",BLUE));addCard(c,card("Release foundation","TornFCA v"+APP_VERSION+" remains on the permanent-signing track while the Play candidate is still under device validation.",BORDER));setContentView(scroll);scroll.requestApplyInsets();}
     private void addBack(LinearLayout c,String title){Button back=secondary("← Home");back.setOnClickListener(v->showHome());c.addView(back,new LinearLayout.LayoutParams(dp(104),dp(42)));TextView t=text(title,26,TEXT,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);tp.topMargin=dp(14);tp.bottomMargin=dp(14);c.addView(t,tp);}
-    @Override public void onBackPressed(){if(screen!=Screen.HOME&&screen!=Screen.LOGIN)showHome();else super.onBackPressed();}
 }

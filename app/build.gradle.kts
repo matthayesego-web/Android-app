@@ -102,6 +102,7 @@ android {
 tasks.named("preBuild").configure { dependsOn(prepareTornFcaLauncherIcon) }
 
 dependencies {
+    implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
     implementation("com.google.firebase:firebase-messaging")

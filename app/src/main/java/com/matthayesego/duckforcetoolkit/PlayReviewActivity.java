@@ -1,6 +1,7 @@
 package com.matthayesego.duckforcetoolkit;
 
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -22,7 +23,7 @@ import android.widget.Toast;
  * No Torn API key, Torn API call, Apps Script backend call, Firebase registration or production write is made
  * from this activity. It exists only to let store reviewers inspect representative Member/Leader workflows.
  */
-public class PlayReviewActivity extends Activity {
+public class PlayReviewActivity extends ComponentActivity {
     public static final String REVIEW_CODE="TORNFCA-PLAY-REVIEW";
     private PlayReviewStore.Persona persona=PlayReviewStore.Persona.MEMBER;
     private boolean featureOpen=false;
@@ -31,6 +32,7 @@ public class PlayReviewActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(TornFcaUi.BG);
         getWindow().setNavigationBarColor(TornFcaUi.BG);
+        getOnBackPressedDispatcher().addCallback(this,new OnBackPressedCallback(true){@Override public void handleOnBackPressed(){if(PlayReviewStore.isActive(PlayReviewActivity.this)&&featureOpen)showDashboard();else if(PlayReviewStore.isActive(PlayReviewActivity.this))moveTaskToBack(true);else finish();}});
         if(PlayReviewStore.isActive(this)){
             persona=PlayReviewStore.persona(this);
             showDashboard();
@@ -176,8 +178,4 @@ public class PlayReviewActivity extends Activity {
 
     private int dp(int value){return TornFcaUi.dp(this,value);}
 
-    @SuppressWarnings("deprecation")
-    @Override public void onBackPressed(){
-        if(PlayReviewStore.isActive(this)&&featureOpen)showDashboard();else if(PlayReviewStore.isActive(this))moveTaskToBack(true);else super.onBackPressed();
-    }
 }

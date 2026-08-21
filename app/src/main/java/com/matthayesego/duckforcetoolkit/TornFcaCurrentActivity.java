@@ -15,6 +15,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.activity.OnBackPressedCallback;
+
 /**
  * Current TornFCA player shell.
  *
@@ -36,7 +38,17 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
     private Runnable submenuBack;
     private boolean currentShellInstalled;
 
-    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);}
+    @Override protected void onCreate(Bundle savedInstanceState){
+        super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this,new OnBackPressedCallback(true){
+            @Override public void handleOnBackPressed(){
+                if(submenuBack!=null){Runnable back=submenuBack;submenuBack=null;back.run();return;}
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+                setEnabled(true);
+            }
+        });
+    }
 
     @Override public void setContentView(View view){
         super.setContentView(view);
@@ -53,17 +65,6 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
         forceCurrentVersion(root);
         if(isLegacyAuthenticatedHome(root))installCurrentShell(root);
         else if(isCurrentShell(root))refreshIdentityIfNeeded(root);
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override public void onBackPressed(){
-        if(submenuBack!=null){
-            Runnable back=submenuBack;
-            submenuBack=null;
-            back.run();
-            return;
-        }
-        super.onBackPressed();
     }
 
     private boolean isCurrentShell(ViewGroup root){

@@ -86,8 +86,8 @@ public final class PremiumActionPolish {
             raw = "MY DAY";
         }
         if (raw.startsWith("Duck Force Companion v") && raw.endsWith("preview")) {
-            text.setText("TornFCA v0.9.19 preview");
-            raw = "TornFCA v0.9.19 preview";
+            String current="TornFCA v"+TornFcaBrand.VERSION+" preview";text.setText(current);
+            raw=current;
         }
         if (!(text instanceof Button) && looksLikeEyebrow(raw)) {
             float sp = text.getTextSize() / activity.getResources().getDisplayMetrics().scaledDensity;

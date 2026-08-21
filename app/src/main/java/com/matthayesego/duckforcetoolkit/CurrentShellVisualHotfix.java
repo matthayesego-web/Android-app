@@ -92,7 +92,7 @@ public final class CurrentShellVisualHotfix {
         if(android.os.Build.VERSION.SDK_INT>=28)w.setNavigationBarDividerColor(BORDER_SOFT);
         int flags=w.getDecorView().getSystemUiVisibility();
         flags&=~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        flags&=~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        if(android.os.Build.VERSION.SDK_INT>=26)flags&=~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         w.getDecorView().setSystemUiVisibility(flags);
     }
 

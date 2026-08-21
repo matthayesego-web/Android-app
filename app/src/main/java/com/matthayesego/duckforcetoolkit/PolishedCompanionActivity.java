@@ -166,7 +166,7 @@ public class PolishedCompanionActivity extends CompanionActivity {
         column.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView footer = new TextView(this);
-        footer.setText("Duck Force Companion v0.8.0 • faction operating layer");
+        footer.setText("TornFCA v"+TornFcaBrand.VERSION+" • faction operating layer");
         footer.setTextColor(MUTED); footer.setTextSize(11); footer.setGravity(Gravity.CENTER_HORIZONTAL);
         LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         fp.topMargin = dp(6); fp.bottomMargin = dp(4); column.addView(footer, fp);

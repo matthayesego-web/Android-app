@@ -1,7 +1,8 @@
 package com.matthayesego.duckforcetoolkit;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -27,14 +28,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ToolHostActivity extends Activity {
+public class ToolHostActivity extends ComponentActivity {
     public static final String EXTRA_TOOL="tool";
     private static final String APP_VERSION=TornFcaBrand.VERSION;
     private static final String MANAGED_KEY_SENTINEL="TORNFCA_MANAGED_KEY";
     private static final int BG=Color.rgb(8,12,18),PANEL=Color.rgb(20,27,38),TEXT=Color.rgb(245,248,252);
     private WebView webView;private SecureApiKeyStore keyStore;
     private enum Tool{ARMORY("Faction Armory Auditor","armory.duckforce.app","armory_log.html"),TRAIN("Company Train Calculator","train.duckforce.app","train_calculator.html");final String title,domain,asset;Tool(String t,String d,String a){title=t;domain=d;asset=a;}}
-    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);Tool tool;try{tool=Tool.valueOf(getIntent().getStringExtra(EXTRA_TOOL));}catch(Exception e){finish();return;}openTool(tool);}
+    @Override protected void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);keyStore=new SecureApiKeyStore(this);getOnBackPressedDispatcher().addCallback(this,new OnBackPressedCallback(true){@Override public void handleOnBackPressed(){if(webView!=null&&webView.canGoBack())webView.goBack();else finish();}});Tool tool;try{tool=Tool.valueOf(getIntent().getStringExtra(EXTRA_TOOL));}catch(Exception e){finish();return;}openTool(tool);}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     @SuppressWarnings("deprecation") private void applyInsets(LinearLayout view){int l=view.getPaddingLeft(),t=view.getPaddingTop(),r=view.getPaddingRight(),b=view.getPaddingBottom();view.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(l+i.getSystemWindowInsetLeft(),t+i.getSystemWindowInsetTop(),r+i.getSystemWindowInsetRight(),b+i.getSystemWindowInsetBottom());return i;});}
     @SuppressLint("SetJavaScriptEnabled") private void openTool(Tool tool){
@@ -79,6 +80,5 @@ public class ToolHostActivity extends Activity {
     private String errorEnvelope(String message){try{return new JSONObject().put("error",new JSONObject().put("error",message)).toString();}catch(Exception ignored){return "{\"error\":{\"error\":\"Torn API request failed.\"}}";}}
     private WebResourceResponse jsonResponse(int status,String reason,String body){Map<String,String> headers=new HashMap<>();headers.put("Access-Control-Allow-Origin","*");headers.put("Access-Control-Allow-Methods","GET, OPTIONS");headers.put("Cache-Control","no-store");return new WebResourceResponse("application/json","UTF-8",status,reason,headers,new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));}
     private WebResourceResponse blockedResponse(int status,String reason,String message){try{return jsonResponse(status,reason,new JSONObject().put("error",message).toString());}catch(Exception e){return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(message.getBytes(StandardCharsets.UTF_8)));}}
-    @Override public void onBackPressed(){if(webView!=null&&webView.canGoBack())webView.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){if(webView!=null){webView.stopLoading();webView.setWebViewClient(null);webView.destroy();webView=null;}super.onDestroy();}
 }
