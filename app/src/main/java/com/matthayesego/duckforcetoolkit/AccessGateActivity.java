@@ -1,5 +1,6 @@
 package com.matthayesego.duckforcetoolkit;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Typeface;
@@ -19,9 +20,11 @@ import android.widget.TextView;
 public class AccessGateActivity extends Activity {
     private static final long MIN_VISIBLE_MS = 900L;
     private static final long MAX_VISIBLE_MS = 12000L;
+    private static final int REQUEST_NOTIFICATIONS = 4103;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long startedAtMs;
     private boolean launched;
+    private String pendingHomeWarning="";
     private TextView status, detail;
     private ProgressBar progress;
 
@@ -109,11 +112,29 @@ public class AccessGateActivity extends Activity {
     }
 
     private void openHome(String warning){
+        if(launched||isFinishing())return;
+        if(NotificationPermissionOnboarding.shouldRequest(this)){
+            pendingHomeWarning=warning==null?"":warning;
+            NotificationPermissionOnboarding.markRequested(this);
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},REQUEST_NOTIFICATIONS);
+            return;
+        }
+        launchHome(warning);
+    }
+
+    private void launchHome(String warning){
         if(launched||isFinishing())return;launched=true;handler.removeCallbacksAndMessages(null);
+        PushNotifications.initialize(this);
+        PushNotifications.syncIfReady(this);
         Intent i=TornFcaCommandRuntime.homeIntent(this,"Home");
         if(warning!=null&&!warning.isBlank())i.putExtra("startup_warning",warning);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(i);finish();
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        if(requestCode==REQUEST_NOTIFICATIONS)launchHome(pendingHomeWarning);
     }
 
     private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setLineSpacing(0f,1.08f);if(bold)t.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));return t;}
