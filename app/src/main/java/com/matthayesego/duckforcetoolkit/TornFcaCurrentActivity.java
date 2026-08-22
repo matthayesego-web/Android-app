@@ -320,21 +320,21 @@ public class TornFcaCurrentActivity extends TornFcaActivity {
     }
 
     private void renderFaction(){
-        beginTop("Faction","FACTION","Faction","Shared faction information stays here. Extra status and community tools are grouped one level deeper.");
+        beginTop("Faction","FACTION","Faction","Faction chat and shared faction information stay here. Less-frequent status tools remain one level deeper.");
+        addMenu("CHAT","Faction Chat",CommunityBackendClient.isConfigured()?"Open faction communication in one consistent place, with the experimental real Torn Chat option available inside.":"Community backend is not configured in this build yet.",TornFcaUi.BLUE,"Open faction chat",()->openActivity(FactionChatActivity.class));
         addMenu("ANNOUNCEMENTS","Faction Announcements","Current leadership announcements stay here until they are deleted.",TornFcaUi.GOLD,"Open announcements",this::openAnnouncements);
         addMenu("OVERVIEW","Faction Overview","Current faction information available to members.",TornFcaUi.GOLD,"Open overview",()->openActivity(MemberFactionActivity.class));
         addMenu("DIRECTORY","Faction Directory","Search the roster and open basic member status cards.",TornFcaUi.BLUE,"Open directory",()->openActivity(MemberDirectoryActivity.class));
         addMenu("RESOURCES","Faction Resources","Onboarding, rules, guides and useful faction shortcuts.",TornFcaUi.GOLD,"Open resources",()->openActivity(FactionResourcesActivity.class));
-        addMenu("TOOLS","Faction Tools & Community","OC, chain, strength intel and faction chat.",TornFcaUi.GREEN,"Open faction tools",this::renderFactionTools);
+        addMenu("TOOLS","Faction Tools","OC, chain and strength intelligence without duplicating Chat.",TornFcaUi.GREEN,"Open faction tools",this::renderFactionTools);
         addFooter();
     }
 
     private void renderFactionTools(){
-        beginSubmenu("Faction","Faction","FACTION TOOLS","Tools & community","Only the less-frequent faction tools live here, keeping the main Faction tab easy to scan.",this::renderFaction);
+        beginSubmenu("Faction","Faction","FACTION TOOLS","Faction tools","Less-frequent faction status tools live here; Chat stays on the main Faction page.",this::renderFaction);
         addMenu("OC","My Organized Crime","Your assignment and readiness; leadership detail remains permission-gated.",TornFcaUi.PURPLE,"Open My OC",()->openFeature(FeatureRouterActivity.TARGET_OC));
         addMenu("CHAIN","Chain Status","Current chain context and your participation.",TornFcaUi.GREEN,"View chain",()->openFeature(FeatureRouterActivity.TARGET_CHAIN));
         addMenu("INTEL","Faction Strength Intel","Optional FFScouter estimates with consent and freshness controls.",TornFcaUi.BLUE,"View intelligence",()->openFeature(FeatureRouterActivity.TARGET_STRENGTH));
-        addMenu("COMMUNITY","Faction Chat",CommunityBackendClient.isConfigured()?"Verified faction chat inside TornFCA.":"Community backend is not configured in this build yet.",TornFcaUi.BLUE,"Open faction chat",()->openActivity(FactionChatActivity.class));
         addFooter();
     }
 
