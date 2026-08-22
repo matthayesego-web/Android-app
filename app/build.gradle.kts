@@ -46,8 +46,8 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 77
-        versionName = "0.10.22"
+        versionCode = 78
+        versionName = "0.10.23"
         manifestPlaceholders["appLabel"] = "TornFCA"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_v3"
 
