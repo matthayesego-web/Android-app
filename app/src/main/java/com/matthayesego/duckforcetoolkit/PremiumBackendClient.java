@@ -62,23 +62,28 @@ public final class PremiumBackendClient {
     /** Retained only for binary/source compatibility; authenticated status now requires the signed-in Torn key. */
     @Deprecated public static JSONObject status(int playerId)throws Exception{throw new Exception("Authenticated premium status requires the signed-in Torn API key.");}
 
-    public static JSONObject updateConfig(String apiKey,String developerPassword,int daysPerXanax,String requiredMessage)throws Exception{
-        JSONObject request=request("admin_config",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("days_per_xanax",daysPerXanax);request.put("required_message",requiredMessage==null?"":requiredMessage);return checked(post(request));
+    /** Owner-only mutation. The backend verifies the Torn identity represented by apiKey on every request. */
+    public static JSONObject updateConfig(String apiKey,int daysPerXanax,String requiredMessage)throws Exception{
+        JSONObject request=request("admin_config",apiKey);request.put("days_per_xanax",daysPerXanax);request.put("required_message",requiredMessage==null?"":requiredMessage);return checked(post(request));
     }
 
-    /** Retained for source compatibility; server-side admin changes require verified developer identity. */
-    @Deprecated public static JSONObject updateConfig(String developerPassword,int daysPerXanax,String requiredMessage)throws Exception{throw new Exception("Verified developer Torn identity is required for premium administration.");}
+    /** Compatibility overload: the obsolete password value is deliberately ignored and never sent. */
+    @Deprecated public static JSONObject updateConfig(String apiKey,String ignoredPassword,int daysPerXanax,String requiredMessage)throws Exception{return updateConfig(apiKey,daysPerXanax,requiredMessage);}
+    @Deprecated public static JSONObject updateConfig(String ignoredPassword,int daysPerXanax,String requiredMessage)throws Exception{throw new Exception("Verified Torn owner identity is required for premium administration.");}
 
-    public static JSONObject grant(String apiKey,String developerPassword,int playerId,int days)throws Exception{
-        JSONObject request=request("admin_grant",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);request.put("grant_type","developer");return checked(post(request));
+    /** Owner-only grant. The backend independently verifies the signed-in Torn player before applying it. */
+    public static JSONObject grant(String apiKey,int playerId,int days)throws Exception{
+        JSONObject request=request("admin_grant",apiKey);request.put("player_id",playerId);request.put("days",days);request.put("grant_type","developer");return checked(post(request));
     }
 
-    public static JSONObject grantComplimentary(String apiKey,String developerPassword,int playerId,int days)throws Exception{
-        JSONObject request=request("admin_grant",apiKey);request.put("admin_password",developerPassword==null?"":developerPassword);request.put("player_id",playerId);request.put("days",days);request.put("grant_type","complimentary");return checked(post(request));
+    public static JSONObject grantComplimentary(String apiKey,int playerId,int days)throws Exception{
+        JSONObject request=request("admin_grant",apiKey);request.put("player_id",playerId);request.put("days",days);request.put("grant_type","complimentary");return checked(post(request));
     }
 
-    /** Retained for source compatibility; server-side admin changes require verified developer identity. */
-    @Deprecated public static JSONObject grant(String developerPassword,int playerId,int days)throws Exception{throw new Exception("Verified developer Torn identity is required for premium administration.");}
+    /** Compatibility overloads: password is obsolete and never transmitted. */
+    @Deprecated public static JSONObject grant(String apiKey,String ignoredPassword,int playerId,int days)throws Exception{return grant(apiKey,playerId,days);}
+    @Deprecated public static JSONObject grantComplimentary(String apiKey,String ignoredPassword,int playerId,int days)throws Exception{return grantComplimentary(apiKey,playerId,days);}
+    @Deprecated public static JSONObject grant(String ignoredPassword,int playerId,int days)throws Exception{throw new Exception("Verified Torn owner identity is required for premium administration.");}
 
     private static SharedPreferences prefs(Context context){return context.getApplicationContext().getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
     private static void saveOffer(Context context,JSONObject offer){
