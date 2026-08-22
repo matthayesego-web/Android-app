@@ -46,9 +46,10 @@ android {
         applicationId = "com.matthayesego.duckforcetoolkit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 75
-        versionName = "0.10.20"
+        versionCode = 76
+        versionName = "0.10.21"
         manifestPlaceholders["appLabel"] = "TornFCA"
+        manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_v3"
 
         val factionBackend = localOrEnv("TORNFCA_FACTION_BACKEND_URL", "https://script.google.com/macros/s/AKfycbzR8zjFVYaDoIZaxFdJV4yBaM4mLSv-iqZL8146HCzq6vRzJgeYr1Y0TKkPGrdASjQj/exec")
         val premiumBackend = localOrEnv("TORNFCA_PREMIUM_BACKEND_URL", "https://script.google.com/macros/s/AKfycbxGp-l6UYQb6MzSSWrhHMo9QNuYlsJfvw1c2qYxdoPnFr-G5TxeUOFOgr1ziOZHpWi7/exec")
@@ -88,6 +89,7 @@ android {
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-development"
             manifestPlaceholders["appLabel"] = "TornFCA Development"
+            manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher_development"
             isDebuggable = false
             signingConfig = null
         }
