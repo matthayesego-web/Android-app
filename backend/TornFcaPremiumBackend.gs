@@ -1,10 +1,10 @@
 /**
- * TornFCA global premium entitlement backend v1.3.1.
+ * TornFCA global premium entitlement backend v1.4.0.
  * Deploy as a SEPARATE Apps Script web app from faction/community/developer backends.
  *
  * Security:
  * - Status reads require a Torn API key and can only read the verified caller's own entitlement.
- * - Admin mutations require BOTH verified TornFCA owner identity and the premium admin password.
+ * - Admin mutations require the verified TornFCA owner identity; no second client-supplied password is used.
  * - Client API keys are never persisted; only SHA-256 fingerprints may be used for short-lived identity cache keys.
  * - The owner Torn key used by the payment scanner lives only in Script Properties as OWNER_API_KEY.
  * - Incoming payments are deduped by Torn log id under ScriptLock.
@@ -15,7 +15,7 @@
  * - scanPremiumPayments() is intended to run once per minute only after monetization approval: one Torn /user log request/minute.
  * - entitlement identity verification is cached briefly by API-key fingerprint.
  */
-const TORNFCA_PREMIUM_VERSION='1.3.1';
+const TORNFCA_PREMIUM_VERSION='1.4.0';
 const TORNFCA_PREMIUM_DEVELOPER_ID=3987363;
 const TORNFCA_XANAX_ITEM_ID=206;
 const TORNFCA_ITEM_RECEIVE_LOG=4103;
@@ -32,7 +32,7 @@ function setupTornFcaPremiumBackend(){
   setPremiumSettingIfMissing_(settings,'stacking','true');
   ensurePremiumSheet_(ss,P_SHEETS.ENTITLEMENTS,['player_id','tier','expires_at','updated_at','source','total_xanax']);
   ensurePremiumSheet_(ss,P_SHEETS.PAYMENTS,['log_id','timestamp','sender_id','xanax_qty','days_added','message','processed_at']);
-  return {ok:true,version:TORNFCA_PREMIUM_VERSION,monetization_approved:premiumMonetizationApproved_(),days_per_xanax:readPremiumConfig_().days_per_xanax,next:'Set the one-time PREMIUM_ADMIN_PASSWORD_SETUP property and bootstrap the admin password. Existing deployments should confirm days_per_xanax is 7 in Premium Admin before enabling paid scanning. Automatic payment scanning remains disabled until MONETIZATION_APPROVED=true is deliberately set after required Torn/distribution approval.'};
+  return {ok:true,version:TORNFCA_PREMIUM_VERSION,monetization_approved:premiumMonetizationApproved_(),days_per_xanax:readPremiumConfig_().days_per_xanax,next:'Owner-only admin mutations are authorized by verified Torn player identity. Confirm days_per_xanax is 7 in Premium Admin before enabling paid scanning. Automatic payment scanning remains disabled until MONETIZATION_APPROVED=true is deliberately set after required Torn/distribution approval.'};
 }
 
 /** One-time helper for an existing Premium sheet created before the 7-day launch price was finalized. */
@@ -47,22 +47,6 @@ function installPremiumScanTrigger(){
   ScriptApp.getProjectTriggers().forEach(t=>{if(t.getHandlerFunction()==='scanPremiumPayments')ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('scanPremiumPayments').timeBased().everyMinutes(1).create();
   return 'Installed one-minute TornFCA premium scan trigger.';
-}
-
-function setPremiumAdminPassword(password){
-  if(!password||String(password).length<10)throw new Error('Use a developer password of at least 10 characters.');
-  PropertiesService.getScriptProperties().setProperty('PREMIUM_ADMIN_SHA256',sha256_(String(password)));
-  return 'Premium admin password updated.';
-}
-
-/**
- * Safe Apps Script UI bootstrap: temporarily set PREMIUM_ADMIN_PASSWORD_SETUP in Script Properties,
- * run this once, and the plaintext property is deleted immediately after hashing.
- */
-function bootstrapPremiumAdminPassword(){
-  const props=PropertiesService.getScriptProperties(),plain=String(props.getProperty('PREMIUM_ADMIN_PASSWORD_SETUP')||'');
-  if(plain.length<10)throw new Error('Set PREMIUM_ADMIN_PASSWORD_SETUP in Script Properties to a password of at least 10 characters first.');
-  try{return setPremiumAdminPassword(plain);}finally{props.deleteProperty('PREMIUM_ADMIN_PASSWORD_SETUP');}
 }
 
 function doGet(){return premiumJson_({ok:true,app:'TornFCA Premium Entitlements',version:TORNFCA_PREMIUM_VERSION,monetization_approved:premiumMonetizationApproved_(),authenticated_actions:'POST only'});}
@@ -83,7 +67,6 @@ function doPost(e){
     }
     if(action==='admin_config'){
       requirePremiumDeveloper_(user);
-      requirePremiumAdmin_(String(body.admin_password||''));
       const current=readPremiumConfig_();
       const days=Math.max(1,Math.min(365,Number(body.days_per_xanax||current.days_per_xanax||TORNFCA_DEFAULT_DAYS_PER_XANAX)));
       const required=String(body.required_message==null?current.required_message:body.required_message).trim().slice(0,80);
@@ -96,7 +79,6 @@ function doPost(e){
     }
     if(action==='admin_grant'){
       requirePremiumDeveloper_(user);
-      requirePremiumAdmin_(String(body.admin_password||''));
       const playerId=Number(body.player_id||0),days=Math.max(1,Math.min(3650,Number(body.days||0)));
       if(!playerId||!days)throw new Error('Valid player_id and days required.');
       const grantType=String(body.grant_type||'developer').trim().toLowerCase();
@@ -118,7 +100,7 @@ function verifyPremiumUser_(apiKey){
   return user;
 }
 
-function requirePremiumDeveloper_(user){if(Number(user&&user.id||0)!==TORNFCA_PREMIUM_DEVELOPER_ID)throw new Error('Verified TornFCA developer account required.');}
+function requirePremiumDeveloper_(user){if(Number(user&&user.id||0)!==TORNFCA_PREMIUM_DEVELOPER_ID)throw new Error('Verified TornFCA owner account required.');}
 
 function premiumTornGet_(path,key){
   const joiner=String(path).indexOf('?')>=0?'&':'?';
@@ -179,8 +161,6 @@ function extendEntitlement_(playerId,days,source,xanaxQty,stacking){
   const sheet=premiumDb_().getSheetByName(P_SHEETS.ENTITLEMENTS),values=sheet.getDataRange().getValues();
   const now=Math.floor(Date.now()/1000),add=Math.round(days*86400),updated=now;let row=0,current=0,total=0,currentSource='';
   for(let i=1;i<values.length;i++)if(Number(values[i][0])===Number(playerId)){row=i+1;current=Number(values[i][2]||0);currentSource=String(values[i][4]||'');total=Number(values[i][5]||0);break;}
-  // If a prior scanner run granted this exact receipt and failed before writing PremiumPayments,
-  // return the existing entitlement instead of extending it again.
   if(source&&String(source).indexOf('XANAX_LOG_4103:')===0&&currentSource===String(source))return {player_id:playerId,tier:current>now?'PREMIUM':'FREE',expires_at:current,verified_at:updated,source:currentSource,idempotent:true};
   const base=stacking===false?now:Math.max(now,current),expires=base+add;
   const valuesOut=[playerId,'PREMIUM',expires,updated,String(source||'backend'),total+Number(xanaxQty||0)];
@@ -211,7 +191,6 @@ function setPremiumSetting_(sheet,key,value){const values=sheet.getDataRange().g
 function setPremiumSettingIfMissing_(sheet,key,value){const values=sheet.getDataRange().getValues();for(let i=1;i<values.length;i++)if(String(values[i][0])===key)return;sheet.appendRow([key,value]);}
 function ensurePremiumSheet_(ss,name,headers){let s=ss.getSheetByName(name);if(!s)s=ss.insertSheet(name);if(s.getLastRow()===0)s.appendRow(headers);return s;}
 function premiumDb_(){const id=PropertiesService.getScriptProperties().getProperty('PREMIUM_SHEET_ID');if(!id)throw new Error('Run setupTornFcaPremiumBackend() first.');return SpreadsheetApp.openById(id);}
-function requirePremiumAdmin_(password){const expected=String(PropertiesService.getScriptProperties().getProperty('PREMIUM_ADMIN_SHA256')||'');if(!expected||sha256_(password)!==expected)throw new Error('Developer authorization failed.');}
 function premiumMonetizationApproved_(){return premiumBool_(PropertiesService.getScriptProperties().getProperty('MONETIZATION_APPROVED')||'false');}
 function premiumBool_(v){if(typeof v==='boolean')return v;const n=String(v==null?'':v).trim().toLowerCase();return n==='true'||n==='1'||n==='yes'||n==='on';}
 function sha256_(value){const bytes=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value),Utilities.Charset.UTF_8);return bytes.map(b=>('0'+((b<0?b+256:b).toString(16))).slice(-2)).join('').toUpperCase();}

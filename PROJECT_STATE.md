@@ -12,11 +12,13 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 
 ## Current versions
 - Production `main`: v0.10.19, versionCode 74. This remains the Google Play line.
-- Development `development`: v0.10.21, versionCode 76, versionName suffix `-development`.
+- Last accepted `development`: v0.10.21, versionCode 76.
+- Current work target: v0.10.22, versionCode 77, versionName suffix `-development`.
 - Development package: `com.matthayesego.duckforcetoolkit.beta`, visible app name **TornFCA Development**.
 - v0.10.21 validated PR: #22, merged into `development` after CI success.
 - Validated v0.10.21 APK SHA-256: `f1ea9d953b53db798cb3e0400ff7751d8b5b88ce4b3095e9128f1cc0fbf568ab`.
 - Pre-v0.10.21 restore point: `restore/development-pre-v0.10.21-real-chat-2026-08-21`.
+- Pre-v0.10.22 restore point: `restore/development-pre-v0.10.22-chat-login-admin-fixes-2026-08-21`.
 
 ## Core architecture
 - Android native app, Java/Kotlin Gradle project, compile/target SDK 36, min SDK 24.
@@ -41,7 +43,6 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 - `RealTornChatActivity` is implemented and compiled/signed successfully.
 - Entry path: native TornFCA Chat -> **Torn Chat**.
 - Hosts Torn's own `https://www.torn.com/` page in a dedicated Android WebView.
-- First use can require the user's normal Torn web login. TornFCA does not receive/bridge the Torn password.
 - Torn owns authentication, chat transport, messages and Send behavior.
 - TornFCA detects the visible faction chat DOM, primarily using `div[id^="faction-"]` plus defensive `#chatRoot` / chat-box fallbacks, and expands that actual Torn chat box to the full WebView.
 - The user sends through Torn's real visible textarea/send control; TornFCA does not call Sendbird with an unowned credential.
@@ -56,6 +57,31 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 - Development build uses `@mipmap/ic_launcher_development` with dedicated D artwork.
 - CI checks the D-icon configuration and fails Development validation if it is missing.
 - Before future Play promotion, production T identity must be preserved/restored for the release build.
+
+## v0.10.22 device-feedback corrections
+### Chat placement
+- v0.10.21 incorrectly injected a Chat button into nearly every shared TornFCA header. User explicitly rejected this.
+- **Do not put Chat on every screen.** Chat has one normal, obvious faction/community entry point.
+- `TornFcaUi.header()` no longer injects Chat globally.
+- The single normal Chat entry is now a prominent top-level **Faction Chat** card directly on the main **Faction** page.
+- The Faction Tools submenu no longer contains a duplicate Chat row; it contains OC, Chain and Strength Intel only.
+- Inside the Chat destination itself, the `Torn Chat` button is allowed because it switches chat provider rather than creating another normal navigation entry.
+- Future navigation changes must preserve the one-place rule unless explicitly redesigned by the user.
+
+### Torn website authentication
+- Torn API-key authentication and Torn website-session authentication are different systems.
+- A Torn API key **cannot** be used to log the embedded Torn website/WebView in.
+- Google explicitly blocks OAuth sign-in inside embedded Android WebViews; this is why a Google-authenticated Torn account cannot simply use a Google button inside `RealTornChatActivity`.
+- Torn PDA has documented the same limitation. Practical current fallback: use the Torn email/password web login; if the account was created/used through Google and the password is unknown, use Torn's normal Recover account flow to set/reset a Torn password.
+- v0.10.22 states this clearly in the Real Torn Chat UI rather than implying Google sign-in or API-key login should work.
+- Continue researching a legitimate native Google/Torn session bridge, but do not spoof Google OAuth, copy browser cookies, or claim external Chrome login will authenticate Android WebView unless a verified Torn-supported exchange exists.
+
+### Premium Admin authorization
+- User explicitly requested removal of the extra Developer Password field.
+- Premium admin mutations are owner-only by Torn identity. The client API key is validated and the backend verifies the caller Torn player ID against the configured TornFCA owner ID.
+- v0.10.22 removes the Developer Password UI and stops sending `admin_password` from Android.
+- Canonical `backend/TornFcaPremiumBackend.gs` v1.4.0 removes the second password check for `admin_config` / `admin_grant`; verified Torn owner identity remains mandatory server-side.
+- Backend deployment is separate from committing Android/GitHub source. Do not claim the live Apps Script endpoint is upgraded until the v1.4.0 web-app deployment is actually published and verified.
 
 ## Real Torn chat research boundaries
 - Torn Chat 3.0 is Sendbird-backed.
@@ -84,10 +110,11 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 9. Promote to `main` only as an explicit release action after production checks, including production T icon.
 
 ## Immediate next work
-- Device-test v0.10.21 Real Torn Chat: login, chat detection/focus, incoming messages, explicit send, background/reload behavior and DOM-change failure state.
-- If DOM focus works but layout is imperfect, tune selectors/CSS from screenshots/device observations rather than guessing.
+- Validate v0.10.22 Android compile/signing and the single Faction-page Chat placement.
+- Publish/verify Premium backend v1.4.0 before testing owner Premium mutations without a password.
+- Retest Real Torn Chat using a Torn website password / Recover account path and then test faction-chat DOM focus, incoming messages and explicit send.
+- Continue researching legitimate native Google/Torn website authentication or user-scoped Sendbird bootstrap.
 - If real Torn chat is stable, decide whether it becomes primary member chat while keeping native Leadership/TornFCA chat where useful.
-- Continue legitimate user-scoped Sendbird bootstrap research in parallel.
 - Verify Community backend leader moderation policy.
 - Continue War Chain Live Tracker device tuning.
 
