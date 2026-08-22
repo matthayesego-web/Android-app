@@ -28,10 +28,10 @@ public final class TornFcaUi {
     public static void header(Activity a,LinearLayout r,String backLabel,String title,String subtitle){
         LinearLayout actions=new LinearLayout(a);actions.setOrientation(LinearLayout.HORIZONTAL);actions.setGravity(Gravity.CENTER_VERTICAL);
         Button back=button(a,"← "+backLabel,BORDER);back.setOnClickListener(v->a.finish());actions.addView(back,new LinearLayout.LayoutParams(0,dp(a,44),1f));
+        // Chat is intentionally not injected into every screen. The single normal entry point lives under Faction.
+        // Inside the chat destination itself, keep one explicit switch to Torn's real foreground chat experiment.
         if(a instanceof FactionChatActivity){
             Button real=button(a,"Torn Chat",GREEN);real.setOnClickListener(v->a.startActivity(new Intent(a,RealTornChatActivity.class)));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(dp(a,104),dp(a,44));cp.leftMargin=dp(a,8);actions.addView(real,cp);
-        }else if(!(a instanceof RealTornChatActivity)){
-            Button chat=button(a,"Chat",BLUE);chat.setOnClickListener(v->a.startActivity(new Intent(a,FactionChatActivity.class)));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(dp(a,92),dp(a,44));cp.leftMargin=dp(a,8);actions.addView(chat,cp);
         }
         r.addView(actions,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(a,44)));
         TextView brand=text(a,"TORNFCA • FACTION COMPANION",10,GOLD,true);brand.setLetterSpacing(.11f);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);bp.topMargin=dp(a,17);r.addView(brand,bp);r.addView(text(a,title,30,TEXT,true));TextView sub=text(a,subtitle,13,MUTED,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);sp.topMargin=dp(a,4);sp.bottomMargin=dp(a,16);r.addView(sub,sp);}
