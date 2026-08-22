@@ -48,6 +48,29 @@ jobs:
           test -s app/src/main/res/mipmap-anydpi/ic_launcher_development.xml
           test -s app/src/main/res/mipmap-anydpi-v26/ic_launcher_development.xml
 
+      - name: Corrective chat and premium preflight
+        run: |
+          set -euo pipefail
+          UI=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaUi.java
+          REAL=app/src/main/java/com/matthayesego/duckforcetoolkit/RealTornChatActivity.java
+          ADMIN=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumAdminActivity.java
+          CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
+          PREMIUM=backend/TornFcaPremiumBackend.gs
+
+          # Chat must not be injected into every shared screen header.
+          ! grep -q 'Button chat=button(a,"Chat"' "$UI"
+          grep -q 'a instanceof FactionChatActivity' "$UI"
+          grep -q 'Google/Apple OAuth cannot run inside Android WebView' "$REAL"
+          grep -q 'API key cannot create a website login' "$REAL"
+
+          # Premium admin is owner-ID authorized; the old client password must stay gone.
+          ! grep -q 'Developer password' "$ADMIN"
+          ! grep -q 'admin_password' "$CLIENT"
+          grep -q "const TORNFCA_PREMIUM_VERSION='1.4.0'" "$PREMIUM"
+          ! grep -q 'requirePremiumAdmin_' "$PREMIUM"
+          cp "$PREMIUM" /tmp/TornFcaPremiumBackend.js
+          node --check /tmp/TornFcaPremiumBackend.js
+
       - name: Compile Development APK
         env:
           TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
