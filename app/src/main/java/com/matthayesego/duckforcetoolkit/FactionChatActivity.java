@@ -2,6 +2,8 @@ package com.matthayesego.duckforcetoolkit;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -131,9 +133,16 @@ public class FactionChatActivity extends Activity {
         lastRenderedSignature=serverMessages.toString();
         JSONArray displayMessages=withPending(serverMessages,currentChannel,session.factionId);
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
-        TornFcaUi.header(this,r,"Member Center","Faction Chat",session.factionName+" • private to your current Torn faction");
+        TornFcaUi.header(this,r,"Community","Faction Chat",session.factionName+" • live TornFCA community chat for your current faction");
         freshnessView=TornFcaUi.text(this,DataFreshness.label(StartupWarmCache.chatAgeMs(session.factionId,currentChannel),refreshing),11.5f,TornFcaUi.MUTED,false);LinearLayout.LayoutParams fsp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);fsp.bottomMargin=TornFcaUi.dp(this,8);r.addView(freshnessView,fsp);
-        List<String> channels=new ArrayList<>();channels.add("General");channels.add("War");channels.add("OC");if(AccessPolicy.isLeaderPosition(session.position)&&!DeveloperPreviewStore.isMemberPreview(this))channels.add("Leadership");
+
+        boolean leadership=AccessPolicy.isLeaderPosition(session.position)&&!DeveloperPreviewStore.isMemberPreview(this);
+        if(leadership){
+            Button reports=TornFcaUi.button(this,"Reports & Moderation",TornFcaUi.GOLD);reports.setOnClickListener(v->startActivity(new Intent(this,CommunityModerationActivity.class)));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,44));rp.bottomMargin=TornFcaUi.dp(this,8);r.addView(reports,rp);
+        }
+        TextView safetyHint=TornFcaUi.text(this,"Tap another member's message for profile, report and block options.",11.5f,TornFcaUi.MUTED,false);LinearLayout.LayoutParams shp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);shp.bottomMargin=TornFcaUi.dp(this,8);r.addView(safetyHint,shp);
+
+        List<String> channels=new ArrayList<>();channels.add("General");channels.add("War");channels.add("OC");if(leadership)channels.add("Leadership");
         if("leadership".equals(currentChannel)&&!containsChannel(channels,"leadership"))currentChannel="general";
         channelSpinner=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,channels);adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);channelSpinner.setAdapter(adapter);
         for(int i=0;i<channels.size();i++)if(channels.get(i).toLowerCase(java.util.Locale.US).startsWith(currentChannel)){channelSpinner.setSelection(i);break;}
@@ -154,13 +163,7 @@ public class FactionChatActivity extends Activity {
             int cardAccent=failed?TornFcaUi.RED:sending?TornFcaUi.GOLD:mine?TornFcaUi.GREEN:accent(currentChannel);
             LinearLayout card=TornFcaUi.card(this,eye,title,body,cardAccent);
             if(failed){String tempId=m.optString("id","");Button retry=TornFcaUi.button(this,"Retry Send",TornFcaUi.GOLD);retry.setOnClickListener(v->retryPending(tempId));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,42));rp.topMargin=TornFcaUi.dp(this,9);card.addView(retry,rp);}
-            else if(!mine&&authorId>0){
-                LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);
-                Button report=TornFcaUi.button(this,"Report",TornFcaUi.GOLD);report.setOnClickListener(v->reportMessage(m));
-                Button block=TornFcaUi.button(this,"Block User",TornFcaUi.RED);block.setOnClickListener(v->blockUser(authorId,title));
-                LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,TornFcaUi.dp(this,42),1f);LinearLayout.LayoutParams b=new LinearLayout.LayoutParams(0,TornFcaUi.dp(this,42),1f);b.leftMargin=TornFcaUi.dp(this,7);actions.addView(report,a);actions.addView(block,b);
-                LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,42));ap.topMargin=TornFcaUi.dp(this,9);card.addView(actions,ap);
-            }
+            else if(!mine&&authorId>0){card.setClickable(true);card.setFocusable(true);card.setOnClickListener(v->showMemberActions(m,authorId,title));}
             TornFcaUi.add(this,r,card);
         }
         if(visible==0)TornFcaUi.add(this,r,TornFcaUi.card(this,"QUIET CHANNEL","No visible messages","Start the conversation, or wait for another faction member to post.",TornFcaUi.BORDER));
@@ -176,6 +179,15 @@ public class FactionChatActivity extends Activity {
         Button send=TornFcaUi.button(this,"Send Message",TornFcaUi.BLUE);send.setOnClickListener(v->send());LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46));sp.topMargin=TornFcaUi.dp(this,8);compose.addView(send,sp);TornFcaUi.add(this,r,compose);
         Button refresh=TornFcaUi.button(this,refreshing?"Refreshing Chat…":"Refresh Chat",TornFcaUi.BORDER);refresh.setEnabled(!refreshing);refresh.setOnClickListener(v->load(false));r.addView(refresh,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,46)));
         setContentView(s);s.requestApplyInsets();if(scrollToBottom)s.post(()->s.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private void showMemberActions(JSONObject message,int authorId,String name){
+        String[] actions={"View Torn profile","Report this message","Block user"};
+        new AlertDialog.Builder(this).setTitle(name).setItems(actions,(dialog,which)->{
+            if(which==0){try{startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.torn.com/profiles.php?XID="+authorId)));}catch(Exception e){Toast.makeText(this,"Unable to open Torn profile.",Toast.LENGTH_SHORT).show();}}
+            else if(which==1)reportMessage(message);
+            else if(which==2)blockUser(authorId,name);
+        }).setNegativeButton("Cancel",null).show();
     }
 
     private JSONArray withPending(JSONArray server,String channel,int factionId){
@@ -239,7 +251,7 @@ public class FactionChatActivity extends Activity {
     private String safe(String value){return value==null?"":value.trim();}
     private String safeName(String value,String fallback){String s=safe(value);return s.isEmpty()?fallback:s;}
     private int accent(String channel){if("leadership".equals(channel))return TornFcaUi.GOLD;if("war".equals(channel))return TornFcaUi.RED;if("oc".equals(channel))return TornFcaUi.PURPLE;return TornFcaUi.BLUE;}
-    private void renderLoading(String message){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Member Center","Faction Chat",message);TornFcaUi.add(this,r,TornFcaUi.card(this,"LOADING","Connecting…","Verifying your faction and loading recent messages.",TornFcaUi.BLUE));setContentView(s);s.requestApplyInsets();}
-    private void renderOffline(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Member Center","Faction Chat","Community service is not connected in this build.");TornFcaUi.add(this,r,TornFcaUi.card(this,"OFFLINE","Faction chat is ready for backend connection","The Android chat client is installed, but no TornFCA community backend URL was compiled into this build. Other faction/member features remain available.",TornFcaUi.GOLD));setContentView(s);s.requestApplyInsets();}
-    private void renderError(String message){runOnUiThread(()->{ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Member Center","Faction Chat","Unable to connect");TornFcaUi.add(this,r,TornFcaUi.card(this,"CHAT UNAVAILABLE","Could not load faction chat",message,TornFcaUi.RED));Button retry=TornFcaUi.button(this,"Retry",TornFcaUi.GOLD);retry.setOnClickListener(v->{renderLoading("Reconnecting…");bootstrap();});r.addView(retry,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,48)));setContentView(s);s.requestApplyInsets();});}
+    private void renderLoading(String message){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Community","Faction Chat",message);TornFcaUi.add(this,r,TornFcaUi.card(this,"LOADING","Connecting…","Verifying your faction and loading recent messages.",TornFcaUi.BLUE));setContentView(s);s.requestApplyInsets();}
+    private void renderOffline(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Community","Faction Chat","Community service is not connected in this build.");TornFcaUi.add(this,r,TornFcaUi.card(this,"OFFLINE","Faction chat is ready for backend connection","The Android chat client is installed, but no TornFCA community backend URL was compiled into this build. Other faction/member features remain available.",TornFcaUi.GOLD));setContentView(s);s.requestApplyInsets();}
+    private void renderError(String message){runOnUiThread(()->{ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Community","Faction Chat","Unable to connect");TornFcaUi.add(this,r,TornFcaUi.card(this,"CHAT UNAVAILABLE","Could not load faction chat",message,TornFcaUi.RED));Button retry=TornFcaUi.button(this,"Retry",TornFcaUi.GOLD);retry.setOnClickListener(v->{renderLoading("Reconnecting…");bootstrap();});r.addView(retry,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,48)));setContentView(s);s.requestApplyInsets();});}
 }

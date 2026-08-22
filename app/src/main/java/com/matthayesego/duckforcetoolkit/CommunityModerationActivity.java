@@ -15,7 +15,7 @@ import org.json.JSONObject;
 import java.text.DateFormat;
 import java.util.Date;
 
-/** Hidden owner-only review queue for TornFCA community reports. Server authorization is still enforced independently. */
+/** Faction-scoped leadership review queue for TornFCA community reports. Server authorization is enforced independently. */
 public class CommunityModerationActivity extends Activity {
     private String key;
 
@@ -28,8 +28,8 @@ public class CommunityModerationActivity extends Activity {
 
     private void render(JSONArray reports){
         ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);
-        TornFcaUi.header(this,r,"Developer Panel","Community Moderation","Central TornFCA review queue • "+reports.length()+" open report"+(reports.length()==1?"":"s"));
-        if(reports.length()==0){TornFcaUi.add(this,r,TornFcaUi.card(this,"ALL CLEAR","No open reports","Faction chat reports that still need TornFCA review will appear here.",TornFcaUi.GREEN));}
+        TornFcaUi.header(this,r,"Leadership","Reports & Moderation","Faction-scoped report queue • "+reports.length()+" open report"+(reports.length()==1?"":"s"));
+        if(reports.length()==0){TornFcaUi.add(this,r,TornFcaUi.card(this,"ALL CLEAR","No open reports","Faction chat reports that still need leadership review will appear here.",TornFcaUi.GREEN));}
         for(int i=0;i<reports.length();i++){
             JSONObject row=reports.optJSONObject(i);if(row==null)continue;
             String reportId=row.optString("id","");String author=row.optString("author_name","Member");String reporter=row.optString("reporter_name","Member");String channel=row.optString("channel","general");String reason=row.optString("reason","No reason supplied");String snapshot=row.optString("message_snapshot","");long created=row.optLong("created_at",0L);int factionId=row.optInt("faction_id",0);
@@ -53,6 +53,6 @@ public class CommunityModerationActivity extends Activity {
 
     private void resolve(String reportId,String action){new Thread(()->{try{CommunityBackendClient.resolveModerationReport(key,reportId,action);runOnUiThread(()->{Toast.makeText(this,"Moderation action saved.",Toast.LENGTH_SHORT).show();renderLoading();load();});}catch(Exception e){String m=e.getMessage()==null?"Moderation action failed.":e.getMessage();runOnUiThread(()->Toast.makeText(this,m,Toast.LENGTH_LONG).show());}},"TornFCA-ModerationResolve").start();}
 
-    private void renderLoading(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Developer Panel","Community Moderation","Loading open reports…");TornFcaUi.add(this,r,TornFcaUi.card(this,"LOADING","Checking report queue","Verifying the developer account and loading unresolved community reports.",TornFcaUi.BLUE));setContentView(s);s.requestApplyInsets();}
-    private void renderError(String message){runOnUiThread(()->{ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Developer Panel","Community Moderation","Unable to open review queue");TornFcaUi.add(this,r,TornFcaUi.card(this,"MODERATION UNAVAILABLE","Could not load reports",message,TornFcaUi.RED));Button retry=TornFcaUi.button(this,"Retry",TornFcaUi.GOLD);retry.setOnClickListener(v->{renderLoading();load();});r.addView(retry,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,48)));setContentView(s);s.requestApplyInsets();});}
+    private void renderLoading(){ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Leadership","Reports & Moderation","Loading open reports…");TornFcaUi.add(this,r,TornFcaUi.card(this,"LOADING","Checking report queue","Verifying your faction role and loading unresolved reports for the current faction.",TornFcaUi.BLUE));setContentView(s);s.requestApplyInsets();}
+    private void renderError(String message){runOnUiThread(()->{ScrollView s=TornFcaUi.shell(this);LinearLayout r=TornFcaUi.root(this,s);TornFcaUi.header(this,r,"Leadership","Reports & Moderation","Unable to open review queue");TornFcaUi.add(this,r,TornFcaUi.card(this,"MODERATION UNAVAILABLE","Could not load reports",message,TornFcaUi.RED));Button retry=TornFcaUi.button(this,"Retry",TornFcaUi.GOLD);retry.setOnClickListener(v->{renderLoading();load();});r.addView(retry,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,TornFcaUi.dp(this,48)));setContentView(s);s.requestApplyInsets();});}
 }

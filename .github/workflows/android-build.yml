@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, development, work/v0.10.20-chat-notification-ux ]
   workflow_dispatch:
 
 permissions:
@@ -38,15 +38,15 @@ jobs:
 
       - name: Name APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk "DuckForce-Companion-v${VERSION_NAME}-internal-debug.apk"
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "DuckForce-Companion-v${VERSION_NAME}-unsigned-release.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "TornFCA-v${VERSION_NAME}-internal-debug.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "TornFCA-v${VERSION_NAME}-unsigned-release.apk"
 
       - name: Upload APKs
         uses: actions/upload-artifact@v7
         with:
-          name: DuckForce-Companion-v${{ env.VERSION_NAME }}-internal-builds
+          name: TornFCA-v${{ env.VERSION_NAME }}-internal-builds
           path: |
-            DuckForce-Companion-v${{ env.VERSION_NAME }}-internal-debug.apk
-            DuckForce-Companion-v${{ env.VERSION_NAME }}-unsigned-release.apk
+            TornFCA-v${{ env.VERSION_NAME }}-internal-debug.apk
+            TornFCA-v${{ env.VERSION_NAME }}-unsigned-release.apk
           if-no-files-found: error
           retention-days: 14
