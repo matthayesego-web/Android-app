@@ -1,83 +1,95 @@
 # TornFCA Project State
 
-This file is the durable recovery note for TornFCA. Keep it current whenever architecture, branch policy, release state, major features, credentials/deployment assumptions, or next steps change.
+This is the durable recovery note for TornFCA. Read this first after any lost chat/session. Update it whenever branch policy, release state, architecture, major features, deployment assumptions, restore points, or next work changes.
 
 ## Branch policy
 - `main` = Google Play / production source. Do not develop directly here.
 - `development` = accepted next-version development source.
 - `work/*` = temporary implementation/validation branches created from `development`.
-- `restore/*` = immutable recovery snapshots before risky changes.
-- Production app identity/icon uses **T**. Development app identity/icon uses **D**.
+- `restore/*` = recovery snapshots before risky changes.
+- Production launcher identity = **T**. Development launcher identity = **D**.
+- Never merge to `main` merely to produce a test APK.
 
 ## Current versions
-- Production `main`: v0.10.19, versionCode 74.
-- Development target: v0.10.21, versionCode 76.
-- Development package remains isolated from production using the existing `.beta` applicationId suffix, but visible naming is **TornFCA Development** and version suffix is `-development`.
+- Production `main`: v0.10.19, versionCode 74. This remains the Google Play line.
+- Development `development`: v0.10.21, versionCode 76, versionName suffix `-development`.
+- Development package: `com.matthayesego.duckforcetoolkit.beta`, visible app name **TornFCA Development**.
+- v0.10.21 validated PR: #22, merged into `development` after CI success.
+- Validated v0.10.21 APK SHA-256: `f1ea9d953b53db798cb3e0400ff7751d8b5b88ce4b3095e9128f1cc0fbf568ab`.
+- Pre-v0.10.21 restore point: `restore/development-pre-v0.10.21-real-chat-2026-08-21`.
 
-## Current architecture
-- Android native app, Java/Kotlin Gradle project, target/compile SDK 36.
-- Torn API key stored through `SecureApiKeyStore`; never commit user keys.
-- Torn API v2 is used for authenticated player/faction data.
-- Shared TornFCA services use separate backend endpoints for faction, community, premium, developer, WarPay and feedback.
-- Firebase/FCM supplies cloud push when configured through build secrets.
-- `main` must remain Play-safe and review-safe; Play Review mode stays synthetic and isolated from Torn/backend writes.
+## Core architecture
+- Android native app, Java/Kotlin Gradle project, compile/target SDK 36, min SDK 24.
+- Torn API key is stored through `SecureApiKeyStore`; never commit or expose user keys.
+- Torn API v2 supplies authenticated player/faction data.
+- Separate TornFCA backend endpoints exist for faction, community, premium, developer, WarPay and feedback.
+- Firebase/FCM supplies cloud push when build secrets are configured.
+- Android signing material stays in GitHub secrets; Development CI permanently signs and verifies test APKs.
+- Play Review mode remains synthetic/isolated from Torn and production backend writes.
 
-## Accepted feature state through v0.10.20 development
+## Accepted through v0.10.20
 - Automatic Android notification permission onboarding after authenticated startup; denial is remembered.
-- Automatic push initialization/sync after startup.
-- Notification deep links route to Chat, War, Chain/OC, Banking, announcements or moderation as appropriate.
-- Native TornFCA community chat remains available with General / War / OC / Leadership channels.
-- Chat safety actions are behind tapping another member message: View Torn Profile / Report / Block.
-- Leaders have a Reports & Moderation entry in Chat; server-side moderation policy still governs actual access.
-- War Chain Live Tracker is opt-in and uses a foreground notification/service: ~30 s API refresh during active chain, ~60 s during ranked war with no active chain, local chronometer for second-level timeout display, Android 16 promoted-ongoing request where eligible.
-- Development build is permanently signed by CI before being accepted into `development`.
+- Automatic push initialization/sync.
+- Notification deep links route to Chat, War, Chain/OC, Banking, announcements or moderation.
+- Native TornFCA community chat with General / War / OC / Leadership channels.
+- Chat safety actions behind tapping another member message: View Torn Profile / Report / Block.
+- Leaders have Reports & Moderation entry in Chat; backend still independently enforces moderation permissions.
+- Opt-in War Chain Live Tracker foreground service: ~30 s Torn refresh during active chain, ~60 s during ranked war with no active chain, local chronometer for second-level timeout, Android 16 promoted-ongoing request when eligible.
 
-## Real Torn chat integration plan (v0.10.21 experiment)
-Goal: test true two-way Torn faction chat without copying/extracting any third-party Sendbird privileged credential.
+## v0.10.21 accepted Development changes
+### Real Torn faction chat experiment
+- `RealTornChatActivity` is implemented and compiled/signed successfully.
+- Entry path: native TornFCA Chat -> **Torn Chat**.
+- Hosts Torn's own `https://www.torn.com/` page in a dedicated Android WebView.
+- First use can require the user's normal Torn web login. TornFCA does not receive/bridge the Torn password.
+- Torn owns authentication, chat transport, messages and Send behavior.
+- TornFCA detects the visible faction chat DOM, primarily using `div[id^="faction-"]` plus defensive `#chatRoot` / chat-box fallbacks, and expands that actual Torn chat box to the full WebView.
+- The user sends through Torn's real visible textarea/send control; TornFCA does not call Sendbird with an unowned credential.
+- The WebView only allows in-WebView navigation to HTTPS Torn hosts; external links are handed to the system browser.
+- When the activity leaves foreground, TornFCA stops the load and blanks the WebView to `about:blank`; on return it reloads Torn. This is deliberate so the experiment is not a hidden/unfocused Torn page or WebSocket collector.
+- Native TornFCA community chat remains the fallback and is not removed.
+- Device test plan: `docs/TORN_CHAT_V01021_TEST_PLAN.md`.
+- Research trail: `docs/TORN_CHAT_INTEGRATION_RESEARCH.md`.
 
-Preferred experiment:
-1. Add a foreground, full-screen Torn-backed chat activity using Android WebView.
-2. Load Torn while the user is actively viewing the WebView; do not run a hidden/unfocused Torn scraper.
-3. Keep authentication owned by Torn's normal web session/cookies.
-4. Navigate/open Torn's faction chat UI and visually reduce unrelated page chrome so faction chat behaves like a full-screen chat surface.
-5. Use DOM interaction only while the user is actively viewing the Torn page. Sending should drive Torn's actual textarea/send control rather than calling Sendbird with an unowned credential.
-6. DOM selectors must be defensive because Torn can change markup. Detect faction chat using selectors/patterns such as `div[id^="faction-"]` plus fallbacks; never assume one selector forever.
-7. If the Torn session is logged out or the chat DOM cannot be found, show a clear recovery UI instead of silently scraping/retrying in background.
-8. This experiment is foreground-only. No hidden WebView harvesting, external aggregation, or background WebSocket interception.
-9. Keep the existing native TornFCA community chat as a fallback during testing; do not remove it until real Torn chat proves stable.
-10. Continue researching whether Torn exposes a legitimate first-party user-scoped Sendbird/session-token exchange. Do not ship or extract another app's Sendbird API token.
+### Development D icon
+- `main` continues to use the production T launcher.
+- Development build uses `@mipmap/ic_launcher_development` with dedicated D artwork.
+- CI checks the D-icon configuration and fails Development validation if it is missing.
+- Before future Play promotion, production T identity must be preserved/restored for the release build.
 
-## Development icon rule
-- Production: launcher mark/crest must remain **T**.
-- Development: launcher mark/crest must visibly use **D** so installed builds are instantly distinguishable.
-- Switching a validated development version to production requires restoring the production **T** icon and production app label/package behavior before Play promotion.
+## Real Torn chat research boundaries
+- Torn Chat 3.0 is Sendbird-backed.
+- Torn PDA public source proves native Sendbird faction chat is technically possible, but its privileged Sendbird API/server credential is not ours and must never be copied/extracted/shipped.
+- Continue researching whether Torn exposes a legitimate first-party user-scoped Sendbird/session-token exchange.
+- Public current Torn userscripts confirm active-page DOM approaches using faction chat selectors and Torn's actual input/send UI.
+- Do not implement hidden WebView scraping, hidden WebSocket interception, or background alerts derived from an unfocused Torn page.
 
 ## Moderation plan
 - Reports are faction-scoped.
 - Normal members can report/block; blocking remains device/faction local.
-- Leaders/Co-leaders should be able to review faction reports when backend moderation policy enables them.
-- Owner/developer retains global/owner override where backend policy allows.
-- Never trust only the Android UI for permission enforcement; backend must re-verify Torn identity/faction/position/abilities.
+- Leaders/Co-leaders should review faction reports when the backend moderation policy enables them.
+- Owner/developer retains owner/global override where backend policy allows.
+- Never trust only Android UI for permissions; backend must re-verify Torn identity/faction/position/abilities.
+- Remaining task: verify/enable deployed Community backend leader moderation policy before production promotion.
 
 ## Release discipline
-- Before risky work, make a `restore/...` branch from `development`.
-- Implement on `work/...`.
-- Open a PR into `development`; compile/sign/test the Development APK there.
-- Merge only after CI passes.
-- Never merge to `main` merely to produce a test APK.
-- Keep restore branches and signed build artifacts long enough for rollback/audit.
+1. Read this file and the chat research doc before starting work.
+2. Compare `main...development`.
+3. Create a `restore/...` snapshot from `development` before risky changes.
+4. Implement on `work/...`.
+5. Open PR into `development`.
+6. Require Development CI compile + permanent signing + package/version/label checks + branch identity preflight.
+7. Merge only after CI passes.
+8. Device-test the signed APK.
+9. Promote to `main` only as an explicit release action after production checks, including production T icon.
 
 ## Immediate next work
-- v0.10.21: foreground real Torn faction-chat WebView experiment.
-- v0.10.21: replace Development launcher T with D; production assets stay unchanged on `main`.
-- Validate real Torn chat read/send behavior on device, including login loss and Torn DOM changes.
-- Verify moderation backend policy for non-owner faction leaders before production promotion.
-- Continue improving live war/chain notification behavior based on device testing.
+- Device-test v0.10.21 Real Torn Chat: login, chat detection/focus, incoming messages, explicit send, background/reload behavior and DOM-change failure state.
+- If DOM focus works but layout is imperfect, tune selectors/CSS from screenshots/device observations rather than guessing.
+- If real Torn chat is stable, decide whether it becomes primary member chat while keeping native Leadership/TornFCA chat where useful.
+- Continue legitimate user-scoped Sendbird bootstrap research in parallel.
+- Verify Community backend leader moderation policy.
+- Continue War Chain Live Tracker device tuning.
 
-## Recovery checklist
-When resuming after a lost chat/session:
-1. Read this file first.
-2. Read `docs/TORN_CHAT_INTEGRATION_RESEARCH.md`.
-3. Compare `main...development` before editing.
-4. Inspect latest successful Development APK workflow and latest restore branch.
-5. Never expose API keys, Firebase secrets, Android signing material, or privileged third-party credentials in source/chat.
+## Secret/safety recovery rule
+Never expose or commit Torn API keys, Firebase secrets, Android signing material, Apps Script service credentials, or privileged third-party Sendbird credentials. If a future session lacks context, reconstruct from GitHub state and this file rather than inventing credentials or architecture.
