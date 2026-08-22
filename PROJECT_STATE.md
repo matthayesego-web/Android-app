@@ -85,6 +85,42 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 - Backend deployment is separate from committing Android/GitHub source. Do not claim the live Apps Script endpoint is upgraded until the v1.4.0 web-app deployment is actually published and verified.
 - v0.10.22 CI explicitly checks that global Chat injection and client admin password handling do not regress, validates Premium backend syntax, compiles the Android Development build, permanently signs it and verifies package/version/label.
 
+## Queued Internal Beta follow-up changes
+These are planning notes only. Do not treat them as implemented until they are built, validated and device-tested on a `work/*` branch and accepted into `development`.
+
+### Restore the in-app Feedback entry
+- The feedback feature itself already exists: `FeedbackActivity` and `FeedbackBackendClient` support Bug, Feature Request, UI/UX, Performance, Access/Permissions and Other submissions plus the signed-in user's recent submission history.
+- The current command-center **More** page lost the visible Feedback route during navigation consolidation.
+- Restore a clear **Feedback & Requests / Send Feedback** entry on the current More/App Control page so Internal/Closed Beta users can submit feedback directly into the live feedback backend instead of contacting the owner manually.
+- This should be a navigation repair only; do not replace or duplicate the existing feedback backend/form unnecessarily.
+
+### Premium Admin should use authorized Developer Console access
+- v0.10.22 correctly removed the extra Premium Developer Password, but it currently restricts Premium mutations to the single owner Torn ID.
+- Desired next behavior: a user who has already been explicitly authorized into the TornFCA Developer Console may use the Premium Admin controls without a second password.
+- Do not trust Android UI alone. Premium backend mutations must validate a real short-lived Developer Console session/token server-side (or an equivalent backend-to-backend authorization mechanism) before allowing delegated Premium administration.
+- Owner/root access remains valid. Revoking a developer from the Developer Console should also remove their ability to perform Premium admin mutations without requiring another app update.
+
+### Complete Premium entitlement administration
+- Add a current-status lookup for a target Torn player ID before changing entitlement state.
+- Keep **Grant Complimentary Premium** and support extending an existing entitlement by a chosen number of days.
+- Add **Remove / Revoke Premium** for manually granted/promotional access when needed.
+- Revocation should not silently delete history. Prefer an expired/revoked entitlement state plus an auditable event/source such as `ADMIN_REVOKE`.
+- Add a confirmation before destructive revoke/removal.
+- Record who performed grant/extend/revoke, target player ID, amount/duration, timestamp and action in an admin audit trail.
+- Paid Xanax-derived entitlement processing must remain separate from these manual administrative grants/revocations and preserve existing idempotency/deduplication protections.
+
+### Premium visual identity polish
+- Keep the existing FREE / PREMIUM account indicator.
+- Make verified Premium slightly more pronounced with a restrained gold treatment, preferably a thin gold border/accent on the account/status hero or tier badge.
+- Avoid large glows, animation or a major layout redesign.
+- Complimentary Premium should receive the normal verified Premium visual treatment. Developer Preview may remain visually distinct from server-verified Premium.
+
+### Closed Beta / production UI cleanup
+- Before Closed Beta/live, inventory and remove or hide developer-only/test-only controls that normal users do not need, including test-push/debug utilities and temporary diagnostics.
+- Prefer keeping useful troubleshooting tools available only in Development/internal builds rather than exposing them in the public Play release.
+- Continue small UI cleanup for duplicate/redundant headers, repeated back controls, temporary labels and extra buttons that no longer add value.
+- Do not perform a broad redesign while stability testing is underway; treat these as targeted polish changes.
+
 ## Real Torn chat research boundaries
 - Torn Chat 3.0 is Sendbird-backed.
 - Torn PDA public source proves native Sendbird faction chat is technically possible, but its privileged Sendbird API/server credential is not ours and must never be copied/extracted/shipped.
@@ -114,11 +150,14 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 ## Immediate next work
 - Device-test v0.10.22: confirm Chat appears once on the main Faction page and no longer appears on unrelated screens.
 - Publish/verify Premium backend v1.4.0 before testing owner Premium mutations without a password.
+- Restore a visible Feedback & Requests route on the current More/App Control page so beta users can submit into the existing feedback backend.
+- Design delegated Premium Admin authorization around the existing Developer Console session/access system, then add target status + grant/extend/revoke + audit support.
 - Retest Real Torn Chat using a Torn website password / Recover account path and then test faction-chat DOM focus, incoming messages and explicit send.
 - Continue researching legitimate native Google/Torn website authentication or user-scoped Sendbird bootstrap.
 - If real Torn chat is stable, decide whether it becomes primary member chat while keeping native Leadership/TornFCA chat where useful.
 - Verify Community backend leader moderation policy.
 - Continue War Chain Live Tracker device tuning.
+- Before Closed Beta/live, perform targeted public-build cleanup of test/debug controls and small redundant UI elements, and add the restrained verified-Premium gold accent.
 
 ## Secret/safety recovery rule
 Never expose or commit Torn API keys, Firebase secrets, Android signing material, Apps Script service credentials, or privileged third-party Sendbird credentials. If a future session lacks context, reconstruct from GitHub state and this file rather than inventing credentials or architecture.
