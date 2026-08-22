@@ -54,6 +54,14 @@ Public Torn userscripts already do these things without owning Sendbird credenti
 
 CSS class names in Torn Chat 3.0 are hashed and change between builds, so production code must avoid relying on a single exact hashed class. Prefer stable IDs, element roles, textarea/input semantics, and layered selector fallbacks.
 
+### Web-login limitation discovered during v0.10.21 device test
+
+- A Torn API key authenticates Torn API requests but does not create a logged-in `torn.com` browser session.
+- Google OAuth intentionally blocks embedded Android WebViews, so a Google-authenticated Torn account cannot simply use a Google button inside `RealTornChatActivity`.
+- The practical WebView fallback is Torn's own email/password login; a user who normally uses Google can use Torn's Recover account flow to set/reset a Torn password.
+- Torn PDA's current public dependencies include native Google sign-in support, but its build documentation says native authentication provider/login implementation files are intentionally excluded from the public repository and replaced by example/stub files for outside builds. This strongly suggests its smooth Google sign-in path depends on a private/native auth integration, not an API-key-to-WebView-session trick we can copy from public source.
+- Continue researching a legitimate native Torn identity/session exchange. Do not spoof Google OAuth, steal browser cookies, or assume external Chrome login shares authentication with Android WebView.
+
 ## Torn scripting-rule constraint
 
 Torn's January 2026 scripting clarification says scripts/applications may use data from an API or from a page the user manually loaded and is actively viewing. They must not scrape unfocused/hidden pages or use page/WebSocket data from those pages to generate external alerts/aggregation.
@@ -75,15 +83,18 @@ Keep the existing TornFCA faction/community chat and private Leadership Chat as 
 1. Inspect current Torn Chat 3.0 bootstrap/network flow for the user-scoped Sendbird `sessionToken` lifecycle.
 2. Determine whether the token comes from a Torn first-party HTTP endpoint that is safe to invoke only inside an authenticated, foreground Torn WebView.
 3. Determine whether Torn exposes an officially reusable client app ID while keeping privileged token creation server-side.
-4. Prototype a foreground-only Torn faction-chat WebView on the Development branch, with no background extraction.
+4. Continue device-testing the foreground-only Torn faction-chat WebView with Torn email/password authentication.
 5. Build selectors around stable DOM semantics and test Desktop/mobile Torn Chat 3.0 changes.
 6. Preserve explicit user action for sends.
+7. Investigate legitimate native Google/Torn authentication or session handoff without copying Torn PDA private auth code/credentials.
 
 ## Sources / evidence reviewed
 
 - Torn forum: Updated Rules Page — Scripting & Scraping, Jan. 26 2026.
 - Torn forum: Chat 3.0 incidents where staff identifies Sendbird and discusses regenerating `sessionToken`, Oct. 2025.
-- Torn PDA public repository: `sendbird_controller.dart`, `.env_example`, architecture docs, and faction-chat send path.
+- Torn PDA public repository: `sendbird_controller.dart`, `.env_example`, architecture docs, faction-chat send path, current auth dependencies, and build documentation describing private/stubbed native auth files.
+- Google OAuth documentation: embedded WebViews are not a supported OAuth user-agent path.
+- Torn PDA forum discussions: Google login inside native WebView limitation and Torn password/recovery workaround.
 - GreasyFork: Torn Chat Banking Helper (live faction-chat DOM observer).
 - GreasyFork: Better Faction Chat (DOM enhancement of Torn's current faction chat).
 - GreasyFork: Torn DIBS Button + Hospital Timer + TornPDA Support (user-triggered real faction-chat input/send interaction).
