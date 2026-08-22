@@ -61,22 +61,24 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 ## v0.10.22 device-feedback corrections
 ### Chat placement
 - v0.10.21 incorrectly injected a Chat button into nearly every shared TornFCA header. User explicitly rejected this.
-- **Do not put Chat on every screen.** Chat should have one normal, obvious faction/community entry point.
+- **Do not put Chat on every screen.** Chat has one normal, obvious faction/community entry point.
 - `TornFcaUi.header()` no longer injects Chat globally.
-- The normal app entry remains under Faction -> Tools & Community -> Faction Chat for this corrective build; inside the Chat destination itself, the `Torn Chat` switch is allowed because it changes chat provider rather than adding another global entry point.
-- Future navigation improvements may make that single Faction entry more prominent, but must not recreate global per-screen Chat buttons.
+- The single normal Chat entry is now a prominent top-level **Faction Chat** card directly on the main **Faction** page.
+- The Faction Tools submenu no longer contains a duplicate Chat row; it contains OC, Chain and Strength Intel only.
+- Inside the Chat destination itself, the `Torn Chat` button is allowed because it switches chat provider rather than creating another normal navigation entry.
+- Future navigation changes must preserve the one-place rule unless explicitly redesigned by the user.
 
 ### Torn website authentication
 - Torn API-key authentication and Torn website-session authentication are different systems.
 - A Torn API key **cannot** be used to log the embedded Torn website/WebView in.
 - Google explicitly blocks OAuth sign-in inside embedded Android WebViews; this is why a Google-authenticated Torn account cannot simply use a Google button inside `RealTornChatActivity`.
 - Torn PDA has documented the same limitation. Practical current fallback: use the Torn email/password web login; if the account was created/used through Google and the password is unknown, use Torn's normal Recover account flow to set/reset a Torn password.
-- v0.10.22 must state this clearly in the Real Torn Chat UI rather than implying Google sign-in or API-key login should work.
+- v0.10.22 states this clearly in the Real Torn Chat UI rather than implying Google sign-in or API-key login should work.
 - Continue researching a legitimate native Google/Torn session bridge, but do not spoof Google OAuth, copy browser cookies, or claim external Chrome login will authenticate Android WebView unless a verified Torn-supported exchange exists.
 
 ### Premium Admin authorization
 - User explicitly requested removal of the extra Developer Password field.
-- Premium admin mutations are already owner-only by Torn identity. The client API key is validated and the backend verifies the caller Torn player ID against the configured TornFCA owner ID.
+- Premium admin mutations are owner-only by Torn identity. The client API key is validated and the backend verifies the caller Torn player ID against the configured TornFCA owner ID.
 - v0.10.22 removes the Developer Password UI and stops sending `admin_password` from Android.
 - Canonical `backend/TornFcaPremiumBackend.gs` v1.4.0 removes the second password check for `admin_config` / `admin_grant`; verified Torn owner identity remains mandatory server-side.
 - Backend deployment is separate from committing Android/GitHub source. Do not claim the live Apps Script endpoint is upgraded until the v1.4.0 web-app deployment is actually published and verified.
@@ -108,7 +110,7 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 9. Promote to `main` only as an explicit release action after production checks, including production T icon.
 
 ## Immediate next work
-- Validate v0.10.22 Android compile/signing.
+- Validate v0.10.22 Android compile/signing and the single Faction-page Chat placement.
 - Publish/verify Premium backend v1.4.0 before testing owner Premium mutations without a password.
 - Retest Real Torn Chat using a Torn website password / Recover account path and then test faction-chat DOM focus, incoming messages and explicit send.
 - Continue researching legitimate native Google/Torn website authentication or user-scoped Sendbird bootstrap.
