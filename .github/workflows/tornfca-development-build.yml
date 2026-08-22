@@ -71,6 +71,29 @@ jobs:
           cp "$PREMIUM" /tmp/TornFcaPremiumBackend.js
           node --check /tmp/TornFcaPremiumBackend.js
 
+      - name: Navigation architecture preflight
+        run: |
+          set -euo pipefail
+          NAV=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
+          MANIFEST=app/src/main/AndroidManifest.xml
+          grep -q 'navItem("Home"' "$NAV"
+          grep -q 'navItem("Faction"' "$NAV"
+          grep -q 'navItem("War"' "$NAV"
+          grep -q 'navItem("Leadership"' "$NAV"
+          grep -q 'navItem("More"' "$NAV"
+          ! grep -q 'navItem("Training"' "$NAV"
+          grep -q '"People & Activity"' "$NAV"
+          grep -q '"War & Intel"' "$NAV"
+          grep -q '"Finance & Assets"' "$NAV"
+          grep -q '"Faction Admin"' "$NAV"
+          grep -q 'SpyIntelActivity.class' "$NAV"
+          grep -q 'CacheMarketAdvisorActivity.class' "$NAV"
+          grep -q 'FeedbackActivity.class' "$NAV"
+          grep -q 'CommunityModerationActivity.class' "$NAV"
+          ! grep -q 'renderLeadershipOperations' "$NAV"
+          grep -q 'SpyIntelActivity' "$MANIFEST"
+          grep -q 'CacheMarketAdvisorActivity' "$MANIFEST"
+
       - name: Compile Development APK
         env:
           TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
