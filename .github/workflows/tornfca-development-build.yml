@@ -36,6 +36,18 @@ jobs:
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
+      - name: Development branch identity preflight
+        run: |
+          set -euo pipefail
+          test -s PROJECT_STATE.md
+          grep -q 'main.*Google Play' PROJECT_STATE.md
+          grep -q 'manifestPlaceholders\["appIcon"\] = "@mipmap/ic_launcher_development"' app/build.gradle.kts
+          grep -q 'TornFCA Development' app/build.gradle.kts
+          grep -q 'RealTornChatActivity' app/src/main/AndroidManifest.xml
+          test -s app/src/main/res/drawable/tornfca_development_launcher.xml
+          test -s app/src/main/res/mipmap-anydpi/ic_launcher_development.xml
+          test -s app/src/main/res/mipmap-anydpi-v26/ic_launcher_development.xml
+
       - name: Compile Development APK
         env:
           TORNFCA_FACTION_BACKEND_URL: ${{ secrets.TORNFCA_FACTION_BACKEND_URL }}
