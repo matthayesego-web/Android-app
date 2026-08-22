@@ -57,13 +57,10 @@ jobs:
           CLIENT=app/src/main/java/com/matthayesego/duckforcetoolkit/PremiumBackendClient.java
           PREMIUM=backend/TornFcaPremiumBackend.gs
 
-          # Chat must not be injected into every shared screen header.
           ! grep -q 'Button chat=button(a,"Chat"' "$UI"
           grep -q 'a instanceof FactionChatActivity' "$UI"
           grep -q 'Google/Apple OAuth cannot run inside Android WebView' "$REAL"
           grep -q 'API key cannot create a website login' "$REAL"
-
-          # Premium admin is owner-ID authorized; the old client password must stay gone.
           ! grep -q 'Developer password' "$ADMIN"
           ! grep -q 'admin_password' "$CLIENT"
           grep -q "const TORNFCA_PREMIUM_VERSION='1.4.0'" "$PREMIUM"
@@ -74,14 +71,24 @@ jobs:
       - name: Navigation architecture preflight
         run: |
           set -euo pipefail
-          NAV=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCurrentActivity.java
+          NAV=app/src/main/java/com/matthayesego/duckforcetoolkit/BetaCommandActivity.java
+          RUNTIME=app/src/main/java/com/matthayesego/duckforcetoolkit/TornFcaCommandRuntime.java
           MANIFEST=app/src/main/AndroidManifest.xml
+
+          # The runtime must actually launch the shell being audited.
+          grep -q 'new Intent(context, BetaCommandActivity.class)' "$RUNTIME"
+
+          # Canonical bottom navigation.
           grep -q 'navItem("Home"' "$NAV"
           grep -q 'navItem("Faction"' "$NAV"
           grep -q 'navItem("War"' "$NAV"
           grep -q 'navItem("Leadership"' "$NAV"
           grep -q 'navItem("More"' "$NAV"
+          ! grep -q 'navItem("Members"' "$NAV"
           ! grep -q 'navItem("Training"' "$NAV"
+          ! grep -q 'navItem("Operations"' "$NAV"
+
+          # Leadership hierarchy and newly added features must live in the visible command shell.
           grep -q '"People & Activity"' "$NAV"
           grep -q '"War & Intel"' "$NAV"
           grep -q '"Finance & Assets"' "$NAV"
@@ -90,7 +97,7 @@ jobs:
           grep -q 'CacheMarketAdvisorActivity.class' "$NAV"
           grep -q 'FeedbackActivity.class' "$NAV"
           grep -q 'CommunityModerationActivity.class' "$NAV"
-          ! grep -q 'renderLeadershipOperations' "$NAV"
+          grep -q 'FactionChatActivity.class' "$NAV"
           grep -q 'SpyIntelActivity' "$MANIFEST"
           grep -q 'CacheMarketAdvisorActivity' "$MANIFEST"
 
