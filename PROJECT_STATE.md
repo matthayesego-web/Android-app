@@ -12,12 +12,15 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 
 ## Current versions
 - Production `main`: **v0.10.19**, versionCode **74**. This remains the Google Play line.
-- Accepted `development`: **v0.10.24**, versionCode **79**, Development package `com.matthayesego.duckforcetoolkit.beta`, visible name **TornFCA Development**.
+- Accepted `development`: **v0.10.25**, versionCode **80**, Development package `com.matthayesego.duckforcetoolkit.beta`, visible name **TornFCA Development**.
 - v0.10.23 feature PR: **#24**, validated and merged as `3785b273575499e97094d7b4f9140795c30d3b28`.
-- v0.10.24 navigation PR: **#25**, validated and merged as `aba8e7d61b9fb9016588e8d3790196a23e47a6ca`.
-- Validated v0.10.24 APK SHA-256: `2ecd767fb2e53f6d1e38c6d5eba4ff9b174524d62221b7a1633660e351fa8482`.
+- v0.10.24 navigation PR: **#25**, validated/merged as `aba8e7d61b9fb9016588e8d3790196a23e47a6ca`, but device testing proved its navigation changes targeted the non-canonical shell and therefore were not visible after login.
+- v0.10.25 canonical-shell correction PR: **#26**, validated and merged as `5d338de150083caa4bc598b7d62b39e088c02bf2`.
+- Validated v0.10.25 APK SHA-256: `27677b9bd1a14adb818d6a3e7c05ec1a0f1b11f89ae60968f831a3c1b50d86f1`.
 - Pre-feature restore: `restore/development-pre-v0.10.23-features-2026-08-22`.
 - Feature-complete restore before navigation: `restore/development-v0.10.23-feature-complete-2026-08-22`.
+- v0.10.24 mismatch restore: `restore/development-v0.10.24-beta-shell-mismatch-2026-08-22`.
+- Accepted v0.10.25 navigation-fixed restore: `restore/development-v0.10.25-navigation-fixed-2026-08-22`.
 - Older restore points remain available for pre-v0.10.21 and pre-v0.10.22 states.
 
 ## Core architecture/security
@@ -30,6 +33,7 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 - Android signing material remains in GitHub secrets; Development CI permanently signs and verifies test APKs.
 - Play Review mode remains synthetic/isolated from Torn and production backend writes.
 - Android UI visibility is never the sole security boundary; backend-controlled actions must independently verify identity/role.
+- **Canonical visible authenticated shell is `BetaCommandActivity` via `TornFcaCommandRuntime.homeIntent()`.** Do not audit or redesign only `TornFcaCurrentActivity` and assume users will see it.
 
 ## Accepted notification / live features
 - First authenticated launch asks for Android notification permission; denial is remembered instead of nagging every launch.
@@ -85,9 +89,15 @@ This is the durable recovery note for TornFCA. Read this first after any lost ch
 - Partner handoff: `docs/NUKE_REVIVE_PARTNER_HANDOFF.md`.
 - Research: `docs/REVIVE_REQUEST_INTEGRATION_RESEARCH.md`.
 
-## v0.10.24 accepted navigation architecture
-Detailed audit: `docs/NAVIGATION_AUDIT_V01024.md`.
-Planning basis: `docs/NAVIGATION_INFORMATION_ARCHITECTURE_PLAN.md`.
+## v0.10.24 / v0.10.25 navigation architecture
+Detailed design/audit: `docs/NAVIGATION_AUDIT_V01024.md` and `docs/NAVIGATION_INFORMATION_ARCHITECTURE_PLAN.md`.
+
+### Important correction discovered by device test
+- v0.10.24 implemented the desired hierarchy in `TornFcaCurrentActivity` and its CI audited that class.
+- The real authenticated runtime had already standardized on `BetaCommandActivity` through `TornFcaCommandRuntime.homeIntent()`.
+- Result: v0.10.24 showed the new version number but still displayed the old Home / Members / Training / Operations / More shell on-device.
+- v0.10.25 fixes the **actual `BetaCommandActivity` command shell** and updates CI to prove the runtime launches the same class being audited.
+- CI now fails if Members, Training or Operations reappear as permanent bottom tabs.
 
 ### Top-level navigation
 Leadership account:
@@ -104,12 +114,12 @@ Normal member:
 
 ### Home
 - My Day
-- Training & Progress -> Training Center / My Training Progress
+- Training & Progress -> Training Center / My Training Progress / My War Prep
 - Notification Inbox
 - No permanent leadership/admin cards.
 
 ### Faction
-- Faction Chat
+- Faction Chat as the single normal prominent chat entry
 - Faction Announcements
 - Faction Overview
 - Faction Directory
@@ -155,6 +165,7 @@ The vague **Operations/Faction Operations** navigation bucket is retired.
 
 ### More
 - Settings
+- Notification Inbox
 - TornFCA Premium
 - Feedback & Requests
 - Legal & Privacy
@@ -164,10 +175,11 @@ Feedback is restored to visible navigation. Developer/test tools are not ordinar
 
 ### Navigation rules
 - Target 3-6 persistent cards per page; larger feature families use named sub-pages.
-- One obvious primary home per feature; duplicate only for genuine context (e.g. Chain in Faction Tools and live War context).
+- One obvious primary home per feature; duplicate only for genuine context (e.g. Chain in Faction Tools and War).
 - Leadership/admin controls must not leak into member pages merely because the signed-in user happens to be a leader.
 - Chat remains one normal Faction destination, not a global button.
 - Shell Back from a sub-page returns to its parent before leaving the shell.
+- Any future navigation CI must validate the **canonical runtime destination**, not merely a similar/legacy Activity.
 
 ## Premium/admin state
 - v0.10.22 removed the separate Premium Developer Password from Android and stopped sending `admin_password`.
@@ -180,11 +192,13 @@ Feedback is restored to visible navigation. Developer/test tools are not ordinar
   - restrained verified-Premium gold styling.
 
 ## Remaining validation / follow-up
-- Device-test **v0.10.24 Development** as member/leadership where possible:
-  - correct 4-vs-5 bottom-nav items
-  - no Training bottom tab
+- Device-test **v0.10.25 Development** as member/leadership where possible:
+  - leadership bottom bar must show Home / Faction / War / Leadership / More
+  - normal member bottom bar must show Home / Faction / War / More
+  - no Members / Training / Operations permanent tabs
+  - Training & Progress opens from Home and Back returns Home
   - no leadership cards leaking into Home/Faction/War
-  - predictable submenu Back behavior
+  - leadership submenus and Back behavior
   - Spy Intel runtime response shape/permissions
   - Cache Market Advisor runtime reward/market/forum response handling
   - Feedback route
@@ -204,9 +218,10 @@ Feedback is restored to visible navigation. Developer/test tools are not ordinar
 4. Implement on `work/...`.
 5. PR into `development`.
 6. Require Development CI compile + permanent signing + package/version/label + applicable architecture/regression preflight.
-7. Merge only after CI passes.
-8. Device-test signed Development APK.
-9. Promote to `main` only by explicit release action after production checks; preserve production T icon.
+7. For navigation work, verify the runtime launch target and audit that exact shell class.
+8. Merge only after CI passes.
+9. Device-test signed Development APK.
+10. Promote to `main` only by explicit release action after production checks; preserve production T icon.
 
 ## Secret/safety recovery rule
 Never expose or commit Torn API keys, Firebase secrets, Android signing material, Apps Script service credentials, Nuke integration keys, or privileged third-party Sendbird credentials. Reconstruct future context from GitHub state and this file rather than inventing credentials or architecture.
