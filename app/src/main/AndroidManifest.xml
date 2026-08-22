@@ -54,6 +54,8 @@
         <activity android:name=".RealTornChatActivity" android:exported="false"/>
         <activity android:name=".CommunityModerationActivity" android:exported="false"/>
         <activity android:name=".FeedbackActivity" android:exported="false"/>
+        <activity android:name=".SpyIntelActivity" android:exported="false"/>
+        <activity android:name=".CacheMarketAdvisorActivity" android:exported="false"/>
         <service android:name=".TornFcaMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>
         <service android:name=".WarChainLiveService" android:exported="false" android:foregroundServiceType="dataSync" />
         <activity android:name=".WarCenterActivity" android:exported="false"/>
