@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <application android:name=".TornFcaApplication" android:allowBackup="false" android:icon="@mipmap/ic_launcher_v3" android:label="${appLabel}" android:roundIcon="@mipmap/ic_launcher_v3" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
+    <application android:name=".TornFcaApplication" android:allowBackup="false" android:icon="${appIcon}" android:label="${appLabel}" android:roundIcon="${appIcon}" android:supportsRtl="true" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
         <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
         <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
         <activity android:name=".AccessGateActivity" android:exported="true" android:launchMode="singleTask" android:clearTaskOnLaunch="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
@@ -51,11 +51,11 @@
         <activity android:name=".PremiumInsightsActivity" android:exported="false"/>
         <activity android:name=".PremiumActivityTrendsActivity" android:exported="false"/>
         <activity android:name=".FactionChatActivity" android:exported="false"/>
+        <activity android:name=".RealTornChatActivity" android:exported="false"/>
         <activity android:name=".CommunityModerationActivity" android:exported="false"/>
         <activity android:name=".FeedbackActivity" android:exported="false"/>
         <service android:name=".TornFcaMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>
         <service android:name=".WarChainLiveService" android:exported="false" android:foregroundServiceType="dataSync" />
-
         <activity android:name=".WarCenterActivity" android:exported="false"/>
         <activity android:name=".WarPayoutActivity" android:exported="false"/>
         <activity android:name=".WarPayoutReceiptActivity" android:exported="false"/>
