@@ -28,6 +28,7 @@ import android.widget.Toast;
  */
 public final class RealTornChatActivity extends Activity {
     private static final String START_URL="https://www.torn.com/factions.php?step=your";
+    private static final String LOGIN_HELP="WEB SIGN-IN • Google/Apple OAuth cannot run inside Android WebView. Use your Torn email/password, or use Recover account below to set/reset a Torn password. Your Torn API key cannot create a website login.";
     private WebView webView;
     private TextView status;
     private boolean blankedForBackground=false;
@@ -137,7 +138,7 @@ public final class RealTornChatActivity extends Activity {
         Button reload=TornFcaUi.button(this,"↻",TornFcaUi.GOLD);reload.setOnClickListener(v->{setStatus("Reloading Torn…",TornFcaUi.GOLD);webView.reload();});LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(TornFcaUi.dp(this,50),TornFcaUi.dp(this,42));rp.leftMargin=TornFcaUi.dp(this,6);bar.addView(reload,rp);
         root.addView(bar,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        status=TornFcaUi.text(this,"Loading Torn. First use may require your normal Torn web login.",11.5f,TornFcaUi.MUTED,false);status.setPadding(TornFcaUi.dp(this,12),TornFcaUi.dp(this,8),TornFcaUi.dp(this,12),TornFcaUi.dp(this,8));root.addView(status,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        status=TornFcaUi.text(this,"Loading Torn. The API key authenticates TornFCA features, but it cannot sign this embedded website session in.",11.5f,TornFcaUi.MUTED,false);status.setPadding(TornFcaUi.dp(this,12),TornFcaUi.dp(this,8),TornFcaUi.dp(this,12),TornFcaUi.dp(this,8));root.addView(status,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
         webView=new WebView(this);root.addView(webView,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f));
         setContentView(root);
     }
@@ -172,7 +173,7 @@ public final class RealTornChatActivity extends Activity {
             }
             @Override public void onPageFinished(WebView view,String url){
                 if(isTorn(Uri.parse(url)))resumeUrl=url;
-                setStatus("Open Torn's faction chat if it is not already open. TornFCA will focus the real chat box.",TornFcaUi.MUTED);
+                setStatus("Checking Torn website session and faction chat…",TornFcaUi.MUTED);
                 view.postDelayed(()->focusFactionChat(false),500);
                 view.postDelayed(()->focusFactionChat(false),1500);
                 view.postDelayed(()->focusFactionChat(false),3500);
@@ -195,7 +196,7 @@ public final class RealTornChatActivity extends Activity {
             String state=result==null?"":result.replace("\"","").trim();
             switch(state){
                 case "READY": setStatus("LIVE • Torn's real faction chat is focused. Messages and Send are handled by Torn.",TornFcaUi.GREEN);break;
-                case "LOGIN": setStatus("SIGN IN • Complete your normal Torn web login here. TornFCA does not receive your password.",TornFcaUi.GOLD);break;
+                case "LOGIN": setStatus(LOGIN_HELP,TornFcaUi.GOLD);break;
                 case "OPENING": setStatus("Opening Torn faction chat…",TornFcaUi.BLUE);break;
                 default: setStatus("Open the faction chat in Torn, then tap Focus. The native TornFCA chat remains available behind Back.",TornFcaUi.GOLD);break;
             }
