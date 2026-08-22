@@ -69,7 +69,6 @@ public final class PremiumBackendClient {
 
     /** Compatibility overload: the obsolete password value is deliberately ignored and never sent. */
     @Deprecated public static JSONObject updateConfig(String apiKey,String ignoredPassword,int daysPerXanax,String requiredMessage)throws Exception{return updateConfig(apiKey,daysPerXanax,requiredMessage);}
-    @Deprecated public static JSONObject updateConfig(String ignoredPassword,int daysPerXanax,String requiredMessage)throws Exception{throw new Exception("Verified Torn owner identity is required for premium administration.");}
 
     /** Owner-only grant. The backend independently verifies the signed-in Torn player before applying it. */
     public static JSONObject grant(String apiKey,int playerId,int days)throws Exception{
@@ -83,7 +82,6 @@ public final class PremiumBackendClient {
     /** Compatibility overloads: password is obsolete and never transmitted. */
     @Deprecated public static JSONObject grant(String apiKey,String ignoredPassword,int playerId,int days)throws Exception{return grant(apiKey,playerId,days);}
     @Deprecated public static JSONObject grantComplimentary(String apiKey,String ignoredPassword,int playerId,int days)throws Exception{return grantComplimentary(apiKey,playerId,days);}
-    @Deprecated public static JSONObject grant(String ignoredPassword,int playerId,int days)throws Exception{throw new Exception("Verified Torn owner identity is required for premium administration.");}
 
     private static SharedPreferences prefs(Context context){return context.getApplicationContext().getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
     private static void saveOffer(Context context,JSONObject offer){
