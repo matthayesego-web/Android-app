@@ -126,6 +126,7 @@ public class AccessGateActivity extends Activity {
         if(launched||isFinishing())return;launched=true;handler.removeCallbacksAndMessages(null);
         PushNotifications.initialize(this);
         PushNotifications.syncIfReady(this);
+        WarChainLiveService.startIfEnabled(this);
         Intent i=TornFcaCommandRuntime.homeIntent(this,"Home");
         if(warning!=null&&!warning.isBlank())i.putExtra("startup_warning",warning);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);
